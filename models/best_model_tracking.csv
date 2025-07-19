@@ -1,0 +1,4 @@
+date,best_scaler_name,best_model_name,best_score,len_y
+2025-06-26 15:18:04,RobustScaler,mlp,0.790909090909091,110
+2025-07-03 13:31:28,QuantileTransformer,svm,0.8,110
+2025-07-04 14:02:34,RobustScaler,mlp,0.8261904761904763,104
