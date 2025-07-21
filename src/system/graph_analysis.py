@@ -75,73 +75,6 @@ def get_synapses_graph(worm_mask: np.ndarray,
     if not directions: print("Warning: No valid segment directions found"); return DEFAULT_RETURN
 
     # -- 5 -- Decompose segments into slices
-    def _clamp_coordinates(coords, max_val=1024):
-        """Clamp coordinates to valid image bounds."""
-        return tuple(np.clip(coords, 0, max_val))
-
-    def _find_mask_intersection(start, direction, worm_mask, max_distance=1000):
-        """Find intersection point with mask boundary along a direction."""
-        end_point = start + direction * max_distance
-        end_point = np.round(end_point).astype(int)
-        
-        # Get line coordinates
-        rr, cc = line(start[0], start[1], end_point[0], end_point[1])
-        
-        # Find first intersection with mask boundary (value == 0)
-        for r, c in zip(rr, cc):
-            if 0 <= r < worm_mask.shape[0] and 0 <= c < worm_mask.shape[1]:
-                if worm_mask[r, c] == 0:
-                    return _clamp_coordinates((r, c), max(worm_mask.shape) - 1)
-        
-        return _clamp_coordinates(end_point, max(worm_mask.shape) - 1)
-
-    def _calculate_segment_properties(start, end_pos, end_neg):
-        """Calculate all segment properties and return as tuple matching original format."""
-        mid_pos = ((start[0] + end_pos[0]) // 2, (start[1] + end_pos[1]) // 2)
-        mid_neg = ((start[0] + end_neg[0]) // 2, (start[1] + end_neg[1]) // 2)
-        
-        length_mid_pos = np.linalg.norm(np.array(mid_pos) - np.array(start))
-        length_mid_neg = np.linalg.norm(np.array(mid_neg) - np.array(start))
-        length_end_pos = np.linalg.norm(np.array(end_pos) - np.array(start))
-        length_end_neg = np.linalg.norm(np.array(end_neg) - np.array(start))
-        length_total = np.linalg.norm(np.array(end_pos) - np.array(end_neg))
-        
-        return (start, mid_pos, mid_neg, end_pos, end_neg, 
-                length_mid_pos, length_mid_neg, length_end_pos, length_end_neg, length_total)
-
-       
-    def decompose_worm_segments_into_slice(skel_path, worm_mask, n_segments):
-        """Analyze worm segments and return dic_segments with visualization."""
-        seg_len = len(skel_path) // n_segments
-        
-        # Find coordinate of the middle of each segment
-        middle_coords = [skel_path[i * seg_len + seg_len // 2] for i in range(n_segments)]
-        
-        dic_segments = {}
-        
-        for i in range(n_segments):
-            start = middle_coords[i]
-            end = skel_path[min((i + 1) * seg_len - 1, len(skel_path) - 1)]
-            
-            # Calculate direction vector and perpendicular
-            direction_vec = np.array(end) - np.array(start)
-            if np.linalg.norm(direction_vec) > 0:
-                direction_vec = direction_vec / np.linalg.norm(direction_vec)
-            
-            perp_vec = np.array([-direction_vec[1], direction_vec[0]])
-            
-            # Find intersections in both directions
-            end_pos = _find_mask_intersection(start, perp_vec, worm_mask)
-            end_neg = _find_mask_intersection(start, -perp_vec, worm_mask)
-            
-            # Calculate all segment properties and store in original format
-            dic_segments[i] = _calculate_segment_properties(start, end_pos, end_neg)
-        
-        # Calculate median width
-        median_width = np.median([dic_segments[i][9] for i in range(n_segments)])
-        
-        return dic_segments, median_width
-
     # Set entire border to black
     worm_mask[0, :] = worm_mask[-1, :] = worm_mask[:, 0] = worm_mask[:, -1] = 0
     dic_segments, median_width = decompose_worm_segments_into_slice(skel_path, worm_mask, n_segments)
@@ -303,6 +236,71 @@ def get_synapses_graph(worm_mask: np.ndarray,
     return maxima, G, median_width, measure_diff_slice, measure_diff_points, head_mask_1, head_mask_2
 
 # Utils functions
+def decompose_worm_segments_into_slice(skel_path, worm_mask, n_segments):
+    """Analyze worm segments and return dic_segments with visualization."""
+    seg_len = len(skel_path) // n_segments
+    
+    # Find coordinate of the middle of each segment
+    middle_coords = [skel_path[i * seg_len + seg_len // 2] for i in range(n_segments)]
+    
+    dic_segments = {}
+    
+    for i in range(n_segments):
+        start = middle_coords[i]
+        end = skel_path[min((i + 1) * seg_len - 1, len(skel_path) - 1)]
+        
+        # Calculate direction vector and perpendicular
+        direction_vec = np.array(end) - np.array(start)
+        if np.linalg.norm(direction_vec) > 0:
+            direction_vec = direction_vec / np.linalg.norm(direction_vec)
+        
+        perp_vec = np.array([-direction_vec[1], direction_vec[0]])
+        
+        # Find intersections in both directions
+        end_pos = _find_mask_intersection(start, perp_vec, worm_mask)
+        end_neg = _find_mask_intersection(start, -perp_vec, worm_mask)
+        
+        # Calculate all segment properties and store in original format
+        dic_segments[i] = _calculate_segment_properties(start, end_pos, end_neg)
+    
+    # Calculate median width
+    median_width = np.median([dic_segments[i][9] for i in range(n_segments)])
+    
+    return dic_segments, median_width
+
+def _clamp_coordinates(coords, max_val=1024):
+    """Clamp coordinates to valid image bounds."""
+    return tuple(np.clip(coords, 0, max_val))
+
+def _find_mask_intersection(start, direction, worm_mask, max_distance=1000):
+    """Find intersection point with mask boundary along a direction."""
+    end_point = start + direction * max_distance
+    end_point = np.round(end_point).astype(int)
+    
+    # Get line coordinates
+    rr, cc = line(start[0], start[1], end_point[0], end_point[1])
+    
+    # Find first intersection with mask boundary (value == 0)
+    for r, c in zip(rr, cc):
+        if 0 <= r < worm_mask.shape[0] and 0 <= c < worm_mask.shape[1]:
+            if worm_mask[r, c] == 0:
+                return _clamp_coordinates((r, c), max(worm_mask.shape) - 1)
+    
+    return _clamp_coordinates(end_point, max(worm_mask.shape) - 1)
+
+def _calculate_segment_properties(start, end_pos, end_neg):
+    """Calculate all segment properties and return as tuple matching original format."""
+    mid_pos = ((start[0] + end_pos[0]) // 2, (start[1] + end_pos[1]) // 2)
+    mid_neg = ((start[0] + end_neg[0]) // 2, (start[1] + end_neg[1]) // 2)
+    
+    length_mid_pos = np.linalg.norm(np.array(mid_pos) - np.array(start))
+    length_mid_neg = np.linalg.norm(np.array(mid_neg) - np.array(start))
+    length_end_pos = np.linalg.norm(np.array(end_pos) - np.array(start))
+    length_end_neg = np.linalg.norm(np.array(end_neg) - np.array(start))
+    length_total = np.linalg.norm(np.array(end_pos) - np.array(end_neg))
+    
+    return (start, mid_pos, mid_neg, end_pos, end_neg, 
+            length_mid_pos, length_mid_neg, length_end_pos, length_end_neg, length_total)
 
 def _find_endpoints_graph(G: 'nx.Graph', 
                   maxima_coords: np.ndarray,
@@ -318,7 +316,6 @@ def _find_endpoints_graph(G: 'nx.Graph',
     Returns:
         Tuple of (endpoints, angle junctions) as lists of coordinate tuples
     """
-    import networkx as nx
     
     # Input validation
     if G is None or len(G.nodes) == 0 or maxima_coords is None or len(maxima_coords) == 0:
@@ -392,8 +389,6 @@ def _skeleton_to_graph(skel: np.ndarray) -> 'nx.Graph':
     Returns:
         NetworkX graph
     """
-    # Ensure networkx is imported in this scope
-    import networkx as nx
         
     # Input validation
     if skel is None or skel.size == 0: print("Warning: Empty skeleton provided to skeleton_to_graph"); return nx.Graph()

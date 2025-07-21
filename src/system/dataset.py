@@ -21,7 +21,7 @@ from src.system.classifiers import ClassifierFactory, evaluate_models_with_scale
 from src.system.outlier import MahalanobisOutlierDetector
 from src.system.features import FeatureExtractor
 
-from config import DATA_DIR, IMAGE_SIZE, DEFAULT_PKL_NAME, MODELS_DIR
+from config import DATA_DIR, IMAGE_SIZE, DEFAULT_PKL_NAME, MODELS_DIR, DATE_FORMAT
 
 
 class Dataset:
@@ -425,7 +425,6 @@ class Dataset:
         indices_class_0 = np.where(y == 0)[0]
         indices_class_1 = np.where(y == 1)[0]
         min_size = min(len(indices_class_0), len(indices_class_1))
-        np.random.seed(42) 
         balanced_indices_0 = np.random.choice(indices_class_0, min_size, replace=False)
         balanced_indices_1 = np.random.choice(indices_class_1, min_size, replace=False)
         balanced_indices = np.concatenate([balanced_indices_0, balanced_indices_1])
@@ -490,7 +489,7 @@ class Dataset:
 
             # save model performance to CSV
             new_line = {
-                'date': [pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')],
+                'date': [pd.Timestamp.now().strftime(DATE_FORMAT)],
                 'best_scaler_name': [best_scaler_name],
                 'best_model_name': [best_model_name],
                 'best_score': [best_score],

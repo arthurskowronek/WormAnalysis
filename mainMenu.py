@@ -21,6 +21,8 @@ from src.interface.AssistAcquisition_Page import AssistAcquisitionPage
 from src.interface.MapCamera import MapCamera
 from src.interface.Live_Track_Page import LiveTrackPage
 
+import src.system.Grid_Search as Crible
+
 #### Loading the MicroManagerCore ####
 if not TEST:
     Config = "BESSEREAU_Lab.cfg" #The config file has to be in the Micro-Manager root folder. Available : "MMConfig_demo.cfg" "BESSEREAU_Lab.cfg"
@@ -363,8 +365,6 @@ if __name__ == "__main__":
             mmc = LoadCore(Config, MM_Directory) 
             mmc.setExposure(CAMERA_EXPOSURE_TIME)
             print("Core successfully loaded")
-            
-            import src.system.Grid_Search as Crible
             
             WORM_POSITIONS, WORM_POSITIONS_PROPORTION, STICHING_IMG = Crible.ScanSlice(mmc, OBJECTIVE_MAGNIFICATION_SCAN, DUALVIEW, SCAN_SHAPE)
             mmc.setExposure(LIVE_EXPOSURE_TIME)

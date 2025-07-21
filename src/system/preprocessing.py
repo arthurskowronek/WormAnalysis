@@ -4,10 +4,12 @@ Image preprocessing utilities for synapse detection.
 import cv2
 import numpy as np
 import skimage as ski
+import networkx as nx
 from ultralytics import YOLO
 from skimage.morphology import binary_closing, disk
-
+        
 from config import DATA_DIR, MODELS_DIR
+from .graph_analysis import get_synapses_graph
 
 def worm_segmentation(img: np.ndarray) -> np.ndarray:
     """
@@ -118,10 +120,6 @@ def get_synapse_using_graph(image: np.ndarray, worm_mask: np.ndarray) -> tuple:
                 point segment difference measure)
     """
     try:
-        # Import networkx and graph_analysis at the start of the function
-        import networkx as nx
-        from .graph_analysis import get_synapses_graph
-        
         # Preprocess image
         img, local_max = find_local_maxima(image)
 
@@ -164,8 +162,6 @@ def get_synapse_using_graph(image: np.ndarray, worm_mask: np.ndarray) -> tuple:
         return maxima, G, median_width, diff_slice, diff_segment
         
     except Exception as e:
-        # Re-import networkx here to ensure it's available
-        import networkx as nx
         print(f"Error in synapse detection: {str(e)}")
         empty_graph = nx.Graph()
         return [], empty_graph, 0, 0, 0

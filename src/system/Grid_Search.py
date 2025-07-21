@@ -203,22 +203,6 @@ def get_worms_position(list_bounding_boxes):
 
     return positions_worms
 
-def convert_white_to_red(input_tif_path):
-
-    img = Image.open(input_tif_path)
-    img.convert('RGB')
-    data = np.array(img)
-
-    white = np.array([255, 255, 255])
-    white_mask = np.all(data == white, axis=-1)
-
-    data[white_mask] = [255, 0, 0]
-
-    result_img = Image.fromarray(data)
-    result_img = result_img.resize((1024, 1024), Image.LANCZOS)
-
-    return result_img
-
 def transform_positions_into_proportion(end_x, end_y, positions_worms, start_x, start_y, Step_Size_X, Step_Size_Y):
     # transform position into proportion of the scan
     start_corner_x = start_x - Step_Size_X//2

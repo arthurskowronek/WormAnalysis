@@ -13,7 +13,6 @@ from typing import List
 from skimage import draw
 from boruta import BorutaPy
 from mpl_toolkits.mplot3d import Axes3D
-#from feature_engine.selection import MRMR
 from scipy.spatial import distance_matrix
 from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.linear_model import LassoCV, ElasticNetCV
@@ -386,6 +385,43 @@ class FeatureExtractor:
         
         return mask_synapse
 
+    def _watershed_segmentation(coordinates, image, mask):
+        """Helper function for watershed segmentation"""
+        markers = np.zeros_like(image, dtype=np.int32)
+        for i, (x, y) in enumerate(coordinates, 1):
+            markers[int(x), int(y)] = i + 100
+        return ski.segmentation.watershed(-image, connectivity=1, markers=markers, mask=mask)
+
+    def _find_additional_synapses(region, image, rough_segmented):
+        """Helper function to find additional synapses in a region"""
+        minr, minc, maxr, maxc = region.bbox
+        mask = (rough_segmented[minr:maxr, minc:maxc] == region.label)
+        
+        # Calcul de l'intensité moyenne des bordures
+        boundary = ski.morphology.dilation(mask, ski.morphology.disk(1)) ^ mask
+        
+        # Si aucun pixel de bord n'est trouvé, on ne peut pas calculer l'intensité moyenne
+        if not image[minr:maxr, minc:maxc][boundary].size:
+            return []
+            
+        # Calcul de l'intensité moyenne des pixels de bord
+        # Cette valeur servira de référence pour détecter les synapses
+        mean_boundary = np.mean(image[minr:maxr, minc:maxc][boundary])
+        
+        # Création de la fenêtre d'analyse en remplaçant l'arrière-plan par l'intensité moyenne des bords
+        window = image[minr:maxr, minc:maxc].copy()
+        window[~mask] = mean_boundary
+        
+        # Détection des maxima locaux
+        local_maxima = ski.feature.peak_local_max(window, min_distance=2, exclude_border=False)
+        
+        # Filtrage des maxima : ne garde que ceux plus intenses que la moyenne des bords
+        synapse_centers = [(x + minr, y + minc) 
+                            for x, y in local_maxima 
+                            if window[x, y] > mean_boundary]
+        
+        return synapse_centers
+
     def _get_regions_of_interest(self, coord, image_original, binary_mask):
         """
         Get regions of interest from the image using watershed segmentation.
@@ -399,45 +435,8 @@ class FeatureExtractor:
             Tuple of (region properties, segmented image)
         """
         
-        def _watershed_segmentation(coordinates, image, mask):
-            """Helper function for watershed segmentation"""
-            markers = np.zeros_like(image, dtype=np.int32)
-            for i, (x, y) in enumerate(coordinates, 1):
-                markers[int(x), int(y)] = i + 100
-            return ski.segmentation.watershed(-image, connectivity=1, markers=markers, mask=mask)
-        
-        def _find_additional_synapses(region, image):
-            """Helper function to find additional synapses in a region"""
-            minr, minc, maxr, maxc = region.bbox
-            mask = (rough_segmented[minr:maxr, minc:maxc] == region.label)
-            
-            # Calcul de l'intensité moyenne des bordures
-            boundary = ski.morphology.dilation(mask, ski.morphology.disk(1)) ^ mask
-            
-            # Si aucun pixel de bord n'est trouvé, on ne peut pas calculer l'intensité moyenne
-            if not image[minr:maxr, minc:maxc][boundary].size:
-                return []
-                
-            # Calcul de l'intensité moyenne des pixels de bord
-            # Cette valeur servira de référence pour détecter les synapses
-            mean_boundary = np.mean(image[minr:maxr, minc:maxc][boundary])
-            
-            # Création de la fenêtre d'analyse en remplaçant l'arrière-plan par l'intensité moyenne des bords
-            window = image[minr:maxr, minc:maxc].copy()
-            window[~mask] = mean_boundary
-            
-            # Détection des maxima locaux
-            local_maxima = ski.feature.peak_local_max(window, min_distance=2, exclude_border=False)
-            
-            # Filtrage des maxima : ne garde que ceux plus intenses que la moyenne des bords
-            synapse_centers = [(x + minr, y + minc) 
-                             for x, y in local_maxima 
-                             if window[x, y] > mean_boundary]
-            
-            return synapse_centers
-        
         # Première passe de segmentation
-        rough_segmented = _watershed_segmentation(coord, image_original, binary_mask)
+        rough_segmented = self._watershed_segmentation(coord, image_original, binary_mask)
         
         # Blurring the image
         image_smooth = ski.filters.gaussian(image_original, sigma=0.5)
@@ -446,7 +445,7 @@ class FeatureExtractor:
         additional_synapses = []
 
         for region in ski.measure.regionprops(rough_segmented, intensity_image=image_smooth):
-            new_centers = _find_additional_synapses(region, image_smooth)
+            new_centers = self._find_additional_synapses(region, image_smooth, rough_segmented)
             additional_synapses.extend(new_centers)
         
         # Mise à jour des coordonnées et suppression des doublons
@@ -454,7 +453,7 @@ class FeatureExtractor:
 
         
         # Segmentation finale
-        final_segmented = _watershed_segmentation(coord, image_smooth, binary_mask)
+        final_segmented = self._watershed_segmentation(coord, image_smooth, binary_mask)
         refined_segmented = np.zeros_like(final_segmented)
         
         # Raffinement des régions

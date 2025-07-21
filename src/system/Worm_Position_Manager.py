@@ -4,6 +4,9 @@ import numpy as np
 import pandas as pd
 from typing import Optional
 
+from python_tsp.exact import solve_tsp_dynamic_programming # moins de 25 pts
+from python_tsp.heuristics import solve_tsp_local_search # plus de de 25 pts
+
 class WormPositionManager:
     """
     Gestionnaire pour les positions de vers
@@ -302,12 +305,10 @@ class WormPositionManager:
         
         if len(df) <= 25:
             # Use exact method
-            from python_tsp.exact import solve_tsp_dynamic_programming # moins de 25 pts
             #print("Utilisation de la méthode exacte pour les chemins courts.")
             permutation, dist_opt = solve_tsp_dynamic_programming(dist_matrix)
         else:
             # Use local search method
-            from python_tsp.heuristics import solve_tsp_local_search # plus de de 25 pts
             #print("Utilisation de la méthode de recherche locale pour les chemins courts.")
             permutation, dist_approx = solve_tsp_local_search(dist_matrix)
             
