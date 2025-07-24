@@ -1,9 +1,9 @@
-binning: "2\xD72"
+binning: 3x3
 display_mode: Grayscale
 dual_view: false
 exposure_time: '100'
 fluo_objective: 10x
 scan_objective: 4x
-shape: square
+shape: rectangle
 shutter: false
 user_directory: Arthur_2025_07_24

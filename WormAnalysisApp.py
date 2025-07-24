@@ -454,7 +454,7 @@ class WormAnalysisApp:
         # Binning
         tk.Label(self.params_content_frame, text="Binning", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
         self.binning_dropdown = self.create_rounded_dropdown(
-            self.params_content_frame, ["2×2", "3x3"], self.binning
+            self.params_content_frame, ["2x2", "3x3"], self.binning
         )
 
         # Shutter toggle
@@ -775,7 +775,7 @@ class WormAnalysisApp:
         # Also bind the label widget and all its children
         bind_events_recursive(label_widget)
         
-        shape_id = self.draw_rounded_rect(
+        """shape_id = self.draw_rounded_rect(
             canvas,
             x1 + inset, y1 + inset,
             x2 - inset, y2 - inset,
@@ -783,7 +783,7 @@ class WormAnalysisApp:
             fill=bg_color,
             outline=bg_color,
             tag="button_shape"
-        )
+        )""" # TODO à supprimer si ne cause pas d'erreurq
 
 
         return canvas
@@ -911,7 +911,7 @@ class WormAnalysisApp:
             text="",
             icon=self.play_icon,
             icon_hover=self.play_icon_hover,
-            command=self.toggle_parameters, # TODO
+            command=lambda: self.switch_page("load_position"),
             bg_color=self.colors.theme["primary_background"],
             text_color=self.colors.theme["primary_text"],
             hover_color=self.colors.theme["secondary_background"],
@@ -932,7 +932,7 @@ class WormAnalysisApp:
 
         # Text label
         title_launch_scan = tk.Label(
-            launch_label_frame, text="Launch scan",
+            launch_label_frame, text="Start analysis",
             bg=self.colors.theme["primary_background"], fg=self.colors.theme["tertiary_text"],
             font=(self.font, 10)
         )
