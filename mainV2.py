@@ -12,14 +12,14 @@ from Tooltip import Tooltip
 from colorTheme import ColorTheme
 
 class WormAnalysisApp:
-    def __init__(self, root, initial_dark_mode=False):
+    def __init__(self, root, initial_dark_mode=False, first_page = "automatic_scan"):
         self.root = root
         self.root.title("Worm Analysis")
         self.root.geometry("1440x960")
 
         # Variables
         self.show_parameters = True
-        self.current_page = "automatic_scan"
+        self.current_page = first_page
         self.dark_mode = initial_dark_mode
 
         # Color themes
@@ -43,9 +43,16 @@ class WormAnalysisApp:
         # Create main layout
         self.create_layout()
 
-        # Show initial page
-        self.show_automatic_scan_page()
-        
+        # Show appropriate page
+        if self.current_page == "automatic_scan":
+            self.show_automatic_scan_page()
+        elif self.current_page == "assist_acquisition":
+            self.show_assist_acquisition_page()
+        elif self.current_page == "load_position":
+            self.show_load_position_page()
+        else:
+            self.show_placeholder_page(self.current_page.replace('_', ' ').title())
+    
     def load_icon(self):   
         # ---------------- Parameters icon ----------------     
         # Process toggle_open.png
@@ -203,11 +210,11 @@ class WormAnalysisApp:
         self.update_colors()
         self.refresh_ui()
 
-    def refresh_ui(self):
+    def refresh_ui(self):        
         self.root.configure(bg=self.colors.theme["primary_background"])
         for widget in self.root.winfo_children():
             widget.destroy()
-        self.__init__(self.root, self.dark_mode)  
+        self.__init__(self.root, self.dark_mode, self.current_page)
   
     def create_layout(self):
         # Top bar with title and controls - FIRST and full width
@@ -217,19 +224,19 @@ class WormAnalysisApp:
         self.body_frame = tk.Frame(self.main_frame, bg=self.colors.theme["primary_background"])
         self.body_frame.pack(fill=tk.BOTH, expand=True)
 
-        # Sidebar (LEFT)
+        # Sidebar (LEFT) - Pack this FIRST to ensure it stays on the left
         self.create_sidebar()
 
-        # Content frame (CENTER)
+        # Parameters (RIGHT) - Pack this SECOND so it goes to the right
+        self.create_parameters_panel()
+
+        # Content frame (CENTER) - Pack this LAST so it fills the remaining space
         self.content_frame = tk.Frame(self.body_frame, bg=self.colors.theme["primary_background"])
         self.content_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         # Main content inside content frame
         self.main_content = tk.Frame(self.content_frame, bg=self.colors.theme["primary_background"])
         self.main_content.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-
-        # Parameters (RIGHT)
-        self.create_parameters_panel()
 
     def create_sidebar(self):
         # Create the side bar
@@ -292,7 +299,7 @@ class WormAnalysisApp:
             # Add button
             bg_color = self.colors.theme["secondary_background"] if page_id == self.current_page else self.colors.theme["primary_background"]
             if page_id == self.current_page: icon = icon_hover
-            self.create_rounded_button(
+            button_canvas = self.create_rounded_button(
                 parent=self.sidebar,
                 text=text,
                 icon=icon,
@@ -310,7 +317,7 @@ class WormAnalysisApp:
                 padx_text=90,
                 pady=2
             )
-            
+                     
     def create_top_bar(self):
         # Create top bar
         top_frame = tk.Frame(self.main_frame, bg=self.colors.theme["primary_background"], height=64)
@@ -563,14 +570,7 @@ class WormAnalysisApp:
         toggle_canvas.bind("<Button-1>", toggle_command)
         draw_toggle() # Initial draw
         return boolean_var
-    
-    def toggle_switch(self, button):
-        current = button.cget('text')
-        if current == "○":
-            button.configure(text="●")
-        else:
-            button.configure(text="○")
-    
+                
     def toggle_parameters(self):
         self.show_parameters = not self.show_parameters
         if self.show_parameters:
@@ -578,9 +578,12 @@ class WormAnalysisApp:
         else:
             self.params_frame.pack_forget()
         
-        # --- NEW: Recalculate content_area size if on the automatic_scan page
-        if self.current_page == "automatic_scan":
-            self.main_content.after(50, self.resize_scan_content_area)
+        # Store the after_id and schedule resizing with error handling
+        if hasattr(self, 'main_content') and self.main_content.winfo_exists():
+            after_id = self.main_content.after(50, self.resize_scan_content_area)
+            if not hasattr(self, '_after_ids'):
+                self._after_ids = []
+            self._after_ids.append(after_id)
 
     def resize_scan_content_area(self):
         middle_container = self.middle_container_ref
@@ -608,9 +611,14 @@ class WormAnalysisApp:
                           hover_color, font, width_pixels, height_pixels,
                           corner_radius, side, padx=0, pady=0, padx_text=0, pady_text=0,
                           anchor='center', border_width=0, border_color=None, icon=None, icon_hover=None):
-        if border_color == None:
+        """
+        Create a rounded-corner button on a Canvas that responds to clicks, hover, and shows a hand cursor.
+        The entire canvas and its label/widget are bound so that clicks anywhere inside fire `command()`.
+        """
+        if border_color is None:
             border_color = self.colors.theme["stroke_button"]
 
+        # Create Canvas
         canvas = tk.Canvas(
             parent,
             width=width_pixels,
@@ -620,10 +628,11 @@ class WormAnalysisApp:
         )
         canvas.pack(side=side, padx=padx, pady=pady)
 
+        # Coordinates
         x1, y1 = 0, 0
         x2, y2 = width_pixels, height_pixels
 
-        # Draw border layer
+        # Draw border
         self.draw_rounded_rect(
             canvas,
             x1, y1,
@@ -634,23 +643,25 @@ class WormAnalysisApp:
             tag="button_border"
         )
 
-        # Draw main button (slightly inside border)
-        inset = border_width
+
+        # Draw main shape inset by border_width
+        inset = border_width        
         self.draw_rounded_rect(
             canvas,
             x1 + inset, y1 + inset,
             x2 - inset, y2 - inset,
-            corner_radius - inset,
+            max(corner_radius - inset, 0),
             fill=bg_color,
             outline=bg_color,
             tag="button_shape"
         )
 
+        # Build label (icon + text or text-only)
         if icon:
             label_frame = tk.Frame(canvas, bg=bg_color)
 
             icon_label = tk.Label(label_frame, image=icon, bg=bg_color)
-            icon_label.image = icon  # Prevent garbage collection
+            icon_label.image = icon
             if icon_hover:
                 icon_label.image_normal = icon
                 icon_label.image_hover = icon_hover
@@ -661,27 +672,27 @@ class WormAnalysisApp:
 
             label_widget = label_frame
         else:
-            # Text only
             text_label = tk.Label(canvas, text=text, bg=bg_color, fg=text_color, font=font)
             label_widget = text_label
 
-        label_window = canvas.create_window(
-            width_pixels / 2 - padx_text, height_pixels / 2 - pady_text,
+        # Place the label on the canvas
+        canvas.create_window(
+            width_pixels / 2 - padx_text,
+            height_pixels / 2 - pady_text,
             window=label_widget,
             anchor=anchor,
             tags="button_label"
         )
 
-
+        # Event handlers
         def on_enter(event):
             canvas.itemconfig("button_shape", fill=hover_color, outline=hover_color)
             if icon:
                 icon_label.config(bg=hover_color)
                 if icon_hover:
                     icon_label.config(image=icon_hover)
-            text_label.config(bg=hover_color)
-            if icon:
                 label_frame.config(bg=hover_color)
+            text_label.config(bg=hover_color)
 
         def on_leave(event):
             canvas.itemconfig("button_shape", fill=bg_color, outline=bg_color)
@@ -689,19 +700,40 @@ class WormAnalysisApp:
                 icon_label.config(bg=bg_color)
                 if icon_hover:
                     icon_label.config(image=icon)
-            text_label.config(bg=bg_color)
-            if icon:
                 label_frame.config(bg=bg_color)
+            text_label.config(bg=bg_color)
 
         def on_click(event):
             command()
 
-        canvas.tag_bind("button_shape", "<Enter>", on_enter)
-        canvas.tag_bind("button_shape", "<Leave>", on_leave)
-        canvas.tag_bind("button_shape", "<Button-1>", on_click)
-        label_widget.bind("<Enter>", on_enter)
-        label_widget.bind("<Leave>", on_leave)
-        label_widget.bind("<Button-1>", on_click)
+        # Function to bind events to a widget and all its children recursively
+        def bind_events_recursive(widget):
+            widget.bind("<Button-1>", on_click)
+            widget.bind("<Enter>", on_enter)
+            widget.bind("<Leave>", on_leave)
+            
+            # If the widget has children, bind them too
+            try:
+                for child in widget.winfo_children():
+                    bind_events_recursive(child)
+            except:
+                pass  # Some widgets might not have children
+
+        # Bind canvas for click and hover
+        bind_events_recursive(canvas)
+        
+        # Also bind the label widget and all its children
+        bind_events_recursive(label_widget)
+        
+        shape_id = self.draw_rounded_rect(
+            canvas,
+            x1 + inset, y1 + inset,
+            x2 - inset, y2 - inset,
+            max(corner_radius - inset, 0),
+            fill=bg_color,
+            outline=bg_color,
+            tag="button_shape"
+        )
 
 
         return canvas
@@ -724,28 +756,10 @@ class WormAnalysisApp:
         ]
         canvas.create_polygon(points, fill=fill, outline=outline, smooth=True, splinesteps=36, tags=tag)
 
-    # Pages
+    # Pages   
     def switch_page(self, page_id):
         self.current_page = page_id
-        
-        # Clear current content
-        for widget in self.main_content.winfo_children():
-            widget.destroy()
-        
-        # Recreate sidebar to update highlighting
-        for widget in self.sidebar.winfo_children():
-            widget.destroy()
-        self.create_sidebar()
-        
-        # Show appropriate page
-        if page_id == "automatic_scan":
-            self.show_automatic_scan_page()
-        elif page_id == "load_position":
-            self.show_load_position_page()
-        elif page_id == "assist_acquisition":
-            self.show_assist_acquisition_page()
-        else:
-            self.show_placeholder_page(page_id.replace('_', ' ').title())
+        self.refresh_ui()
     
     def show_automatic_scan_page(self):
         # Clear previous widgets if needed
@@ -812,47 +826,86 @@ class WormAnalysisApp:
         # Tooltip on hover
         Tooltip(info_label, "Be sure to have the objective in the lower right corner and to use the L camera.")
 
-        # Trigger resizing after layout completes
-        self.main_content.after(100, self.resize_scan_content_area)
-    
-    def show_load_position_page(self):
-        # Page title
-        title_frame = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
-        title_frame.pack(fill=tk.X, pady=(0, 20))
-        
-        # Save position button
-        save_frame = tk.Frame(self.main_content, bg='#2b2b2b')
-        save_frame.pack(pady=20)
-        
-        save_btn = tk.Button(save_frame, text="⊕", bg='white', fg='black',
-                           font=(self.font, 20), width=3, height=2,
-                           command=lambda: messagebox.showinfo("Info", "Position saved!"))
-        save_btn.pack()
-        
-        save_label = tk.Label(save_frame, text="Save position\n(you can use the press bar)",
-                             bg='#2b2b2b', fg='gray', font=(self.font, 10))
-        save_label.pack(pady=10)
-        
-        # Black content area (representing loaded image)
-        content_area = tk.Frame(self.main_content, bg='black', width=300, height=300)
-        content_area.pack(pady=20)
-        content_area.pack_propagate(False)
-        
-        # Start analysis button
-        analysis_btn = tk.Button(self.main_content, text="▶ Start analysis", bg='#e0e0e0', fg='black',
-                               font=(self.font, 12), padx=20, pady=10,
-                               command=lambda: messagebox.showinfo("Info", "Analysis started!"))
-        analysis_btn.pack(pady=20)
-        
-        # Warning
-        warning_frame = tk.Frame(self.main_content, bg='#ffebee', relief=tk.SOLID, bd=1)
-        warning_frame.pack(fill=tk.X, pady=20)
-        
-        warning_label = tk.Label(warning_frame, text="⚠ Warning\nBe sure to use the L camera",
-                               bg='#ffebee', fg='#c62828', font=(self.font, 10))
-        warning_label.pack(padx=15, pady=10, anchor='w')
+        # Trigger resizing after layout completes with error handling
+        if hasattr(self, 'main_content') and self.main_content.winfo_exists():
+            after_id = self.main_content.after(100, self.resize_scan_content_area)
+            if not hasattr(self, '_after_ids'):
+                self._after_ids = []
+            self._after_ids.append(after_id)
     
     def show_assist_acquisition_page(self):
+        # Clear previous widgets if needed
+        for widget in self.main_content.winfo_children():
+            widget.destroy()
+
+        # Page title
+        title_frame = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
+        title_frame.pack(fill=tk.X)
+
+        # Middle container that will hold the content_area and expand to max space
+        middle_container = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
+        middle_container.pack(fill=tk.BOTH, expand=True)
+        self.middle_container_ref = middle_container
+
+        # Content area inside the middle container
+        content_area = tk.Frame(middle_container, bg=self.colors.theme["secondary_background"], relief=tk.RAISED, bd=1)
+        content_area.place(x=0, y=0, width=0, height=0)  # Temporary, real size set later
+        self.content_area_ref = content_area
+
+        # Bottom section with launch button
+        bottom_frame = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
+        bottom_frame.pack(fill=tk.X, pady=(20,5))
+
+        self.create_rounded_button(
+            parent=bottom_frame,
+            text="",
+            icon=self.play_icon,
+            icon_hover=self.play_icon_hover,
+            command=self.toggle_parameters, # TODO
+            bg_color=self.colors.theme["primary_background"],
+            text_color=self.colors.theme["primary_text"],
+            hover_color=self.colors.theme["secondary_background"],
+            font=(self.font, 16),
+            width_pixels=200,
+            height_pixels=60,
+            corner_radius=20,
+            side=tk.TOP,
+            pady=5,
+            padx_text=-10,
+            border_width=2,
+            border_color=self.colors.theme["stroke_button"]
+        )
+        
+        # Container to hold label + info icon
+        launch_label_frame = tk.Frame(bottom_frame, bg=self.colors.theme["primary_background"])
+        launch_label_frame.pack()
+
+        # Text label
+        title_launch_scan = tk.Label(
+            launch_label_frame, text="Launch scan",
+            bg=self.colors.theme["primary_background"], fg=self.colors.theme["tertiary_text"],
+            font=(self.font, 10)
+        )
+        title_launch_scan.pack(side=tk.LEFT)
+
+        # Info icon
+        info_label = tk.Label(
+            launch_label_frame, image=self.info_icon,
+            bg=self.colors.theme["primary_background"]
+        )
+        info_label.pack(side=tk.LEFT, padx=(5, 0))  # small gap between text and icon
+
+        # Tooltip on hover
+        Tooltip(info_label, "Be sure to have the objective in the lower right corner and to use the L camera.")
+
+        # Trigger resizing after layout completes with error handling
+        if hasattr(self, 'main_content') and self.main_content.winfo_exists():
+            after_id = self.main_content.after(100, self.resize_scan_content_area)
+            if not hasattr(self, '_after_ids'):
+                self._after_ids = []
+            self._after_ids.append(after_id)
+    
+    def show_load_position_page(self):
         # Page title
         title_frame = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
         title_frame.pack(fill=tk.X, pady=(0, 20))
