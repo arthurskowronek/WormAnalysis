@@ -824,7 +824,7 @@ class WormAnalysisApp:
         info_label.pack(side=tk.LEFT, padx=(5, 0))  # small gap between text and icon
 
         # Tooltip on hover
-        Tooltip(info_label, "Be sure to have the objective in the lower right corner and to use the L camera.")
+        Tooltip(info_label, "Be sure to have the objective in the lower right corner and to use the L camera.", posx=70, posy=-70)
 
         # Trigger resizing after layout completes with error handling
         if hasattr(self, 'main_content') and self.main_content.winfo_exists():
@@ -896,7 +896,7 @@ class WormAnalysisApp:
         info_label.pack(side=tk.LEFT, padx=(5, 0))  # small gap between text and icon
 
         # Tooltip on hover
-        Tooltip(info_label, "Be sure to have the objective in the lower right corner and to use the L camera.")
+        Tooltip(info_label, "Be sure to use the L camera.", posx=0, posy=-30)
 
         # Trigger resizing after layout completes with error handling
         if hasattr(self, 'main_content') and self.main_content.winfo_exists():

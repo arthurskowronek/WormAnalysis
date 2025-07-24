@@ -3,7 +3,7 @@ import tkinter as tk
 from colorTheme import ColorTheme
 
 class Tooltip:
-    def __init__(self, widget, text, title="Warning"):
+    def __init__(self, widget, text, title="Warning", posx=0, posy=0):
         
         self.colors = ColorTheme()   
         self.widget = widget
@@ -13,6 +13,8 @@ class Tooltip:
         self.fg = self.colors.theme["danger_text"]
         self.border_color = self.colors.theme["danger_stroke"]
         self.tooltip_window = None
+        self.posx = posx
+        self.posy = posy
 
         widget.bind("<Enter>", self.show_tooltip)
         widget.bind("<Leave>", self.hide_tooltip)
@@ -21,8 +23,8 @@ class Tooltip:
         if self.tooltip_window or not self.text:
             return
 
-        x = self.widget.winfo_rootx() + 70
-        y = self.widget.winfo_rooty() - 70
+        x = self.widget.winfo_rootx() + self.posx
+        y = self.widget.winfo_rooty() + self.posy
 
         self.tooltip_window = tw = tk.Toplevel(self.widget)
         tw.wm_overrideredirect(True)  # Remove window decorations
