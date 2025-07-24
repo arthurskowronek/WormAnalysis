@@ -1,10 +1,10 @@
 
 import os
-import time
-from PIL import Image, ImageTk, ImageColor
+import yaml
 import tkinter as tk
-from tkinter import ttk, messagebox
 from pathlib import Path
+from tkinter import ttk, messagebox
+from PIL import Image, ImageTk, ImageColor
 
 from config import RESSOURCES_DIR
 
@@ -16,6 +16,7 @@ class WormAnalysisApp:
         self.root = root
         self.root.title("Worm Analysis")
         self.root.geometry("1440x960")
+        self.PARAMS_FILE = "parameters.yaml"
 
         # Variables
         self.show_parameters = True
@@ -30,15 +31,33 @@ class WormAnalysisApp:
         self.root.configure(bg=self.colors.theme["primary_background"])
         
         # Parameters
-        self.shape = "square"
-
+        self.loaded_params = self.load_parameters()
+        self.shape = tk.StringVar(value=self.loaded_params.get("shape", "square"))
+        self.shape.trace_add("write", lambda *args: self.resize_scan_content_area())
+        self.shape.trace_add("write", lambda *args: self.save_parameters())
+        self.exposure_time = tk.StringVar(value=self.loaded_params.get("exposure_time", 100))
+        self.exposure_time.trace_add("write", lambda *args: self.save_parameters())
+        self.binning = tk.StringVar(value=self.loaded_params.get("binning", "2x2"))
+        self.binning.trace_add("write", lambda *args: self.save_parameters())
+        self.shutter = tk.BooleanVar(value=self.loaded_params.get("shutter", False))
+        self.shutter.trace_add("write", lambda *args: self.save_parameters())
+        self.dual_view = tk.BooleanVar(value=self.loaded_params.get("dual_view", False))
+        self.dual_view.trace_add("write", lambda *args: self.save_parameters())
+        self.display_mode = tk.StringVar(value=self.loaded_params.get("display_mode", 'Grayscale'))
+        self.display_mode.trace_add("write", lambda *args: self.save_parameters())
+        self.scan_objective = tk.StringVar(value=self.loaded_params.get("scan_objective", '4x'))
+        self.scan_objective.trace_add("write", lambda *args: self.save_parameters())
+        self.fluo_objective = tk.StringVar(value=self.loaded_params.get("fluo_objective", '10x'))
+        self.fluo_objective.trace_add("write", lambda *args: self.save_parameters())
+        self.user_directory = tk.StringVar(value=self.loaded_params.get("user_directory", 'Arthur_2025_07_24'))
+        self.user_directory.trace_add("write", lambda *args: self.save_parameters())
+        
         # Main container
         self.main_frame = tk.Frame(root, bg=self.colors.theme["primary_background"])
         self.main_frame.pack(fill=tk.BOTH, expand=True)
         
         # Images
         self.load_icon()
-        
 
         # Create main layout
         self.create_layout()
@@ -52,6 +71,28 @@ class WormAnalysisApp:
             self.show_load_position_page()
         else:
             self.show_placeholder_page(self.current_page.replace('_', ' ').title())
+    
+    def load_parameters(self):
+        if os.path.exists(self.PARAMS_FILE):
+            with open(self.PARAMS_FILE, "r") as f:
+                return yaml.safe_load(f)
+        else:
+            return {}
+    
+    def save_parameters(self):
+        params = {
+            "exposure_time": self.exposure_time.get(),
+            "binning": self.binning.get(),
+            "shutter": self.shutter.get(),
+            "dual_view": self.dual_view.get(),
+            "display_mode": self.display_mode.get(),
+            "scan_objective": self.scan_objective.get(),
+            "fluo_objective": self.fluo_objective.get(),
+            "shape": self.shape.get(),
+            "user_directory": self.user_directory.get()
+        }
+        with open(self.PARAMS_FILE, "w") as f:
+            yaml.dump(params, f)
     
     def load_icon(self):   
         # ---------------- Parameters icon ----------------     
@@ -400,56 +441,59 @@ class WormAnalysisApp:
         name_dir_label.pack(anchor='w', pady=(5, 5), padx=20)
 
         self.name_directory_entry = self.create_rounded_input(
-            self.params_frame, "Arthur_2025_07_22"
+            self.params_frame, self.user_directory
         )
 
     def create_parameters_content(self):
         # Exposure time
         tk.Label(self.params_content_frame, text="Exposure time (ms)", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
         self.exposure_time_entry = self.create_rounded_input_with_icon(
-            self.params_content_frame, "100", self.clock_icon
+            self.params_content_frame, self.exposure_time, self.clock_icon
         )
 
         # Binning
         tk.Label(self.params_content_frame, text="Binning", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
         self.binning_dropdown = self.create_rounded_dropdown(
-            self.params_content_frame, ["2×2", "3x3"], "2×2"
+            self.params_content_frame, ["2×2", "3x3"], self.binning
         )
 
         # Shutter toggle
-        self.shutter_toggle_var = tk.BooleanVar(value=False)
-        self.create_custom_toggle(self.params_content_frame, "Shutter", self.shutter_toggle_var)
+        self.create_custom_toggle(self.params_content_frame, "Shutter", self.shutter)
 
         # Dual view
-        self.dual_view_toggle_var = tk.BooleanVar(value=False)
-        self.create_custom_toggle(self.params_content_frame, "Dual view", self.dual_view_toggle_var)
+        self.create_custom_toggle(self.params_content_frame, "Dual view", self.dual_view)
 
         # Display mode
         tk.Label(self.params_content_frame, text="Display mode", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
         self.display_mode_dropdown = self.create_rounded_dropdown(
-            self.params_content_frame, ["Grayscale"], "Grayscale"
+            self.params_content_frame, ["Grayscale"], self.display_mode
         )
 
         # Scan Objective
         tk.Label(self.params_content_frame, text="Scan Objective", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
         self.scan_objective_dropdown = self.create_rounded_dropdown(
-            self.params_content_frame, ["4x", "5x", "10x"], "4x"
+            self.params_content_frame, ["4x", "5x", "10x"], self.scan_objective
         )
 
         # Fluo objective
         tk.Label(self.params_content_frame, text="Fluo objective", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
         self.fluo_objective_dropdown = self.create_rounded_dropdown(
-            self.params_content_frame, ["10x", "20x", "40x"], "10x"
+            self.params_content_frame, ["10x", "20x", "40x"], self.fluo_objective
         )
 
         # Scan shape
         tk.Label(self.params_content_frame, text="Scan shape", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
         self.scan_shape_dropdown = self.create_rounded_dropdown(
-            self.params_content_frame, ["square", "rectangle"], "square"
+            self.params_content_frame, ["square", "rectangle"], self.shape
         )
 
     # Button
-    def create_rounded_input(self, parent, default_value):
+    def create_rounded_input(self, parent, variable):
+        if isinstance(variable, str):
+            variable = tk.StringVar(value=variable)
+        elif variable is None:
+            variable = tk.StringVar() 
+            
         canvas_width = 190 
         canvas_height = 35
         radius = 20 # Corner radius
@@ -463,21 +507,24 @@ class WormAnalysisApp:
                                radius, fill=self.colors.theme["parameters_button_background"],
                                outline=self.colors.theme["parameters_button_background"], tag="input_bg")
 
-        # Create the Entry widget
-        entry = tk.Entry(canvas, font=(self.font, 10), bd=0, relief="flat", highlightthickness=0,
-                         bg=self.colors.theme["parameters_button_background"], fg=self.colors.theme["tertiary_text"],
-                         insertbackground=self.colors.theme["primary_text"]) # Cursor color
-        entry.insert(0, default_value)
+        # Create the Entry widget        
+        entry = tk.Entry(canvas, textvariable=variable, font=(self.font, 10), bd=0, relief="flat", highlightthickness=0,
+                 bg=self.colors.theme["parameters_button_background"], fg=self.colors.theme["tertiary_text"],
+                 insertbackground=self.colors.theme["primary_text"])
 
         # Place the entry widget inside the canvas. Adjust x, y for padding.
         entry_width = canvas_width - 2 * radius # Approximate width of the entry part
         entry_height = canvas_height - 10 # Approximate height of the entry part
         canvas.create_window(radius, canvas_height / 2, window=entry, anchor="w",
                              width=entry_width, height=entry_height)
-        return entry
+        return variable
     
-    def create_rounded_input_with_icon(self, parent, default_value, icon):
-
+    def create_rounded_input_with_icon(self, parent, variable, icon):
+        if isinstance(variable, str):
+            variable = tk.StringVar(value=variable)
+        elif variable is None:
+            variable = tk.StringVar() 
+        
         canvas_width = 190
         canvas_height = 35
         radius = 20
@@ -503,74 +550,77 @@ class WormAnalysisApp:
 
 
         # Entry widget
-        entry = tk.Entry(canvas, font=(self.font, 10), bd=0, relief="flat", highlightthickness=0,
-                        bg=self.colors.theme["parameters_button_background"], fg=self.colors.theme["tertiary_text"],
-                        insertbackground=self.colors.theme["primary_text"])
-        entry.insert(0, default_value)
+        entry = tk.Entry(canvas, textvariable=variable, font=(self.font, 10), bd=0, relief="flat", highlightthickness=0,
+                 bg=self.colors.theme["parameters_button_background"], fg=self.colors.theme["tertiary_text"],
+                 insertbackground=self.colors.theme["primary_text"])
+
 
         entry_width = canvas_width - icon_width - radius
         entry_height = canvas_height - 10
         canvas.create_window(icon_width, canvas_height // 2, window=entry, anchor="w",
                             width=entry_width, height=entry_height)
 
-        return entry
+        return variable
      
-    def create_rounded_dropdown(self, parent, options, default):
+    def create_rounded_dropdown(self, parent, options, variable):
+        if isinstance(variable, str):
+            variable = tk.StringVar(value=variable)
+        elif variable is None:
+            variable = tk.StringVar()        
+        
         canvas_width = 190 
         canvas_height = 35 
-        radius = 20 # Corner radius
+        radius = 20  # Corner radius
 
         canvas = tk.Canvas(parent, width=canvas_width, height=canvas_height,
-                           bg=parent.cget("bg"), highlightthickness=0) # Use parent's bg for canvas
+                        bg=parent.cget("bg"), highlightthickness=0)
         canvas.pack(fill=tk.X, pady=(0, 0))
 
-        # Draw the rounded background
         self.draw_rounded_rect(canvas, 0, 0, canvas_width, canvas_height,
-                               radius, fill=self.colors.theme["parameters_button_background"],
-                               outline=self.colors.theme["parameters_button_background"], tag="dropdown_bg")
+                            radius, fill=self.colors.theme["parameters_button_background"],
+                            outline=self.colors.theme["parameters_button_background"], tag="dropdown_bg")
 
-        combo = ttk.Combobox(canvas, values=options, font=(self.font, 10), state='readonly',
-                             justify='left', style='MyCombobox.TCombobox')
-        combo.set(default)
-        
-        # Place the combobox inside the canvas.
-        combo_width = canvas_width - 10 # Adjust for some padding
+        combo = ttk.Combobox(
+            canvas,
+            values=options,
+            textvariable=variable, 
+            font=(self.font, 10),
+            state='readonly',
+            justify='left',
+            style='MyCombobox.TCombobox'
+        )
+
+        combo_width = canvas_width - 10
         combo_height = canvas_height - 10
         canvas.create_window(5, canvas_height / 2, window=combo, anchor="w",
-                             width=combo_width, height=combo_height)
+                            width=combo_width, height=combo_height)
 
-        return combo
-
+        return variable
+    
     def create_custom_toggle(self, parent, label, boolean_var):
         frame = tk.Frame(parent, bg=self.colors.theme["secondary_background"])
         frame.pack(fill=tk.X, pady=(5, 5))
 
         tk.Label(frame, text=label, bg=self.colors.theme["secondary_background"],
-                 fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(side=tk.LEFT)
-        
+                fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(side=tk.LEFT)
+
         toggle_canvas = tk.Canvas(frame, width=self.toggle_open_icon.width(),
-                          height=self.toggle_open_icon.height(),
-                          bg=self.colors.theme["primary_background"], highlightthickness=0)
-        toggle_canvas.pack(side=tk.RIGHT, padx = 3)
+                                height=self.toggle_open_icon.height(),
+                                bg=self.colors.theme["primary_background"], highlightthickness=0)
+        toggle_canvas.pack(side=tk.RIGHT, padx=3)
 
         def draw_toggle():
-            toggle_canvas.delete("all") # Clear previous drawings/images
-
-            if boolean_var.get():
-                current_image = self.toggle_open_icon
-            else:
-                current_image = self.toggle_close_icon
-
-            toggle_canvas.create_image(0, 0, image=current_image, anchor=tk.NW)
+            toggle_canvas.delete("all")
+            image = self.toggle_open_icon if not boolean_var.get() else self.toggle_close_icon
+            toggle_canvas.create_image(0, 0, image=image, anchor=tk.NW)
 
         def toggle_command(event=None):
-            boolean_var.set(not boolean_var.get())
+            boolean_var.set(not boolean_var.get())  # This will trigger trace_add
             draw_toggle()
 
         toggle_canvas.bind("<Button-1>", toggle_command)
-        draw_toggle() # Initial draw
-        return boolean_var
-                
+        draw_toggle()
+          
     def toggle_parameters(self):
         self.show_parameters = not self.show_parameters
         if self.show_parameters:
@@ -592,10 +642,10 @@ class WormAnalysisApp:
         container_width = middle_container.winfo_width()
         container_height = middle_container.winfo_height()
 
-        if self.shape == 'square':
+        if self.shape.get() == 'square':
             side = min(container_width, container_height)
             width = height = side
-        elif self.shape == 'rectangle':
+        elif self.shape.get() == 'rectangle':
             height = min(container_height, container_width / 2)
             width = 2 * height
         else:
