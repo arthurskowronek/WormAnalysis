@@ -211,7 +211,12 @@ class WormAnalysisApp:
         # Process info.png
         info_path = Path(RESSOURCES_DIR) / "icon" / "info.png" 
         self.info_icon = self.flatten_and_resize(info_path, 16, 16, self.colors.theme["primary_background"], self.colors.theme["secondary_text"])
-                  
+           
+        # Process plus.png
+        plus_path = Path(RESSOURCES_DIR) / "icon" / "plus.png" 
+        self.plus_icon = self.flatten_and_resize(plus_path, 60, 60, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
+        self.plus_icon_hover = self.flatten_and_resize(plus_path, 60, 60, self.colors.theme["tertiary_background"], self.colors.theme["stroke_button"])
+                                          
     def flatten_and_resize(self, img_path, width, height, bg_color, fg_color):
         img_pil = Image.open(str(img_path)).convert("RGBA")
 
@@ -786,7 +791,7 @@ class WormAnalysisApp:
             self.params_frame.pack_forget()
         
         # Store the after_id and schedule resizing with error handling
-        if hasattr(self, 'main_content') and self.main_content.winfo_exists():
+        if hasattr(self, 'main_content') and self.main_content.winfo_exists() and self.current_page == "automatic_scan":
             after_id = self.main_content.after(50, self.resize_scan_content_area)
             if not hasattr(self, '_after_ids'):
                 self._after_ids = []
@@ -796,15 +801,24 @@ class WormAnalysisApp:
         self.current_page = page_id
         self.refresh_ui()
     
+    def resize_live_assist(self, event):
+        w, h = event.width, event.height
+        size = min(w, h - 80)  # leave space for bottom button
+        x = (w - size) // 2
+        self.live_assist_container_ref.place(x=x, y=0, width=size, height=size)
+    
+    def resize_map_assist(self, event):
+        w, h = event.width, event.height
+        size = min(w, h) 
+        x = (w - size) // 2
+        y = h - size - 10  # 10 px from bottom
+        self.map_assist_containter_ref.place(x=x, y=y, width=size, height=size)
+    
     # Pages   
     def show_automatic_scan_page(self):
         # Clear previous widgets if needed
         for widget in self.main_content.winfo_children():
             widget.destroy()
-
-        # Page title
-        title_frame = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
-        title_frame.pack(fill=tk.X)
 
         # Middle container that will hold the content_area and expand to max space
         middle_container = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
@@ -870,30 +884,39 @@ class WormAnalysisApp:
             self._after_ids.append(after_id)
     
     def show_assist_acquisition_page(self):
-        # Clear previous widgets if needed
+        # Clear previous widgets
         for widget in self.main_content.winfo_children():
             widget.destroy()
 
-        # Page title
-        title_frame = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
-        title_frame.pack(fill=tk.X)
+        # Configure grid layout for main_content
+        self.main_content.grid_columnconfigure(0, weight=60)
+        self.main_content.grid_columnconfigure(1, weight=30)
+        self.main_content.grid_rowconfigure(0, weight=1)
 
-        # Middle container that will hold the content_area and expand to max space
-        middle_container = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
-        middle_container.pack(fill=tk.BOTH, expand=True)
-        self.middle_container_ref = middle_container
+        # ----- LEFT CONTAINER -----
+        left_live_assist_container = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"]) 
+        left_live_assist_container.grid(row=0, column=0, sticky="nsew", padx=(0, 10))  
+        self.left_live_assist_container_ref = left_live_assist_container
 
-        # Content area inside the middle container
-        content_area = tk.Frame(middle_container, bg=self.colors.theme["secondary_background"], relief=tk.RAISED, bd=1)
-        content_area.place(x=0, y=0, width=0, height=0)  # Temporary, real size set later
-        self.content_area_ref = content_area
+        # Use grid in left container to stack content
+        left_live_assist_container.grid_rowconfigure(0, weight=1)  # for live_assist_container
+        left_live_assist_container.grid_rowconfigure(1, weight=0)  # for bottom_assist_container
+        left_live_assist_container.grid_columnconfigure(0, weight=1)
 
-        # Bottom section with launch button
-        bottom_frame = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
-        bottom_frame.pack(fill=tk.X, pady=(20,5))
+        # Top: Live assist square
+        live_assist_container = tk.Frame(left_live_assist_container, bg=self.colors.theme["secondary_background"], relief=tk.RAISED, bd=1)
+        live_assist_container.grid(row=0, column=0, sticky="nsew")
+        self.live_assist_container_ref = live_assist_container
 
+        # Bind resize for square behavior
+        self.left_live_assist_container_ref.bind("<Configure>", self.resize_live_assist)
+
+        # Bottom: Buttons + label
+        bottom_assist_container = tk.Frame(left_live_assist_container, bg=self.colors.theme["primary_background"])
+        bottom_assist_container.grid(row=1, column=0, sticky="ew", pady=(10, 10))
+        
         self.create_rounded_button(
-            parent=bottom_frame,
+            parent=bottom_assist_container,
             text="",
             icon=self.play_icon,
             icon_hover=self.play_icon_hover,
@@ -911,113 +934,197 @@ class WormAnalysisApp:
             border_width=2,
             border_color=self.colors.theme["stroke_button"]
         )
-        
-        # Container to hold label + info icon
-        launch_label_frame = tk.Frame(bottom_frame, bg=self.colors.theme["primary_background"])
-        launch_label_frame.pack()
 
-        # Text label
-        title_launch_scan = tk.Label(
-            launch_label_frame, text="Start analysis",
+        # Info label with tooltip
+        launch_label_assist_container = tk.Frame(bottom_assist_container, bg=self.colors.theme["primary_background"])
+        launch_label_assist_container.pack()
+
+        tk.Label(
+            launch_label_assist_container, text="Start analysis",
             bg=self.colors.theme["primary_background"], fg=self.colors.theme["tertiary_text"],
             font=(self.font, 10)
-        )
-        title_launch_scan.pack(side=tk.LEFT)
+        ).pack(side=tk.LEFT)
 
-        # Info icon
-        info_label = tk.Label(
-            launch_label_frame, image=self.info_icon,
+        tk.Label(
+            launch_label_assist_container, image=self.info_icon,
             bg=self.colors.theme["primary_background"]
+        ).pack(side=tk.LEFT, padx=(5, 0))
+
+        Tooltip(launch_label_assist_container, "Be sure to use the L camera.", posx=160, posy=-60)
+
+        # ----- RIGHT CONTAINER -----
+        right_map_assist_container = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
+        right_map_assist_container.grid(row=0, column=1, sticky="nsew", padx=(0, 20))
+        self.right_map_assist_container_ref = right_map_assist_container
+
+        # Make right container expand vertically
+        right_map_assist_container.grid_rowconfigure(0, weight=1)
+        right_map_assist_container.grid_columnconfigure(0, weight=1)
+
+        # Container for button + text
+        top_button_assist_container = tk.Frame(right_map_assist_container, bg=self.colors.theme["primary_background"])
+        top_button_assist_container.pack(pady=(70, 0))  # adjust padding as needed
+
+        # Button at the top
+        self.create_rounded_button(
+            parent=top_button_assist_container,
+            text="",
+            icon=self.plus_icon,
+            icon_hover=self.plus_icon_hover,
+            command=lambda: self.add_worm_callback,
+            bg_color=self.colors.theme["secondary_background"],
+            text_color=self.colors.theme["primary_text"],
+            hover_color=self.colors.theme["tertiary_background"],
+            font=(self.font, 14),
+            width_pixels=150,
+            height_pixels=120,
+            corner_radius=20,
+            side=tk.TOP,
+            pady=5,
+            padx_text=-5,
+            border_width=0
         )
-        info_label.pack(side=tk.LEFT, padx=(5, 0))  # small gap between text and icon
 
-        # Tooltip on hover
-        Tooltip(info_label, "Be sure to use the L camera.", posx=0, posy=-30)
+        # Two lines of text under the button
+        tk.Label(
+            top_button_assist_container,
+            text="Save position",
+            bg=self.colors.theme["primary_background"],
+            fg=self.colors.theme["tertiary_text"],
+            font=(self.font, 10)
+        ).pack()
 
-        # Trigger resizing after layout completes with error handling
-        if hasattr(self, 'main_content') and self.main_content.winfo_exists():
-            after_id = self.main_content.after(100, self.resize_scan_content_area)
-            if not hasattr(self, '_after_ids'):
-                self._after_ids = []
-            self._after_ids.append(after_id)
+        tk.Label(
+            top_button_assist_container,
+            text="(you can use the press bar)",
+            bg=self.colors.theme["primary_background"],
+            fg=self.colors.theme["tertiary_text"],
+            font=(self.font, 7)
+        ).pack()
+
+        # Bottom: Black square (map)
+        map_assist_container = tk.Frame(right_map_assist_container, bg="black")
+        map_assist_container.place(x=0, y=0, width=0, height=0)
+        self.map_assist_containter_ref = map_assist_container
+        self.right_map_assist_container_ref.bind("<Configure>", self.resize_map_assist)
     
     def show_load_position_page(self):
-        # Page title
-        title_frame = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
-        title_frame.pack(fill=tk.X, pady=(0, 20))
+        # Clear previous widgets
+        for widget in self.main_content.winfo_children():
+            widget.destroy()
+
+        # Configure grid layout for main_content
+        self.main_content.grid_columnconfigure(0, weight=75)
+        self.main_content.grid_columnconfigure(1, weight=25)
+        self.main_content.grid_rowconfigure(0, weight=1)
+
+        # ----- LEFT CONTAINER -----
+        left_live_analysis_container = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"]) 
+        left_live_analysis_container.grid(row=0, column=0, sticky="nsew", padx=(0, 10))  
+        self.left_live_analysis_container_ref = left_live_analysis_container
+
+        # Use grid in left container to stack content
+        left_live_analysis_container.grid_rowconfigure(0, weight=1)  # for live_analysis_container
+        left_live_analysis_container.grid_rowconfigure(1, weight=0)  # for bottom_analysis_container
+        left_live_analysis_container.grid_columnconfigure(0, weight=1)
+
+        # Top: Live analysis square
+        live_analysis_container = tk.Frame(left_live_analysis_container, bg=self.colors.theme["secondary_background"], relief=tk.RAISED, bd=1)
+        live_analysis_container.grid(row=0, column=0, sticky="nsew")
+        self.live_analysis_container_ref = live_analysis_container
+
+        # Bind resize for square behavior
+        self.left_live_analysis_container_ref.bind("<Configure>", self.resize_live_assist)
+
+        # Bottom: Buttons + label
+        bottom_analysis_container = tk.Frame(left_live_analysis_container, bg=self.colors.theme["primary_background"])
+        bottom_analysis_container.grid(row=1, column=0, sticky="ew", pady=(10, 10))
         
-        # Synaptic profil prediction
-        prediction_frame = tk.Frame(self.main_content, bg='white', relief=tk.SOLID, bd=1)
-        prediction_frame.pack(fill=tk.X, pady=20, padx=20)
-        
-        pred_title = tk.Label(prediction_frame, text="Synaptic profil prediction",
-                             bg='white', font=(self.font, 12, 'bold'))
-        pred_title.pack(anchor='w', padx=15, pady=(15, 5))
-        
-        pred_text = tk.Label(prediction_frame, text="The analysed worm is a\nmutant with a probability\nof 78%",
-                           bg='white', font=(self.font, 10), justify=tk.LEFT)
-        pred_text.pack(anchor='w', padx=15, pady=(0, 15))
-        
-        # Wild-type vs Mutation buttons
-        buttons_frame = tk.Frame(self.main_content, bg='#2b2b2b')
-        buttons_frame.pack(pady=20)
-        
-        wildtype_frame = tk.Frame(buttons_frame, bg='#2b2b2b')
-        wildtype_frame.pack(side=tk.LEFT, padx=20)
-        
-        wildtype_btn = tk.Button(wildtype_frame, text="⊕", bg='white', fg='black',
-                               font=(self.font, 20), width=3, height=2)
-        wildtype_btn.pack()
-        tk.Label(wildtype_frame, text="Wild-type", bg='#2b2b2b', fg='white',
-                font=(self.font, 10)).pack(pady=5)
-        
-        mutation_frame = tk.Frame(buttons_frame, bg='#2b2b2b')
-        mutation_frame.pack(side=tk.LEFT, padx=20)
-        
-        mutation_btn = tk.Button(mutation_frame, text="⚡", bg='white', fg='black',
-                               font=(self.font, 20), width=3, height=2)
-        mutation_btn.pack()
-        tk.Label(mutation_frame, text="Mutation", bg='#2b2b2b', fg='white',
-                font=(self.font, 10)).pack(pady=5)
-        
-        # Navigation
-        nav_frame = tk.Frame(self.main_content, bg='#2b2b2b')
-        nav_frame.pack(pady=20)
-        
-        tk.Label(nav_frame, text="1 / 23", bg='#2b2b2b', fg='white',
-                font=(self.font, 10)).pack()
-        
-        nav_buttons = tk.Frame(nav_frame, bg='#2b2b2b')
-        nav_buttons.pack(pady=10)
-        
-        prev_btn = tk.Button(nav_buttons, text="⏮", bg='white', fg='black',
-                           font=(self.font, 16), width=3, height=1)
-        prev_btn.pack(side=tk.LEFT, padx=10)
-        
-        next_btn = tk.Button(nav_buttons, text="⏭", bg='white', fg='black',
-                           font=(self.font, 16), width=3, height=1)
-        next_btn.pack(side=tk.LEFT, padx=10)
-        
-        # Launch analysis button
-        launch_frame = tk.Frame(self.main_content, bg='#e0e0e0', relief=tk.SOLID, bd=1)
-        launch_frame.pack(fill=tk.X, pady=20, padx=50)
-        
-        launch_btn = tk.Button(launch_frame, text="▶ Launch analysis", bg='#e0e0e0', fg='black',
-                             font=(self.font, 12), pady=15,
-                             command=lambda: messagebox.showinfo("Info", "Analysis launched!"))
-        launch_btn.pack(fill=tk.X)
-        
-        # Live and Snap buttons
-        bottom_controls = tk.Frame(self.main_content, bg='#2b2b2b')
-        bottom_controls.pack(side=tk.BOTTOM, pady=20)
-        
-        live_btn = tk.Button(bottom_controls, text="📹 Live", bg='#e0e0e0', fg='black',
-                           font=(self.font, 10), padx=20, pady=10)
-        live_btn.pack(side=tk.LEFT, padx=10)
-        
-        snap_btn = tk.Button(bottom_controls, text="📷 Snap", bg='#e0e0e0', fg='black',
-                           font=(self.font, 10), padx=20, pady=10)
-        snap_btn.pack(side=tk.LEFT, padx=10)
+        self.create_rounded_button(
+            parent=bottom_analysis_container,
+            text="",
+            icon=self.play_icon,
+            icon_hover=self.play_icon_hover,
+            command=lambda: self.switch_page("load_position"),
+            bg_color=self.colors.theme["primary_background"],
+            text_color=self.colors.theme["primary_text"],
+            hover_color=self.colors.theme["secondary_background"],
+            font=(self.font, 16),
+            width_pixels=200,
+            height_pixels=60,
+            corner_radius=20,
+            side=tk.TOP,
+            pady=5,
+            padx_text=-10,
+            border_width=2,
+            border_color=self.colors.theme["stroke_button"]
+        )
+
+        # Info label with tooltip
+        launch_label_analysis_container = tk.Frame(bottom_analysis_container, bg=self.colors.theme["primary_background"])
+        launch_label_analysis_container.pack()
+
+        tk.Label(
+            launch_label_analysis_container, text="Start analysis",
+            bg=self.colors.theme["primary_background"], fg=self.colors.theme["tertiary_text"],
+            font=(self.font, 10)
+        ).pack(side=tk.LEFT)
+
+        # ----- RIGHT CONTAINER -----
+        right_map_analysis_container = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
+        right_map_analysis_container.grid(row=0, column=1, sticky="nsew", padx=(0, 20))
+        self.right_map_analysis_container_ref = right_map_analysis_container
+
+        # Make right container expand vertically
+        right_map_analysis_container.grid_rowconfigure(0, weight=1)
+        right_map_analysis_container.grid_columnconfigure(0, weight=1)
+
+        # Container for button + text
+        top_button_analysis_container = tk.Frame(right_map_analysis_container, bg=self.colors.theme["primary_background"])
+        top_button_analysis_container.pack(pady=(70, 0))  # adjust padding as needed
+
+        # Button at the top
+        self.create_rounded_button(
+            parent=top_button_analysis_container,
+            text="",
+            icon=self.plus_icon,
+            icon_hover=self.plus_icon_hover,
+            command=lambda: self.add_worm_callback,
+            bg_color=self.colors.theme["secondary_background"],
+            text_color=self.colors.theme["primary_text"],
+            hover_color=self.colors.theme["tertiary_background"],
+            font=(self.font, 14),
+            width_pixels=150,
+            height_pixels=120,
+            corner_radius=20,
+            side=tk.TOP,
+            pady=5,
+            padx_text=-5,
+            border_width=0
+        )
+
+        # Two lines of text under the button
+        tk.Label(
+            top_button_analysis_container,
+            text="Save position",
+            bg=self.colors.theme["primary_background"],
+            fg=self.colors.theme["tertiary_text"],
+            font=(self.font, 10)
+        ).pack()
+
+        tk.Label(
+            top_button_analysis_container,
+            text="(you can use the press bar)",
+            bg=self.colors.theme["primary_background"],
+            fg=self.colors.theme["tertiary_text"],
+            font=(self.font, 7)
+        ).pack()
+
+        # Bottom: Black square (map)
+        map_analysis_container = tk.Frame(right_map_analysis_container, bg="black")
+        map_analysis_container.place(x=0, y=0, width=0, height=0)
+        self.map_analysis_containter_ref = map_analysis_container
+        self.right_map_analysis_container_ref.bind("<Configure>", self.resize_map_analysis)
     
     def show_placeholder_page(self, page_name):
         placeholder = tk.Label(self.main_content, text=f"{page_name} Page\n(Coming soon...)",
