@@ -18,20 +18,43 @@ class WormAnalysisApp:
         self.root.geometry("1440x960")
         self.PARAMS_FILE = "parameters.yaml"
 
-        # Variables
+        # Initialize variables
         self.show_parameters = True
         self.current_page = first_page
         self.dark_mode = initial_dark_mode
+        self.loaded_params = self.load_parameters()
+        self.set_parameters()
 
-        # Color themes
+        # Theme (color, font, icon)
         self.font = 'Inter'
         self.update_colors()
         self.set_color_theme()
-
-        self.root.configure(bg=self.colors.theme["primary_background"])
+        self.load_icon()
         
-        # Parameters
-        self.loaded_params = self.load_parameters()
+        # Main container
+        self.main_frame = tk.Frame(root, bg=self.colors.theme["primary_background"])
+        self.main_frame.pack(fill=tk.BOTH, expand=True)
+        self.create_layout()
+
+        # Show appropriate page
+        if self.current_page == "automatic_scan":
+            self.show_automatic_scan_page()
+        elif self.current_page == "assist_acquisition":
+            self.show_assist_acquisition_page()
+        elif self.current_page == "load_position":
+            self.show_load_position_page()
+        else:
+            self.show_placeholder_page(self.current_page.replace('_', ' ').title())
+    
+    # Initalization helper function
+    def load_parameters(self):
+        if os.path.exists(self.PARAMS_FILE):
+            with open(self.PARAMS_FILE, "r") as f:
+                return yaml.safe_load(f)
+        else:
+            return {}
+    
+    def set_parameters(self):
         self.shape = tk.StringVar(value=self.loaded_params.get("shape", "square"))
         self.shape.trace_add("write", lambda *args: self.resize_scan_content_area())
         self.shape.trace_add("write", lambda *args: self.save_parameters())
@@ -51,33 +74,6 @@ class WormAnalysisApp:
         self.fluo_objective.trace_add("write", lambda *args: self.save_parameters())
         self.user_directory = tk.StringVar(value=self.loaded_params.get("user_directory", 'Arthur_2025_07_24'))
         self.user_directory.trace_add("write", lambda *args: self.save_parameters())
-        
-        # Main container
-        self.main_frame = tk.Frame(root, bg=self.colors.theme["primary_background"])
-        self.main_frame.pack(fill=tk.BOTH, expand=True)
-        
-        # Images
-        self.load_icon()
-
-        # Create main layout
-        self.create_layout()
-
-        # Show appropriate page
-        if self.current_page == "automatic_scan":
-            self.show_automatic_scan_page()
-        elif self.current_page == "assist_acquisition":
-            self.show_assist_acquisition_page()
-        elif self.current_page == "load_position":
-            self.show_load_position_page()
-        else:
-            self.show_placeholder_page(self.current_page.replace('_', ' ').title())
-    
-    def load_parameters(self):
-        if os.path.exists(self.PARAMS_FILE):
-            with open(self.PARAMS_FILE, "r") as f:
-                return yaml.safe_load(f)
-        else:
-            return {}
     
     def save_parameters(self):
         params = {
@@ -93,6 +89,64 @@ class WormAnalysisApp:
         }
         with open(self.PARAMS_FILE, "w") as f:
             yaml.dump(params, f)
+    
+    def update_colors(self):
+        self.colors = ColorTheme(self.dark_mode)     
+    
+    def set_color_theme(self):
+        self.style = ttk.Style()
+        self.style.theme_use('clam')
+        self.style.map('MyCombobox.TCombobox', # Use the style name you defined in create_rounded_dropdown
+                       fieldbackground=[('readonly', self.colors.theme["parameters_button_background"])],
+                       selectbackground=[('readonly', self.colors.theme["parameters_button_background"])],
+                       selectforeground=[('readonly', self.colors.theme["tertiary_text"])],
+                       foreground=[('readonly', self.colors.theme["tertiary_text"])],
+                       background=[('readonly', self.colors.theme["parameters_button_background"])],
+                       arrowcolor=[('readonly', self.colors.theme["tertiary_text"])],
+                       bordercolor=[('readonly', self.colors.theme["parameters_button_background"])],
+                       darkcolor=[('readonly', self.colors.theme["parameters_button_background"])],
+                       lightcolor=[('readonly', self.colors.theme["parameters_button_background"])]
+                       )
+        self.style.configure('TCombobox.Popdown',
+                             background=self.colors.theme["parameters_button_background"],
+                             foreground=self.colors.theme["tertiary_text"],
+                             selectbackground=self.colors.theme["parameters_button_background"],
+                             selectforeground=self.colors.theme["tertiary_text"]
+                             )
+        # And for the listbox inside the popdown
+        self.style.configure('TCombobox.Popdown.Listbox',
+                             font=(self.font, 10), 
+                             background=self.colors.theme["parameters_button_background"],
+                             foreground=self.colors.theme["tertiary_text"],
+                             selectbackground=self.colors.theme["parameters_button_background"],
+                             selectforeground=self.colors.theme["tertiary_text"]
+                             )
+        self.style.configure('TCombobox.downarrow',
+                             foreground=self.colors.theme["secondary_background"], # Color of the arrow itself
+                             background=self.colors.theme["parameters_button_background"], # Background behind the arrow
+                             arrowsize=25,
+                             relief="flat"
+                             )
+        self.style.configure('TCombobox.button',
+                     background=self.colors.theme["parameters_button_background"],
+                     bordercolor=self.colors.theme["parameters_button_background"], 
+                     relief="flat", 
+                     lightcolor=self.colors.theme["parameters_button_background"],
+                     darkcolor=self.colors.theme["parameters_button_background"],
+                     padding=[10, 0, 10, 0] 
+                     )
+        
+        combobox_layout = [
+            # Move the downarrow to the left side
+            ('Combobox.downarrow', {'side': 'left', 'sticky': 'ns'}),
+            # The field (text area) will now be on the right, expanding
+            ('Combobox.field', {'sticky': 'nswe', 'children': [
+                ('Combobox.padding', {'sticky': 'nswe', 'children': [
+                    ('Combobox.textarea', {'sticky': 'nswe', 'expand': 1}) # expand=1 ensures it takes remaining space
+                ]})
+            ]})
+        ]
+        self.style.layout('MyCombobox.TCombobox', combobox_layout)
     
     def load_icon(self):   
         # ---------------- Parameters icon ----------------     
@@ -157,10 +211,7 @@ class WormAnalysisApp:
         # Process info.png
         info_path = Path(RESSOURCES_DIR) / "icon" / "info.png" 
         self.info_icon = self.flatten_and_resize(info_path, 16, 16, self.colors.theme["primary_background"], self.colors.theme["secondary_text"])
-          
-    def update_colors(self):
-        self.colors = ColorTheme(self.dark_mode)     
-            
+                  
     def flatten_and_resize(self, img_path, width, height, bg_color, fg_color):
         img_pil = Image.open(str(img_path)).convert("RGBA")
 
@@ -190,73 +241,7 @@ class WormAnalysisApp:
 
         return ImageTk.PhotoImage(background)
 
-    def set_color_theme(self):
-        self.style = ttk.Style()
-        self.style.theme_use('clam')
-        self.style.map('MyCombobox.TCombobox', # Use the style name you defined in create_rounded_dropdown
-                       fieldbackground=[('readonly', self.colors.theme["parameters_button_background"])],
-                       selectbackground=[('readonly', self.colors.theme["parameters_button_background"])],
-                       selectforeground=[('readonly', self.colors.theme["tertiary_text"])],
-                       foreground=[('readonly', self.colors.theme["tertiary_text"])],
-                       background=[('readonly', self.colors.theme["parameters_button_background"])],
-                       arrowcolor=[('readonly', self.colors.theme["tertiary_text"])],
-                       bordercolor=[('readonly', self.colors.theme["parameters_button_background"])],
-                       darkcolor=[('readonly', self.colors.theme["parameters_button_background"])],
-                       lightcolor=[('readonly', self.colors.theme["parameters_button_background"])]
-                       )
-        self.style.configure('TCombobox.Popdown',
-                             background=self.colors.theme["parameters_button_background"],
-                             foreground=self.colors.theme["tertiary_text"],
-                             selectbackground=self.colors.theme["parameters_button_background"],
-                             selectforeground=self.colors.theme["tertiary_text"]
-                             )
-        # And for the listbox inside the popdown
-        self.style.configure('TCombobox.Popdown.Listbox',
-                             font=(self.font, 10), 
-                             background=self.colors.theme["parameters_button_background"],
-                             foreground=self.colors.theme["tertiary_text"],
-                             selectbackground=self.colors.theme["parameters_button_background"],
-                             selectforeground=self.colors.theme["tertiary_text"]
-                             )
-        self.style.configure('TCombobox.downarrow',
-                             foreground=self.colors.theme["secondary_background"], # Color of the arrow itself
-                             background=self.colors.theme["parameters_button_background"], # Background behind the arrow
-                             arrowsize=25,
-                             relief="flat"
-                             )
-        self.style.configure('TCombobox.button',
-                     background=self.colors.theme["parameters_button_background"],
-                     bordercolor=self.colors.theme["parameters_button_background"], 
-                     relief="flat", 
-                     lightcolor=self.colors.theme["parameters_button_background"],
-                     darkcolor=self.colors.theme["parameters_button_background"],
-                     padding=[10, 0, 10, 0] 
-                     )
-        
-        combobox_layout = [
-            # Move the downarrow to the left side
-            ('Combobox.downarrow', {'side': 'left', 'sticky': 'ns'}),
-            # The field (text area) will now be on the right, expanding
-            ('Combobox.field', {'sticky': 'nswe', 'children': [
-                ('Combobox.padding', {'sticky': 'nswe', 'children': [
-                    ('Combobox.textarea', {'sticky': 'nswe', 'expand': 1}) # expand=1 ensures it takes remaining space
-                ]})
-            ]})
-        ]
-        self.style.layout('MyCombobox.TCombobox', combobox_layout)
-
-    # Call this method to toggle dark mode and refresh UI
-    def toggle_dark_mode(self):
-        self.dark_mode = not self.dark_mode
-        self.update_colors()
-        self.refresh_ui()
-
-    def refresh_ui(self):        
-        self.root.configure(bg=self.colors.theme["primary_background"])
-        for widget in self.root.winfo_children():
-            widget.destroy()
-        self.__init__(self.root, self.dark_mode, self.current_page)
-  
+    # Create global interface
     def create_layout(self):
         # Top bar with title and controls - FIRST and full width
         self.create_top_bar()
@@ -279,6 +264,60 @@ class WormAnalysisApp:
         self.main_content = tk.Frame(self.content_frame, bg=self.colors.theme["primary_background"])
         self.main_content.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
+    def create_top_bar(self):
+        # Create top bar
+        top_frame = tk.Frame(self.main_frame, bg=self.colors.theme["primary_background"], height=64)
+        top_frame.pack(fill=tk.X)
+        top_frame.pack_propagate(False)
+        
+        # Add a border
+        border_frame = tk.Frame(self.main_frame,bg=self.colors.theme["stroke"],height=1, relief=tk.RIDGE)
+        border_frame.pack(fill=tk.X)
+        border_frame.pack_propagate(False)
+        
+        # Title
+        title_label = tk.Label(top_frame, text="Worm Analysis", bg=self.colors.theme["primary_background"], fg=self.colors.theme["primary_text"],
+                              font=(self.font, 13, 'bold'))
+        title_label.pack(side=tk.LEFT, padx=80)
+        
+        # Create a frame that will contain the 2 buttons
+        controls_frame = tk.Frame(top_frame, bg=self.colors.theme["primary_background"]) 
+        controls_frame.pack(side=tk.RIGHT, padx=30)
+        
+        # Add the Dark mode button (still a standard Tkinter button)
+        text_dark_mode_button = "Dark mode" if not self.dark_mode else "Light mode"
+        dark_btn = self.create_rounded_button(
+            parent=controls_frame,
+            text=text_dark_mode_button,
+            command=self.toggle_dark_mode,
+            bg_color=self.colors.theme["dark_mode_button_background"],
+            text_color=self.colors.theme["dark_mode_button_text"],
+            hover_color=self.colors.theme["dark_mode_button_background_hover"],
+            font=(self.font, 11),
+            width_pixels=100, # Define width in pixels 
+            height_pixels=40, # Define height in pixels 
+            corner_radius=20, # Define the radius of the rounded corners
+            side=tk.RIGHT,
+            padx=5
+        )
+        dark_btn.pack(side=tk.RIGHT)
+
+        self.create_rounded_button(
+            parent=controls_frame,
+            text="...",
+            command=self.toggle_parameters,
+            bg_color=self.colors.theme["secondary_background"],
+            text_color=self.colors.theme["primary_text"],
+            hover_color=self.colors.theme["tertiary_background"],
+            font=(self.font, 16),
+            width_pixels=50, # Define width in pixels
+            height_pixels=40, # Define height in pixels
+            corner_radius=20, # Define the radius of the rounded corners
+            side=tk.RIGHT,
+            padx=5,
+            pady_text=6
+        )
+    
     def create_sidebar(self):
         # Create the side bar
         self.sidebar = tk.Frame(self.body_frame, bg=self.colors.theme["primary_background"], width=230)
@@ -358,61 +397,7 @@ class WormAnalysisApp:
                 padx_text=90,
                 pady=2
             )
-                     
-    def create_top_bar(self):
-        # Create top bar
-        top_frame = tk.Frame(self.main_frame, bg=self.colors.theme["primary_background"], height=64)
-        top_frame.pack(fill=tk.X)
-        top_frame.pack_propagate(False)
-        
-        # Add a border
-        border_frame = tk.Frame(self.main_frame,bg=self.colors.theme["stroke"],height=1, relief=tk.RIDGE)
-        border_frame.pack(fill=tk.X)
-        border_frame.pack_propagate(False)
-        
-        # Title
-        title_label = tk.Label(top_frame, text="Worm Analysis", bg=self.colors.theme["primary_background"], fg=self.colors.theme["primary_text"],
-                              font=(self.font, 13, 'bold'))
-        title_label.pack(side=tk.LEFT, padx=80)
-        
-        # Create a frame that will contain the 2 buttons
-        controls_frame = tk.Frame(top_frame, bg=self.colors.theme["primary_background"]) 
-        controls_frame.pack(side=tk.RIGHT, padx=30)
-        
-        # Add the Dark mode button (still a standard Tkinter button)
-        text_dark_mode_button = "Dark mode" if not self.dark_mode else "Light mode"
-        dark_btn = self.create_rounded_button(
-            parent=controls_frame,
-            text=text_dark_mode_button,
-            command=self.toggle_dark_mode,
-            bg_color=self.colors.theme["dark_mode_button_background"],
-            text_color=self.colors.theme["dark_mode_button_text"],
-            hover_color=self.colors.theme["dark_mode_button_background_hover"],
-            font=(self.font, 11),
-            width_pixels=100, # Define width in pixels 
-            height_pixels=40, # Define height in pixels 
-            corner_radius=20, # Define the radius of the rounded corners
-            side=tk.RIGHT,
-            padx=5
-        )
-        dark_btn.pack(side=tk.RIGHT)
-
-        self.create_rounded_button(
-            parent=controls_frame,
-            text="...",
-            command=self.toggle_parameters,
-            bg_color=self.colors.theme["secondary_background"],
-            text_color=self.colors.theme["primary_text"],
-            hover_color=self.colors.theme["tertiary_background"],
-            font=(self.font, 16),
-            width_pixels=50, # Define width in pixels
-            height_pixels=40, # Define height in pixels
-            corner_radius=20, # Define the radius of the rounded corners
-            side=tk.RIGHT,
-            padx=5,
-            pady_text=6
-        )
-        
+                         
     def create_parameters_panel(self):
         self.params_frame = tk.Frame(self.body_frame, bg=self.colors.theme["secondary_background"], width=230)
         if self.show_parameters:
@@ -621,42 +606,6 @@ class WormAnalysisApp:
         toggle_canvas.bind("<Button-1>", toggle_command)
         draw_toggle()
           
-    def toggle_parameters(self):
-        self.show_parameters = not self.show_parameters
-        if self.show_parameters:
-            self.params_frame.pack(side=tk.RIGHT, fill=tk.Y)
-        else:
-            self.params_frame.pack_forget()
-        
-        # Store the after_id and schedule resizing with error handling
-        if hasattr(self, 'main_content') and self.main_content.winfo_exists():
-            after_id = self.main_content.after(50, self.resize_scan_content_area)
-            if not hasattr(self, '_after_ids'):
-                self._after_ids = []
-            self._after_ids.append(after_id)
-
-    def resize_scan_content_area(self):
-        middle_container = self.middle_container_ref
-        content_area = self.content_area_ref
-
-        container_width = middle_container.winfo_width()
-        container_height = middle_container.winfo_height()
-
-        if self.shape.get() == 'square':
-            side = min(container_width, container_height)
-            width = height = side
-        elif self.shape.get() == 'rectangle':
-            height = min(container_height, container_width / 2)
-            width = 2 * height
-        else:
-            height = min(container_height, container_width)
-            width = height
-
-        x = (container_width - width) / 2
-        y = (container_height - height) / 2
-
-        content_area.place(x=x, y=y, width=width, height=height)
-
     def create_rounded_button(self, parent, text, command, bg_color, text_color,
                           hover_color, font, width_pixels, height_pixels,
                           corner_radius, side, padx=0, pady=0, padx_text=0, pady_text=0,
@@ -775,17 +724,6 @@ class WormAnalysisApp:
         # Also bind the label widget and all its children
         bind_events_recursive(label_widget)
         
-        """shape_id = self.draw_rounded_rect(
-            canvas,
-            x1 + inset, y1 + inset,
-            x2 - inset, y2 - inset,
-            max(corner_radius - inset, 0),
-            fill=bg_color,
-            outline=bg_color,
-            tag="button_shape"
-        )""" # TODO à supprimer si ne cause pas d'erreurq
-
-
         return canvas
 
     def draw_rounded_rect(self, canvas, x1, y1, x2, y2, radius, fill, outline, tag):
@@ -806,11 +744,59 @@ class WormAnalysisApp:
         ]
         canvas.create_polygon(points, fill=fill, outline=outline, smooth=True, splinesteps=36, tags=tag)
 
-    # Pages   
+    def resize_scan_content_area(self):
+        middle_container = self.middle_container_ref
+        content_area = self.content_area_ref
+
+        container_width = middle_container.winfo_width()
+        container_height = middle_container.winfo_height()
+
+        if self.shape.get() == 'square':
+            side = min(container_width, container_height)
+            width = height = side
+        elif self.shape.get() == 'rectangle':
+            height = min(container_height, container_width / 2)
+            width = 2 * height
+        else:
+            height = min(container_height, container_width)
+            width = height
+
+        x = (container_width - width) / 2
+        y = (container_height - height) / 2
+
+        content_area.place(x=x, y=y, width=width, height=height)
+
+    # Command
+    def refresh_ui(self):        
+        self.root.configure(bg=self.colors.theme["primary_background"])
+        for widget in self.root.winfo_children():
+            widget.destroy()
+        self.__init__(self.root, self.dark_mode, self.current_page)
+  
+    def toggle_dark_mode(self):
+        self.dark_mode = not self.dark_mode
+        self.update_colors()
+        self.refresh_ui()
+
+    def toggle_parameters(self):
+        self.show_parameters = not self.show_parameters
+        if self.show_parameters:
+            self.params_frame.pack(side=tk.RIGHT, fill=tk.Y)
+        else:
+            self.params_frame.pack_forget()
+        
+        # Store the after_id and schedule resizing with error handling
+        if hasattr(self, 'main_content') and self.main_content.winfo_exists():
+            after_id = self.main_content.after(50, self.resize_scan_content_area)
+            if not hasattr(self, '_after_ids'):
+                self._after_ids = []
+            self._after_ids.append(after_id)
+    
     def switch_page(self, page_id):
         self.current_page = page_id
         self.refresh_ui()
     
+    # Pages   
     def show_automatic_scan_page(self):
         # Clear previous widgets if needed
         for widget in self.main_content.winfo_children():
