@@ -12,16 +12,20 @@ from Tooltip import Tooltip
 from colorTheme import ColorTheme
 
 class WormAnalysisApp:
-    def __init__(self, root, initial_dark_mode=False, first_page = "automatic_scan"):
+    def __init__(self, root, initial_dark_mode=False, first_page = "automatic_scan", intial_show_parameters = True):
         self.root = root
         self.root.title("Worm Analysis")
         self.root.geometry("1440x960")
         self.PARAMS_FILE = "parameters.yaml"
 
         # Initialize variables
-        self.show_parameters = True
+        self.show_parameters = intial_show_parameters
         self.current_page = first_page
         self.dark_mode = initial_dark_mode
+        self.prediction = 85 # TODO
+        self.proportion_mutation = 10 # TODO
+        self.id_worm_seen = 1 # TODO
+        self.nb_of_worm = 26 # TODO
         self.loaded_params = self.load_parameters()
         self.set_parameters()
 
@@ -216,7 +220,37 @@ class WormAnalysisApp:
         plus_path = Path(RESSOURCES_DIR) / "icon" / "plus.png" 
         self.plus_icon = self.flatten_and_resize(plus_path, 60, 60, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
         self.plus_icon_hover = self.flatten_and_resize(plus_path, 60, 60, self.colors.theme["tertiary_background"], self.colors.theme["stroke_button"])
-                                          
+        
+        # Process live.png
+        live_path = Path(RESSOURCES_DIR) / "icon" / "live.png" 
+        self.live_icon = self.flatten_and_resize(live_path, 40, 40, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
+        self.live_icon_hover = self.flatten_and_resize(live_path, 40, 40, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
+        
+        # Process snap.png
+        snap_path = Path(RESSOURCES_DIR) / "icon" / "snap.png" 
+        self.snap_icon = self.flatten_and_resize(snap_path, 40, 40, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
+        self.snap_icon_hover = self.flatten_and_resize(snap_path, 40, 40, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
+        
+        # Process wildtype.png
+        wildtype_path = Path(RESSOURCES_DIR) / "icon" / "wildtype.png" 
+        self.wildtype_icon = self.flatten_and_resize(wildtype_path, 40, 40, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
+        self.wildtype_icon_hover = self.flatten_and_resize(wildtype_path, 40, 40, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
+        
+        # Process mutant.png
+        mutant_path = Path(RESSOURCES_DIR) / "icon" / "mutant.png" 
+        self.mutant_icon = self.flatten_and_resize(mutant_path, 50, 50, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
+        self.mutant_icon_hover = self.flatten_and_resize(mutant_path, 50, 50, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
+        
+        # Process next.png
+        next_path = Path(RESSOURCES_DIR) / "icon" / "next.png" 
+        self.next_icon = self.flatten_and_resize(next_path, 40, 40, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
+        self.next_icon_hover = self.flatten_and_resize(next_path, 40, 40, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
+        
+        # Process last.png
+        last_path = Path(RESSOURCES_DIR) / "icon" / "last.png" 
+        self.last_icon = self.flatten_and_resize(last_path, 50, 50, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
+        self.last_icon_hover = self.flatten_and_resize(last_path, 50, 50, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
+                                            
     def flatten_and_resize(self, img_path, width, height, bg_color, fg_color):
         img_pil = Image.open(str(img_path)).convert("RGBA")
 
@@ -749,34 +783,12 @@ class WormAnalysisApp:
         ]
         canvas.create_polygon(points, fill=fill, outline=outline, smooth=True, splinesteps=36, tags=tag)
 
-    def resize_scan_content_area(self):
-        middle_container = self.middle_container_ref
-        content_area = self.content_area_ref
-
-        container_width = middle_container.winfo_width()
-        container_height = middle_container.winfo_height()
-
-        if self.shape.get() == 'square':
-            side = min(container_width, container_height)
-            width = height = side
-        elif self.shape.get() == 'rectangle':
-            height = min(container_height, container_width / 2)
-            width = 2 * height
-        else:
-            height = min(container_height, container_width)
-            width = height
-
-        x = (container_width - width) / 2
-        y = (container_height - height) / 2
-
-        content_area.place(x=x, y=y, width=width, height=height)
-
     # Command
     def refresh_ui(self):        
         self.root.configure(bg=self.colors.theme["primary_background"])
         for widget in self.root.winfo_children():
             widget.destroy()
-        self.__init__(self.root, self.dark_mode, self.current_page)
+        self.__init__(self.root, self.dark_mode, self.current_page, self.show_parameters)
   
     def toggle_dark_mode(self):
         self.dark_mode = not self.dark_mode
@@ -801,11 +813,36 @@ class WormAnalysisApp:
         self.current_page = page_id
         self.refresh_ui()
     
-    def resize_live_assist(self, event):
+    def resize_scan_content_area(self):
+        middle_container = self.middle_container_ref
+        content_area = self.content_area_ref
+
+        container_width = middle_container.winfo_width()
+        container_height = middle_container.winfo_height()
+
+        if self.shape.get() == 'square':
+            side = min(container_width, container_height)
+            width = height = side
+        elif self.shape.get() == 'rectangle':
+            height = min(container_height, container_width / 2)
+            width = 2 * height
+        else:
+            height = min(container_height, container_width)
+            width = height
+
+        x = (container_width - width) / 2
+        y = (container_height - height) / 2
+
+        content_area.place(x=x, y=y, width=width, height=height)
+    
+    def resize_live_image(self, event):
         w, h = event.width, event.height
         size = min(w, h - 80)  # leave space for bottom button
         x = (w - size) // 2
-        self.live_assist_container_ref.place(x=x, y=0, width=size, height=size)
+        if self.current_page == "assist_acquisition":
+            self.live_assist_container_ref.place(x=x, y=0, width=size, height=size)
+        elif self.current_page == "load_position":
+            self.live_analysis_container_ref.place(x=x, y=0, width=size, height=size)
     
     def resize_map_assist(self, event):
         w, h = event.width, event.height
@@ -813,7 +850,39 @@ class WormAnalysisApp:
         x = (w - size) // 2
         y = h - size - 10  # 10 px from bottom
         self.map_assist_containter_ref.place(x=x, y=y, width=size, height=size)
-    
+       
+    def resize_prediction_result_box(self, event):
+        canvas_width = event.width
+        canvas_height = event.height
+        self.top_label_canvas.coords(self.top_label_frame_window, canvas_width / 2, canvas_height / 2)   
+        
+        # Draw the rectangle
+        canvas_width = event.width
+        canvas_height = event.height
+
+        rect_width = 299
+        rect_height = 98
+
+        x1 = (canvas_width - rect_width) / 2
+        y1 = (canvas_height - rect_height) / 2
+        x2 = x1 + rect_width
+        y2 = y1 + rect_height
+
+        # Remove previous rectangle if any
+        self.top_label_canvas.delete("rounded_bg")
+
+        self.draw_rounded_rect(
+            self.top_label_canvas,
+            x1=x1,
+            y1=y1,
+            x2=x2,
+            y2=y2,
+            radius=20,
+            fill=self.colors.theme["primary_background"],
+            outline=self.colors.theme["secondary_text"],
+            tag="rounded_bg"
+        )
+            
     # Pages   
     def show_automatic_scan_page(self):
         # Clear previous widgets if needed
@@ -909,7 +978,7 @@ class WormAnalysisApp:
         self.live_assist_container_ref = live_assist_container
 
         # Bind resize for square behavior
-        self.left_live_assist_container_ref.bind("<Configure>", self.resize_live_assist)
+        self.left_live_assist_container_ref.bind("<Configure>", self.resize_live_image)
 
         # Bottom: Buttons + label
         bottom_assist_container = tk.Frame(left_live_assist_container, bg=self.colors.theme["primary_background"])
@@ -1023,28 +1092,38 @@ class WormAnalysisApp:
         left_live_analysis_container.grid(row=0, column=0, sticky="nsew", padx=(0, 10))  
         self.left_live_analysis_container_ref = left_live_analysis_container
 
-        # Use grid in left container to stack content
-        left_live_analysis_container.grid_rowconfigure(0, weight=1)  # for live_analysis_container
-        left_live_analysis_container.grid_rowconfigure(1, weight=0)  # for bottom_analysis_container
+        left_live_analysis_container.grid_rowconfigure(0, weight=1)
+        left_live_analysis_container.grid_rowconfigure(1, weight=0)
         left_live_analysis_container.grid_columnconfigure(0, weight=1)
 
         # Top: Live analysis square
-        live_analysis_container = tk.Frame(left_live_analysis_container, bg=self.colors.theme["secondary_background"], relief=tk.RAISED, bd=1)
+        live_analysis_container = tk.Frame(
+            left_live_analysis_container,
+            bg=self.colors.theme["secondary_background"],
+            relief=tk.RAISED,
+            bd=1
+        )
         live_analysis_container.grid(row=0, column=0, sticky="nsew")
         self.live_analysis_container_ref = live_analysis_container
+        self.left_live_analysis_container_ref.bind("<Configure>", self.resize_live_image)
 
-        # Bind resize for square behavior
-        self.left_live_analysis_container_ref.bind("<Configure>", self.resize_live_assist)
-
-        # Bottom: Buttons + label
+        # Bottom: Buttons + labels
         bottom_analysis_container = tk.Frame(left_live_analysis_container, bg=self.colors.theme["primary_background"])
         bottom_analysis_container.grid(row=1, column=0, sticky="ew", pady=(10, 10))
-        
+
+        # --- Row that holds both button + label groups ---
+        button_label_row_analysis_container = tk.Frame(bottom_analysis_container, bg=self.colors.theme["primary_background"])
+        button_label_row_analysis_container.pack()
+
+        # --- First button + label ---
+        button1_analysis_container = tk.Frame(button_label_row_analysis_container, bg=self.colors.theme["primary_background"])
+        button1_analysis_container.pack(side=tk.LEFT, padx=10)
+
         self.create_rounded_button(
-            parent=bottom_analysis_container,
+            parent=button1_analysis_container,
             text="",
-            icon=self.play_icon,
-            icon_hover=self.play_icon_hover,
+            icon=self.live_icon,
+            icon_hover=self.live_icon_hover,
             command=lambda: self.switch_page("load_position"),
             bg_color=self.colors.theme["primary_background"],
             text_color=self.colors.theme["primary_text"],
@@ -1055,77 +1134,289 @@ class WormAnalysisApp:
             corner_radius=20,
             side=tk.TOP,
             pady=5,
+            padx_text=-7,
+            border_width=2,
+            border_color=self.colors.theme["stroke_button"]
+        )
+
+        tk.Label(
+            button1_analysis_container,
+            text="Start analysis",
+            bg=self.colors.theme["primary_background"],
+            fg=self.colors.theme["secondary_text"],
+            font=(self.font, 10)
+        ).pack()
+
+        # --- Second button + label ---
+        button2_analysis_container = tk.Frame(button_label_row_analysis_container, bg=self.colors.theme["primary_background"])
+        button2_analysis_container.pack(side=tk.LEFT, padx=10)
+
+        self.create_rounded_button(
+            parent=button2_analysis_container,
+            text="",
+            icon=self.snap_icon,
+            icon_hover=self.snap_icon_hover,
+            command=lambda: self.switch_page("load_position"),
+            bg_color=self.colors.theme["primary_background"],
+            text_color=self.colors.theme["primary_text"],
+            hover_color=self.colors.theme["secondary_background"],
+            font=(self.font, 16),
+            width_pixels=200,
+            height_pixels=60,
+            corner_radius=20,
+            side=tk.TOP,
+            pady=5,
+            padx_text=-7,
+            border_width=2,
+            border_color=self.colors.theme["stroke_button"]
+        )
+
+        tk.Label(
+            button2_analysis_container,
+            text="Take snapshot",
+            bg=self.colors.theme["primary_background"],
+            fg=self.colors.theme["secondary_text"],
+            font=(self.font, 10)
+        ).pack()
+
+
+
+
+        # ----- RIGHT CONTAINER -----
+        right_map_analysis_container = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
+        right_map_analysis_container.grid(row=0, column=1, sticky="nsew", padx=(0, 0))
+        self.right_map_analysis_container_ref = right_map_analysis_container
+
+        # Make it expand vertically
+        right_map_analysis_container.grid_rowconfigure((0, 1, 2, 3, 4), weight=1)
+        right_map_analysis_container.grid_columnconfigure(0, weight=1)  # left spacer
+        right_map_analysis_container.grid_columnconfigure(1, weight=0)  # the container column
+        right_map_analysis_container.grid_columnconfigure(2, weight=1)  # right spacer
+
+
+        # 1. Label Container (fixed space with rounded border)
+        self.top_label_1_analysis_container = tk.Frame(right_map_analysis_container)
+        self.top_label_1_analysis_container.grid(row=0, column=1, sticky="ew", pady=(30, 10))
+        self.top_label_1_analysis_container.grid_columnconfigure(1, weight=1)
+
+        # Create a canvas inside this frame for drawing the rounded rectangle
+        self.top_label_canvas = tk.Canvas(
+            self.top_label_1_analysis_container, 
+            height=100, 
+            highlightthickness=0,
+            bg=self.colors.theme["primary_background"]
+        )
+        self.top_label_canvas.grid(row=0, column=0, sticky="ns")
+
+        # Create a frame on top of the canvas to hold the labels
+        self.top_label_frame = tk.Frame(self.top_label_canvas, bg=self.colors.theme["primary_background"], bd=0)
+    
+        # Now add labels inside self.top_label_frame
+        tk.Label(
+            self.top_label_frame,
+            text="Synaptic profiling prediction",
+            bg=self.colors.theme["primary_background"],
+            fg=self.colors.theme["secondary_text"],
+            font=(self.font, 10, "bold")
+        ).pack(pady=(0, 0), anchor="center")  # changed from "w" to "center"
+
+        self.prediction_label = tk.Label(
+            self.top_label_frame,
+            text=f"The analysed worm is a mutant",
+            bg=self.colors.theme["primary_background"],
+            fg=self.colors.theme["secondary_text"],
+            justify="center",  # changed from "left" to "center"
+            font=(self.font, 8)
+        )
+        self.prediction_label.pack(pady=(5, 0), anchor="center")
+
+        self.prediction_label_2 = tk.Label(
+            self.top_label_frame,
+            text=f"with a probability of {self.prediction}%",
+            bg=self.colors.theme["primary_background"],
+            fg=self.colors.theme["secondary_text"],
+            justify="center",  # changed from "left" to "center"
+            font=(self.font, 8)
+        )
+        self.prediction_label_2.pack(pady=(0, 0), anchor="center")
+
+        
+        self.top_label_frame_window = self.top_label_canvas.create_window(
+            (0, 0), window=self.top_label_frame, anchor="center"
+        )
+
+        self.top_label_canvas.bind("<Configure>", self.resize_prediction_result_box)
+
+
+        # To hide it, you can use :
+        #   self.top_label_1_analysis_container.grid_remove()
+        # And to show it :
+        #   self.top_label_1_analysis_container.grid()
+
+        # 2. Two Buttons with Text Below (Side by Side)
+        mid_buttons_2_analysis_container = tk.Frame(right_map_analysis_container, bg=self.colors.theme["primary_background"])
+        mid_buttons_2_analysis_container.grid(row=1, column=1, sticky="ew")
+
+        # 1st
+        sub1_2_analysis_container = tk.Frame(mid_buttons_2_analysis_container, bg=self.colors.theme["primary_background"])
+        sub1_2_analysis_container.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=10)
+
+        self.create_rounded_button(
+            parent=sub1_2_analysis_container,
+            text="",
+            icon=self.wildtype_icon,
+            icon_hover=self.wildtype_icon_hover,
+            command=lambda: self.add_worm_callback, # TODO
+            bg_color=self.colors.theme["primary_background"],
+            text_color=self.colors.theme["primary_text"],
+            hover_color=self.colors.theme["secondary_background"],
+            font=(self.font, 14),
+            width_pixels=104,
+            height_pixels=70,
+            corner_radius=20,
+            side=tk.TOP,
+            padx_text=-5,
+            pady=5,
+            border_width=2,
+            border_color=self.colors.theme["stroke_button"]
+        )
+
+        tk.Label(sub1_2_analysis_container, text="Wild-Type", bg=self.colors.theme["primary_background"],
+                fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack()
+        text_proportion_wild_type = f"{100-self.proportion_mutation}%"
+        tk.Label(sub1_2_analysis_container, text=text_proportion_wild_type, bg=self.colors.theme["primary_background"],
+                fg=self.colors.theme["secondary_text"], font=(self.font, 7)).pack()
+        
+        # 2nd
+        sub2_2_analysis_container = tk.Frame(mid_buttons_2_analysis_container, bg=self.colors.theme["primary_background"])
+        sub2_2_analysis_container.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=10)
+
+        self.create_rounded_button(
+            parent=sub2_2_analysis_container,
+            text="",
+            icon=self.mutant_icon,
+            icon_hover=self.mutant_icon_hover,
+            command=lambda: self.add_worm_callback, # TODO
+            bg_color=self.colors.theme["primary_background"],
+            text_color=self.colors.theme["primary_text"],
+            hover_color=self.colors.theme["secondary_background"],
+            font=(self.font, 14),
+            width_pixels=104,
+            height_pixels=70,
+            corner_radius=20,
+            side=tk.TOP,
+            padx_text=-5,
+            pady=5,
+            border_width=2,
+            border_color=self.colors.theme["stroke_button"]
+        )
+
+        tk.Label(sub2_2_analysis_container, text="Mutation", bg=self.colors.theme["primary_background"],
+                fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack()
+        text_proportion_mutation = f"{self.proportion_mutation}%"
+        tk.Label(sub2_2_analysis_container, text=text_proportion_mutation, bg=self.colors.theme["primary_background"],
+                fg=self.colors.theme["secondary_text"], font=(self.font, 7)).pack()
+
+        # 3. Text Container
+        text_3_analysis_container = tk.Frame(right_map_analysis_container, bg=self.colors.theme["primary_background"])
+        text_3_analysis_container.grid(row=2, column=1, sticky="ew", pady=0, ipady=0)  # Remove all padding
+        text_id_worm_seen = f"{self.id_worm_seen}/{self.nb_of_worm}"
+        tk.Label(
+            text_3_analysis_container,
+            text=text_id_worm_seen,
+            bg=self.colors.theme["primary_background"],
+            fg=self.colors.theme["tertiary_text"],
+            font=(self.font, 10)
+        ).pack(pady=0)
+
+        # 4. Two Buttons Side by Side - Use same row to eliminate gap
+        bottom_buttons_4_analysis_container = tk.Frame(text_3_analysis_container, bg=self.colors.theme["primary_background"])
+        bottom_buttons_4_analysis_container.pack(side=tk.BOTTOM, pady=(5, 0))  # Remove fill=tk.X to center content
+
+        # Create a single container for both buttons without expansion
+        buttons_wrapper = tk.Frame(bottom_buttons_4_analysis_container, bg=self.colors.theme["primary_background"])
+        buttons_wrapper.pack()
+
+        # 1st
+        sub1_4_analysis_container = tk.Frame(buttons_wrapper, bg=self.colors.theme["primary_background"])
+        sub1_4_analysis_container.pack(side=tk.LEFT, padx=(0, 1))  # Remove expand=True and fill=tk.X
+        self.create_rounded_button(
+            parent=sub1_4_analysis_container,
+            text="",
+            icon=self.last_icon,
+            icon_hover=self.last_icon_hover,
+            command=lambda: print(""), # TODO
+            bg_color=self.colors.theme["primary_background"],
+            text_color=self.colors.theme["primary_text"],
+            hover_color=self.colors.theme["secondary_background"],
+            font=(self.font, 12),
+            width_pixels=104,
+            height_pixels=70,
+            corner_radius=10,
+            side=tk.TOP,
+            padx=10,  
+            pady=5,
+            padx_text=-5,
+            border_width=2,
+            border_color=self.colors.theme["stroke_button"]
+        )
+
+        # 2nd
+        sub2_4_analysis_container = tk.Frame(buttons_wrapper, bg=self.colors.theme["primary_background"])
+        sub2_4_analysis_container.pack(side=tk.LEFT, padx=(1, 0))  # Remove expand=True and fill=tk.X
+        self.create_rounded_button(
+            parent=sub2_4_analysis_container,
+            text="",
+            icon=self.next_icon,
+            icon_hover=self.next_icon_hover,
+            command=lambda: print(""), # TODO
+            bg_color=self.colors.theme["primary_background"],
+            text_color=self.colors.theme["primary_text"],
+            hover_color=self.colors.theme["secondary_background"],
+            font=(self.font, 12),
+            width_pixels=104,
+            height_pixels=70,
+            corner_radius=10,
+            side=tk.TOP,
+            padx=10, 
+            pady=5,
+            padx_text=-5,
+            border_width=2,
+            border_color=self.colors.theme["stroke_button"]
+        )
+
+        # 5. Button + Text with Padding
+        final_5_analysis_container = tk.Frame(right_map_analysis_container, bg=self.colors.theme["primary_background"])
+        final_5_analysis_container.grid(row=4, column=1, sticky="ew", pady=(10, 50))
+
+        self.create_rounded_button(
+            parent=final_5_analysis_container,
+            text="",
+            icon=self.play_icon,
+            icon_hover=self.play_icon_hover,
+            command=lambda: print("Final Action"), # TODO
+            bg_color=self.colors.theme["primary_background"],
+            text_color=self.colors.theme["primary_text"],
+            hover_color=self.colors.theme["secondary_background"],
+            font=(self.font, 12),
+            width_pixels=250,
+            height_pixels=60,
+            corner_radius=10,
+            side=tk.TOP,
+            pady=5,
             padx_text=-10,
             border_width=2,
             border_color=self.colors.theme["stroke_button"]
         )
 
-        # Info label with tooltip
-        launch_label_analysis_container = tk.Frame(bottom_analysis_container, bg=self.colors.theme["primary_background"])
-        launch_label_analysis_container.pack()
-
         tk.Label(
-            launch_label_analysis_container, text="Start analysis",
-            bg=self.colors.theme["primary_background"], fg=self.colors.theme["tertiary_text"],
-            font=(self.font, 10)
-        ).pack(side=tk.LEFT)
-
-        # ----- RIGHT CONTAINER -----
-        right_map_analysis_container = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
-        right_map_analysis_container.grid(row=0, column=1, sticky="nsew", padx=(0, 20))
-        self.right_map_analysis_container_ref = right_map_analysis_container
-
-        # Make right container expand vertically
-        right_map_analysis_container.grid_rowconfigure(0, weight=1)
-        right_map_analysis_container.grid_columnconfigure(0, weight=1)
-
-        # Container for button + text
-        top_button_analysis_container = tk.Frame(right_map_analysis_container, bg=self.colors.theme["primary_background"])
-        top_button_analysis_container.pack(pady=(70, 0))  # adjust padding as needed
-
-        # Button at the top
-        self.create_rounded_button(
-            parent=top_button_analysis_container,
-            text="",
-            icon=self.plus_icon,
-            icon_hover=self.plus_icon_hover,
-            command=lambda: self.add_worm_callback,
-            bg_color=self.colors.theme["secondary_background"],
-            text_color=self.colors.theme["primary_text"],
-            hover_color=self.colors.theme["tertiary_background"],
-            font=(self.font, 14),
-            width_pixels=150,
-            height_pixels=120,
-            corner_radius=20,
-            side=tk.TOP,
-            pady=5,
-            padx_text=-5,
-            border_width=0
-        )
-
-        # Two lines of text under the button
-        tk.Label(
-            top_button_analysis_container,
-            text="Save position",
+            final_5_analysis_container,
+            text="Launch analysis",
             bg=self.colors.theme["primary_background"],
-            fg=self.colors.theme["tertiary_text"],
+            fg=self.colors.theme["secondary_text"],
             font=(self.font, 10)
         ).pack()
 
-        tk.Label(
-            top_button_analysis_container,
-            text="(you can use the press bar)",
-            bg=self.colors.theme["primary_background"],
-            fg=self.colors.theme["tertiary_text"],
-            font=(self.font, 7)
-        ).pack()
-
-        # Bottom: Black square (map)
-        map_analysis_container = tk.Frame(right_map_analysis_container, bg="black")
-        map_analysis_container.place(x=0, y=0, width=0, height=0)
-        self.map_analysis_containter_ref = map_analysis_container
-        self.right_map_analysis_container_ref.bind("<Configure>", self.resize_map_analysis)
-    
     def show_placeholder_page(self, page_name):
         placeholder = tk.Label(self.main_content, text=f"{page_name} Page\n(Coming soon...)",
                              bg=self.colors.theme["primary_background"], fg=self.colors.theme["primary_text"], font=(self.font, 16))
