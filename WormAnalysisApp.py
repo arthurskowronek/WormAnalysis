@@ -8,8 +8,8 @@ from PIL import Image, ImageTk, ImageColor
 
 from config import RESSOURCES_DIR
 
-from Tooltip import Tooltip
-from colorTheme import ColorTheme
+from interface.Tooltip import Tooltip
+from interface.colorTheme import ColorTheme
 
 class WormAnalysisApp:
     def __init__(self, root, initial_dark_mode=False, first_page = "automatic_scan", initial_show_parameters = True):

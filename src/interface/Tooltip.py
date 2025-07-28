@@ -1,6 +1,6 @@
 import tkinter as tk
 
-from colorTheme import ColorTheme
+from src.interface.colorTheme import ColorTheme
 
 class Tooltip:
     def __init__(self, widget, text, title="Warning", posx=0, posy=0):
