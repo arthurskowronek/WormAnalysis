@@ -46,11 +46,15 @@ def set_up_environment():
             if file.is_file():
                 file.unlink()
     
-def loadCore(CONFIG, DIRECTORY):
+def loadCore():
+    DIRECTORY = "C:/Program Files/Micro-Manager-2.0gamma" # Select the folder which contains Micro-Manager.
+    CONFIG = "BESSEREAU_Lab.cfg" # Name of the config file (has to be in the Micro-Manager root folder)
+    os.chdir(os.path.dirname(os.path.abspath(__file__))) # Set the current working directory
     mmc = pymmcore.CMMCore()
     mmc.setDeviceAdapterSearchPaths([DIRECTORY])
     mmc.loadSystemConfiguration(os.path.join(DIRECTORY, CONFIG))
     return mmc
+
 
 
 
