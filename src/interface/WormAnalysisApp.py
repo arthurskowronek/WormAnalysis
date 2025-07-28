@@ -74,7 +74,7 @@ class WormAnalysisApp:
             self.show_placeholder_page(self.current_page.replace('_', ' ').title())
         elif self.current_page == "tutorial":
             self.show_placeholder_page(self.current_page.replace('_', ' ').title())
-        elif self.current_page == "machine_config":
+        elif self.current_page == "configuration":
             self.show_placeholder_page(self.current_page.replace('_', ' ').title())
     
     # Initalization helper function
@@ -1976,11 +1976,3 @@ class WormAnalysisApp:
         self.refresh_parameters_interface()
         self.update_parameter_widgets_state(disabled_widgets=["exposure_time","binning","shutter","dual_view","display_mode","scan_objective","fluo_objective","scan_shape"])
         
-
-def main():
-    root = tk.Tk()
-    app = WormAnalysisApp(root)
-    root.mainloop()
-
-if __name__ == "__main__":
-    main()

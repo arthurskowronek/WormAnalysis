@@ -324,15 +324,6 @@ def LoadCore(CONFIG, DIRECTORY):
 
 if __name__ == "__main__":
     
-    # Initialize directory
-    dirs_to_clear = ["Unclassified","Mutant_prediction","WT_prediction","Scan","Scan_modified"]
-    for subdir in dirs_to_clear:
-        directory = Path(DATA_DIR) / subdir
-        for file in directory.iterdir():
-            if file.is_file():
-                file.unlink()
-    
-    
     mode_selected = main_menu()
     
     if mode_selected == "scan":
