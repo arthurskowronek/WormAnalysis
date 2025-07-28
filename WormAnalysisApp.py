@@ -8,8 +8,8 @@ from PIL import Image, ImageTk, ImageColor
 
 from config import RESSOURCES_DIR
 
-from interface.Tooltip import Tooltip
-from interface.colorTheme import ColorTheme
+from src.interface.Tooltip import Tooltip
+from src.interface.colorTheme import ColorTheme
 
 class WormAnalysisApp:
     def __init__(self, root, initial_dark_mode=False, first_page = "automatic_scan", initial_show_parameters = True):
@@ -35,7 +35,7 @@ class WormAnalysisApp:
         self.root = root
         self.root.title("Worm Analysis")
         self.root.geometry("1440x960")
-        self.PARAMS_FILE = "parameters.yaml"
+        self.PARAMS_FILE = Path(RESSOURCES_DIR) / "parameters.yaml"
 
         # Initialize variables
         self.show_parameters = initial_show_parameters
