@@ -9,8 +9,8 @@ Projet Python avec interface graphique (`tkinter`), nécessitant un environnemen
 > Nécessite [Homebrew](https://brew.sh) sur macOS, et `pyenv` sur Linux/macOS.
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/skowronek/WormAnalysis/main/setup.sh | bash
-
+curl -sSL https://raw.githubusercontent.com/arthurskowronek/WormAnalysis/main/setup.sh | bash
+```
 
 ---
 
