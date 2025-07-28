@@ -188,118 +188,118 @@ class WormAnalysisApp:
         # ---------------- Parameters icon ----------------     
         # Process toggle_open.png
         open_img_path = Path(RESSOURCES_DIR) / "icon" / "toggle_open.png"
-        self.toggle_open_icon = self.flatten_and_resize(open_img_path, 34, 14, self.colors.theme["secondary_background"], self.colors.theme["toggle_button"])
+        self.toggle_open_icon = self.flatten_and_resize_icon(open_img_path, 34, 14, self.colors.theme["secondary_background"], self.colors.theme["toggle_button"])
 
         # Process toggle_close.png
         close_img_path = Path(RESSOURCES_DIR) / "icon" / "toggle_close.png"
-        self.toggle_close_icon = self.flatten_and_resize(close_img_path, 34, 14, self.colors.theme["secondary_background"], self.colors.theme["toggle_button"])
+        self.toggle_close_icon = self.flatten_and_resize_icon(close_img_path, 34, 14, self.colors.theme["secondary_background"], self.colors.theme["toggle_button"])
         
         # Process filtre.png
         filtre_path = Path(RESSOURCES_DIR) / "icon" / "filtre.png" 
-        self.icon_parameter = self.flatten_and_resize(filtre_path, 18, 18, self.colors.theme["secondary_background"], self.colors.theme["icon"])
+        self.icon_parameter = self.flatten_and_resize_icon(filtre_path, 18, 18, self.colors.theme["secondary_background"], self.colors.theme["icon"])
         
         # Process clock.png
         clock_path = Path(RESSOURCES_DIR) / "icon" / "clock.png" 
-        self.clock_icon = self.flatten_and_resize(clock_path, 18, 18, self.colors.theme["parameters_button_background"], self.colors.theme["tertiary_text"])
-        self.clock_icon_disabled = self.flatten_and_resize(clock_path, 18, 18, self.colors.theme["parameters_button_disabled_background"], self.colors.theme["tertiary_text"])
+        self.clock_icon = self.flatten_and_resize_icon(clock_path, 18, 18, self.colors.theme["parameters_button_background"], self.colors.theme["tertiary_text"])
+        self.clock_icon_disabled = self.flatten_and_resize_icon(clock_path, 18, 18, self.colors.theme["parameters_button_disabled_background"], self.colors.theme["tertiary_text"])
         
         # ---------------- Menu icon ----------------
         # Process scan.png
         scan_path = Path(RESSOURCES_DIR) / "icon" / "scan.png" 
-        self.scan_icon = self.flatten_and_resize(scan_path, 18, 18, self.colors.theme["primary_background"], self.colors.theme["icon"])
-        self.scan_icon_hover = self.flatten_and_resize(scan_path, 18, 18, self.colors.theme["secondary_background"], self.colors.theme["icon"])
+        self.scan_icon = self.flatten_and_resize_icon(scan_path, 18, 18, self.colors.theme["primary_background"], self.colors.theme["icon"])
+        self.scan_icon_hover = self.flatten_and_resize_icon(scan_path, 18, 18, self.colors.theme["secondary_background"], self.colors.theme["icon"])
         
         # Process validation.png
         validation_path = Path(RESSOURCES_DIR) / "icon" / "validation.png" 
-        self.validation_icon = self.flatten_and_resize(validation_path, 18, 18, self.colors.theme["primary_background"], self.colors.theme["icon"])
-        self.validation_icon_hover = self.flatten_and_resize(validation_path, 18, 18, self.colors.theme["secondary_background"], self.colors.theme["icon"])
+        self.validation_icon = self.flatten_and_resize_icon(validation_path, 18, 18, self.colors.theme["primary_background"], self.colors.theme["icon"])
+        self.validation_icon_hover = self.flatten_and_resize_icon(validation_path, 18, 18, self.colors.theme["secondary_background"], self.colors.theme["icon"])
         
         # Process load.png
         load_path = Path(RESSOURCES_DIR) / "icon" / "load.png" 
-        self.loading_icon = self.flatten_and_resize(load_path, 18, 18, self.colors.theme["primary_background"], self.colors.theme["icon"])
-        self.loading_icon_hover = self.flatten_and_resize(load_path, 18, 18, self.colors.theme["secondary_background"], self.colors.theme["icon"])
+        self.loading_icon = self.flatten_and_resize_icon(load_path, 18, 18, self.colors.theme["primary_background"], self.colors.theme["icon"])
+        self.loading_icon_hover = self.flatten_and_resize_icon(load_path, 18, 18, self.colors.theme["secondary_background"], self.colors.theme["icon"])
         
         # Process machine_parameters.png
         machine_parameters_path = Path(RESSOURCES_DIR) / "icon" / "machine_parameters.png" 
-        self.machine_parameters_icon = self.flatten_and_resize(machine_parameters_path, 18, 18, self.colors.theme["primary_background"], self.colors.theme["icon"])
-        self.machine_parameters_icon_hover = self.flatten_and_resize(machine_parameters_path, 18, 18, self.colors.theme["secondary_background"], self.colors.theme["icon"])
+        self.machine_parameters_icon = self.flatten_and_resize_icon(machine_parameters_path, 18, 18, self.colors.theme["primary_background"], self.colors.theme["icon"])
+        self.machine_parameters_icon_hover = self.flatten_and_resize_icon(machine_parameters_path, 18, 18, self.colors.theme["secondary_background"], self.colors.theme["icon"])
         
         # Process modify.png
         modify_path = Path(RESSOURCES_DIR) / "icon" / "modify.png" 
-        self.modify_icon = self.flatten_and_resize(modify_path, 18, 18, self.colors.theme["primary_background"], self.colors.theme["icon"])
-        self.modify_icon_hover = self.flatten_and_resize(modify_path, 18, 18, self.colors.theme["secondary_background"], self.colors.theme["icon"])
+        self.modify_icon = self.flatten_and_resize_icon(modify_path, 18, 18, self.colors.theme["primary_background"], self.colors.theme["icon"])
+        self.modify_icon_hover = self.flatten_and_resize_icon(modify_path, 18, 18, self.colors.theme["secondary_background"], self.colors.theme["icon"])
         
         # Process page.png
         page_path = Path(RESSOURCES_DIR) / "icon" / "page.png" 
-        self.page_icon = self.flatten_and_resize(page_path, 18, 18, self.colors.theme["primary_background"], self.colors.theme["icon"])
-        self.page_icon_hover = self.flatten_and_resize(page_path, 18, 18, self.colors.theme["secondary_background"], self.colors.theme["icon"])
+        self.page_icon = self.flatten_and_resize_icon(page_path, 18, 18, self.colors.theme["primary_background"], self.colors.theme["icon"])
+        self.page_icon_hover = self.flatten_and_resize_icon(page_path, 18, 18, self.colors.theme["secondary_background"], self.colors.theme["icon"])
         
         # Process question.png
         question_path = Path(RESSOURCES_DIR) / "icon" / "question.png" 
-        self.question_icon = self.flatten_and_resize(question_path, 18, 18, self.colors.theme["primary_background"], self.colors.theme["icon"])
-        self.question_icon_hover = self.flatten_and_resize(question_path, 18, 18, self.colors.theme["secondary_background"], self.colors.theme["icon"])
+        self.question_icon = self.flatten_and_resize_icon(question_path, 18, 18, self.colors.theme["primary_background"], self.colors.theme["icon"])
+        self.question_icon_hover = self.flatten_and_resize_icon(question_path, 18, 18, self.colors.theme["secondary_background"], self.colors.theme["icon"])
         
         # Process quit.png
         quit_path = Path(RESSOURCES_DIR) / "icon" / "quit.png" 
-        self.quit_icon = self.flatten_and_resize(quit_path, 18, 18, self.colors.theme["quit_button_background"], self.colors.theme["quit_button_text"])
-        self.quit_icon_hover = self.flatten_and_resize(quit_path, 18, 18, self.colors.theme["quit_button_background_hover"], self.colors.theme["quit_button_text"])
+        self.quit_icon = self.flatten_and_resize_icon(quit_path, 18, 18, self.colors.theme["quit_button_background"], self.colors.theme["quit_button_text"])
+        self.quit_icon_hover = self.flatten_and_resize_icon(quit_path, 18, 18, self.colors.theme["quit_button_background_hover"], self.colors.theme["quit_button_text"])
         
         # ---------------- Main content icon ----------------
         # Process play.png
         play_path = Path(RESSOURCES_DIR) / "icon" / "play.png" 
-        self.play_icon = self.flatten_and_resize(play_path, 40, 40, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
-        self.play_icon_hover = self.flatten_and_resize(play_path, 40, 40, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
+        self.play_icon = self.flatten_and_resize_icon(play_path, 40, 40, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
+        self.play_icon_hover = self.flatten_and_resize_icon(play_path, 40, 40, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
         
         # Process info.png
         info_path = Path(RESSOURCES_DIR) / "icon" / "info.png" 
-        self.info_icon = self.flatten_and_resize(info_path, 16, 16, self.colors.theme["primary_background"], self.colors.theme["secondary_text"])
+        self.info_icon = self.flatten_and_resize_icon(info_path, 16, 16, self.colors.theme["primary_background"], self.colors.theme["secondary_text"])
            
         # Process plus.png
         plus_path = Path(RESSOURCES_DIR) / "icon" / "plus.png" 
-        self.plus_icon = self.flatten_and_resize(plus_path, 60, 60, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
-        self.plus_icon_hover = self.flatten_and_resize(plus_path, 60, 60, self.colors.theme["tertiary_background"], self.colors.theme["stroke_button"])
+        self.plus_icon = self.flatten_and_resize_icon(plus_path, 60, 60, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
+        self.plus_icon_hover = self.flatten_and_resize_icon(plus_path, 60, 60, self.colors.theme["tertiary_background"], self.colors.theme["stroke_button"])
         
         # Process live.png
         live_path = Path(RESSOURCES_DIR) / "icon" / "live.png" 
-        self.live_icon = self.flatten_and_resize(live_path, 40, 40, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
-        self.live_icon_hover = self.flatten_and_resize(live_path, 40, 40, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
+        self.live_icon = self.flatten_and_resize_icon(live_path, 40, 40, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
+        self.live_icon_hover = self.flatten_and_resize_icon(live_path, 40, 40, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
         
         # Process snap.png
         snap_path = Path(RESSOURCES_DIR) / "icon" / "snap.png" 
-        self.snap_icon = self.flatten_and_resize(snap_path, 40, 40, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
-        self.snap_icon_hover = self.flatten_and_resize(snap_path, 40, 40, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
+        self.snap_icon = self.flatten_and_resize_icon(snap_path, 40, 40, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
+        self.snap_icon_hover = self.flatten_and_resize_icon(snap_path, 40, 40, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
         
         # Process wildtype.png
         wildtype_path = Path(RESSOURCES_DIR) / "icon" / "wildtype.png" 
-        self.wildtype_icon = self.flatten_and_resize(wildtype_path, 40, 40, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
-        self.wildtype_icon_hover = self.flatten_and_resize(wildtype_path, 40, 40, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
+        self.wildtype_icon = self.flatten_and_resize_icon(wildtype_path, 40, 40, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
+        self.wildtype_icon_hover = self.flatten_and_resize_icon(wildtype_path, 40, 40, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
         
         # Process mutant.png
         mutant_path = Path(RESSOURCES_DIR) / "icon" / "mutant.png" 
-        self.mutant_icon = self.flatten_and_resize(mutant_path, 50, 50, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
-        self.mutant_icon_hover = self.flatten_and_resize(mutant_path, 50, 50, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
+        self.mutant_icon = self.flatten_and_resize_icon(mutant_path, 50, 50, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
+        self.mutant_icon_hover = self.flatten_and_resize_icon(mutant_path, 50, 50, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
         
         # Process next.png
         next_path = Path(RESSOURCES_DIR) / "icon" / "next.png" 
-        self.next_icon = self.flatten_and_resize(next_path, 40, 40, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
-        self.next_icon_hover = self.flatten_and_resize(next_path, 40, 40, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
+        self.next_icon = self.flatten_and_resize_icon(next_path, 40, 40, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
+        self.next_icon_hover = self.flatten_and_resize_icon(next_path, 40, 40, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
         
         # Process last.png
         last_path = Path(RESSOURCES_DIR) / "icon" / "last.png" 
-        self.last_icon = self.flatten_and_resize(last_path, 40, 40, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
-        self.last_icon_hover = self.flatten_and_resize(last_path, 40, 40, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
+        self.last_icon = self.flatten_and_resize_icon(last_path, 40, 40, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
+        self.last_icon_hover = self.flatten_and_resize_icon(last_path, 40, 40, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
         
         # Process add_worm.png
         add_worm_path = Path(RESSOURCES_DIR) / "icon" / "add_worm.png" 
-        self.add_worm_icon = self.flatten_and_resize(add_worm_path, 30, 30, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
-        self.add_worm_icon_hover = self.flatten_and_resize(add_worm_path, 30, 30, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
+        self.add_worm_icon = self.flatten_and_resize_icon(add_worm_path, 30, 30, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
+        self.add_worm_icon_hover = self.flatten_and_resize_icon(add_worm_path, 30, 30, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
         
         # Process remove_worm.png
         remove_worm_path = Path(RESSOURCES_DIR) / "icon" / "remove_worm.png" 
-        self.remove_worm_icon = self.flatten_and_resize(remove_worm_path, 30, 30, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
-        self.remove_worm_icon_hover = self.flatten_and_resize(remove_worm_path, 30, 30, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
+        self.remove_worm_icon = self.flatten_and_resize_icon(remove_worm_path, 30, 30, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
+        self.remove_worm_icon_hover = self.flatten_and_resize_icon(remove_worm_path, 30, 30, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
                                                   
-    def flatten_and_resize(self, img_path, width, height, bg_color, fg_color):
+    def flatten_and_resize_icon(self, img_path, width, height, bg_color, fg_color):
         img_pil = Image.open(str(img_path)).convert("RGBA")
 
         # Resize while preserving aspect ratio
@@ -904,6 +904,10 @@ class WormAnalysisApp:
                 self._after_ids = []
             self._after_ids.append(after_id)
     
+    def toggle_add_worm_scan_result(self):
+        self.add_worm_scan_result = not self.add_worm_scan_result   
+        self.show_result_scan_page()
+    
     def switch_page(self, page_id):
         self.current_page = page_id
         self.refresh_ui()
@@ -981,11 +985,7 @@ class WormAnalysisApp:
             outline=self.colors.theme["secondary_text"],
             tag="rounded_bg"
         )
-       
-    def toggle_add_worm_scan_result(self):
-        self.add_worm_scan_result = not self.add_worm_scan_result   
-        self.show_result_scan_page()
-            
+               
     # Pages   
     def show_automatic_scan_page(self):
         # Clear previous widgets if needed
@@ -1063,11 +1063,7 @@ class WormAnalysisApp:
         for widget in self.main_content.winfo_children():
             widget.destroy()
             
-        # Disable some paramaters buttons
-        """self.update_parameter_widgets_state(disabled_widgets=["scan_shape"]) 
-        self.refresh_parameters_interface()
-        self.update_parameter_widgets_state(disabled_widgets=["scan_shape"]) """ 
-        
+        # Disable some paramaters buttons 
         self.update_parameter_widgets_state(disabled_widgets=["exposure_time","binning","shutter","dual_view","display_mode","scan_objective","fluo_objective","scan_shape"]) 
         self.refresh_parameters_interface()
         self.update_parameter_widgets_state(disabled_widgets=["exposure_time","binning","shutter","dual_view","display_mode","scan_objective","fluo_objective","scan_shape"])
@@ -1196,6 +1192,11 @@ class WormAnalysisApp:
         # Clear previous widgets
         for widget in self.main_content.winfo_children():
             widget.destroy()
+          
+        # Disable some paramaters buttons   
+        self.update_parameter_widgets_state(disabled_widgets=["scan_shape"]) 
+        self.refresh_parameters_interface()
+        self.update_parameter_widgets_state(disabled_widgets=["scan_shape"])
 
         # Configure grid layout for main_content
         self.main_content.grid_columnconfigure(0, weight=60)
@@ -1321,6 +1322,11 @@ class WormAnalysisApp:
         # Clear previous widgets
         for widget in self.main_content.winfo_children():
             widget.destroy()
+            
+        # Disable some paramaters buttons   
+        self.update_parameter_widgets_state(disabled_widgets=["scan_shape", "scan_objective"]) 
+        self.refresh_parameters_interface()
+        self.update_parameter_widgets_state(disabled_widgets=["scan_shape", "scan_objective"])
 
         # Configure grid layout for main_content
         self.main_content.grid_columnconfigure(0, weight=75)
@@ -1661,6 +1667,12 @@ class WormAnalysisApp:
         placeholder = tk.Label(self.main_content, text=f"{page_name} Page\n(Coming soon...)",
                              bg=self.colors.theme["primary_background"], fg=self.colors.theme["primary_text"], font=(self.font, 16))
         placeholder.pack(expand=True)
+        
+        # Disable some paramaters buttons 
+        self.update_parameter_widgets_state(disabled_widgets=["exposure_time","binning","shutter","dual_view","display_mode","scan_objective","fluo_objective","scan_shape"]) 
+        self.refresh_parameters_interface()
+        self.update_parameter_widgets_state(disabled_widgets=["exposure_time","binning","shutter","dual_view","display_mode","scan_objective","fluo_objective","scan_shape"])
+        
 
 def main():
     root = tk.Tk()
