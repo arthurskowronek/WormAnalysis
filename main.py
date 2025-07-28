@@ -5,6 +5,7 @@ from config import config_environment
 def main():
     # Create environment
     config_environment()
+    
     # Launch application
     root = tk.Tk()
     app = WormAnalysisApp(root)

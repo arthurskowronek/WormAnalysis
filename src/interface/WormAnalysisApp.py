@@ -1228,6 +1228,13 @@ class WormAnalysisApp:
         
         self.last_scan_area_size = (int(width), int(height))
         
+        # --- Resize image accordingly ---
+        if hasattr(self, 'original_image') and hasattr(self, 'img_label'):
+            resized_img = self.original_image.resize(self.last_scan_area_size)
+            photo = ImageTk.PhotoImage(resized_img)
+            self.displayed_image = photo
+            self.img_label.configure(image=photo)
+        
     def resize_live_image(self, event):
         w, h = event.width, event.height
         size = min(w, h - 80)  # leave space for bottom button
@@ -1477,20 +1484,17 @@ class WormAnalysisApp:
                 self._after_ids = []
             self._after_ids.append(after_id)
             
-            
-        # Load and display image
-        try:
-            img = Image.open(Path(RESSOURCES_DIR) / "stitching_img_resized.jpg") 
-            img.thumbnail((self.last_scan_area_size)) 
-            photo = ImageTk.PhotoImage(img)
-            self.displayed_image = photo  # Keep a reference to avoid garbage collection
+        # Load and store original image
+        self.original_image = Image.open(Path(RESSOURCES_DIR) / "stitching_img_resized.jpg")
+        # Temporary placeholder — resized correctly after layout
+        placeholder_img = self.original_image.resize((10, 10))  # tiny for now
+        photo = ImageTk.PhotoImage(placeholder_img)
+        self.displayed_image = photo
+        # Create image label and store reference
+        self.img_label = tk.Label(content_area_result_container, image=photo, bg=self.colors.theme["secondary_background"])
+        self.img_label.pack(expand=True)
 
-            img_label = tk.Label(content_area_result_container, image=photo, bg=self.colors.theme["secondary_background"])
-            img_label.pack(expand=True)
-        except Exception as e:
-            error_label = tk.Label(content_area_result_container, text=f"Error loading image:\n{e}", fg="red")
-            error_label.pack()
-    
+
     def show_assist_acquisition_page(self):
         # Clear previous widgets
         for widget in self.main_content.winfo_children():
