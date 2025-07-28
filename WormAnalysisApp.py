@@ -938,6 +938,8 @@ class WormAnalysisApp:
 
         content_area.place(x=x, y=y, width=width, height=height)
         
+        self.last_scan_area_size = (int(width), int(height))
+        
     def resize_live_image(self, event):
         w, h = event.width, event.height
         size = min(w, h - 80)  # leave space for bottom button
@@ -1068,7 +1070,6 @@ class WormAnalysisApp:
         self.refresh_parameters_interface()
         self.update_parameter_widgets_state(disabled_widgets=["exposure_time","binning","shutter","dual_view","display_mode","scan_objective","fluo_objective","scan_shape"])
         
-
         # Middle container that will hold the content_area and expand to max space
         middle_result_container = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
         middle_result_container.pack(fill=tk.BOTH, expand=True)
@@ -1077,7 +1078,7 @@ class WormAnalysisApp:
         # Content area inside the middle container
         content_area_result_container = tk.Frame(middle_result_container, bg=self.colors.theme["secondary_background"], relief=tk.RAISED, bd=1)
         content_area_result_container.place(x=0, y=0, width=0, height=0)  # Temporary, real size set later
-        self.content_area_result_container_ref = content_area_result_container
+        self.content_area_result_container_ref = content_area_result_container        
 
         # Bottom section with launch button
         bottom_frame_result_container = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
@@ -1187,6 +1188,20 @@ class WormAnalysisApp:
             if not hasattr(self, '_after_ids'):
                 self._after_ids = []
             self._after_ids.append(after_id)
+            
+            
+        # Load and display image
+        try:
+            img = Image.open(Path(RESSOURCES_DIR) / "stitching_img_resized.jpg") 
+            img.thumbnail((self.last_scan_area_size)) 
+            photo = ImageTk.PhotoImage(img)
+            self.displayed_image = photo  # Keep a reference to avoid garbage collection
+
+            img_label = tk.Label(content_area_result_container, image=photo, bg=self.colors.theme["secondary_background"])
+            img_label.pack(expand=True)
+        except Exception as e:
+            error_label = tk.Label(content_area_result_container, text=f"Error loading image:\n{e}", fg="red")
+            error_label.pack()
     
     def show_assist_acquisition_page(self):
         # Clear previous widgets
