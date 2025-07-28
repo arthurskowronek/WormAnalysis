@@ -4,6 +4,6 @@ dual_view: false
 exposure_time: '100'
 fluo_objective: 10x
 scan_objective: 4x
-shape: rectangle
+shape: square
 shutter: false
 user_directory: Arthur_2025_07_24

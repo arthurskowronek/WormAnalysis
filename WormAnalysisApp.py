@@ -13,6 +13,25 @@ from colorTheme import ColorTheme
 
 class WormAnalysisApp:
     def __init__(self, root, initial_dark_mode=False, first_page = "automatic_scan", initial_show_parameters = True):
+        """
+        Initializes the Worm Analysis Application interface.
+
+        Parameters:
+            root (tk.Tk): The root window of the Tkinter application.
+            initial_dark_mode (bool): If True, enables dark mode by default. Defaults to False.
+            first_page (str): The initial page to display. Options include:
+                              "automatic_scan", "scan_result", "assist_acquisition", "load_position", "documentation", "tutorial", "machine_config".
+                              Defaults to "automatic_scan".
+            initial_show_parameters (bool): If True, shows parameters section on startup. Defaults to True.
+
+        This constructor:
+            - Sets up main window dimensions and title.
+            - Initializes state variables and default values (e.g., prediction score, mutation proportion).
+            - Loads and binds parameter settings from a YAML configuration file.
+            - Sets up the visual theme (colors, fonts, icons).
+            - Initializes and displays the main frame layout.
+            - Displays the specified initial page.
+        """
         self.root = root
         self.root.title("Worm Analysis")
         self.root.geometry("1440x960")
@@ -51,11 +70,25 @@ class WormAnalysisApp:
             self.show_assist_acquisition_page()
         elif self.current_page == "load_position":
             self.show_load_position_page()
-        else:
+        elif self.current_page == "documentation":
+            self.show_placeholder_page(self.current_page.replace('_', ' ').title())
+        elif self.current_page == "tutorial":
+            self.show_placeholder_page(self.current_page.replace('_', ' ').title())
+        elif self.current_page == "machine_config":
             self.show_placeholder_page(self.current_page.replace('_', ' ').title())
     
     # Initalization helper function
     def load_parameters(self):
+        """
+        Loads application parameters from a YAML file.
+
+        Returns:
+            dict: A dictionary containing parameter keys and their saved values.
+                Returns an empty dictionary if the file does not exist.
+
+        Notes:
+            The parameters are loaded from the file defined by `self.PARAMS_FILE`.
+        """
         if os.path.exists(self.PARAMS_FILE):
             with open(self.PARAMS_FILE, "r") as f:
                 return yaml.safe_load(f)
@@ -63,27 +96,54 @@ class WormAnalysisApp:
             return {}
     
     def set_parameters(self):
+        """
+        Initializes and binds UI parameters using Tkinter variables.
+
+        This method:
+            - Initializes `StringVar` and `BooleanVar` objects for each parameter.
+            - Sets default values from the loaded YAML configuration (`self.loaded_params`).
+            - Adds trace callbacks to automatically save the parameters when they change.
+            - In the case of the 'shape' parameter, also triggers a resize of the scan content area.
+
+        Parameters initialized include:
+            - shape, exposure_time, binning, shutter, dual_view,
+            display_mode, scan_objective, fluo_objective, user_directory.
+        """
         self.shape = tk.StringVar(value=self.loaded_params.get("shape", "square"))
         self.shape.trace_add("write", lambda *args: self.resize_scan_content_area())
         self.shape.trace_add("write", lambda *args: self.save_parameters())
+        
         self.exposure_time = tk.StringVar(value=self.loaded_params.get("exposure_time", 100))
         self.exposure_time.trace_add("write", lambda *args: self.save_parameters())
+        
         self.binning = tk.StringVar(value=self.loaded_params.get("binning", "2x2"))
         self.binning.trace_add("write", lambda *args: self.save_parameters())
+        
         self.shutter = tk.BooleanVar(value=self.loaded_params.get("shutter", False))
         self.shutter.trace_add("write", lambda *args: self.save_parameters())
+        
         self.dual_view = tk.BooleanVar(value=self.loaded_params.get("dual_view", False))
         self.dual_view.trace_add("write", lambda *args: self.save_parameters())
+        
         self.display_mode = tk.StringVar(value=self.loaded_params.get("display_mode", 'Grayscale'))
         self.display_mode.trace_add("write", lambda *args: self.save_parameters())
+        
         self.scan_objective = tk.StringVar(value=self.loaded_params.get("scan_objective", '4x'))
         self.scan_objective.trace_add("write", lambda *args: self.save_parameters())
+        
         self.fluo_objective = tk.StringVar(value=self.loaded_params.get("fluo_objective", '10x'))
         self.fluo_objective.trace_add("write", lambda *args: self.save_parameters())
+        
         self.user_directory = tk.StringVar(value=self.loaded_params.get("user_directory", 'Arthur_2025_07_24'))
         self.user_directory.trace_add("write", lambda *args: self.save_parameters())
     
     def save_parameters(self):
+        """
+        Saves the current application parameters to a YAML file.
+
+        This method collects the current values of all parameter variables
+        and writes them to the file specified by `self.PARAMS_FILE`.
+        """
         params = {
             "exposure_time": self.exposure_time.get(),
             "binning": self.binning.get(),
@@ -99,9 +159,26 @@ class WormAnalysisApp:
             yaml.dump(params, f)
     
     def update_colors(self):
+        """
+        Updates the application's color theme based on the current dark mode setting.
+
+        Creates a new instance of `ColorTheme` and stores it in `self.colors`.
+        This object holds all color values used throughout the UI.
+        """
         self.colors = ColorTheme(self.dark_mode)     
     
     def set_color_theme(self):
+        """
+        Configures the visual appearance of custom-themed ttk comboboxes.
+
+        This method:
+            - Applies a theme ("clam") to ttk styles.
+            - Maps widget state styles (disabled, readonly) for foreground, background, borders, etc.
+            - Configures fonts and layout for dropdown menus.
+            - Repositions the combobox arrow to the left side for a custom look.
+
+        Affects the appearance of all comboboxes using the 'MyCombobox.TCombobox' style.
+        """
         self.style = ttk.Style()
         self.style.theme_use('clam')
         self.style.map('MyCombobox.TCombobox',
@@ -149,7 +226,7 @@ class WormAnalysisApp:
                              selectbackground=self.colors.theme["parameters_button_background"],
                              selectforeground=self.colors.theme["tertiary_text"]
                              )
-        # And for the listbox inside the popdown
+
         self.style.configure('TCombobox.Popdown.Listbox',
                              font=(self.font, 10), 
                              background=self.colors.theme["parameters_button_background"],
@@ -173,9 +250,7 @@ class WormAnalysisApp:
                      )
         
         combobox_layout = [
-            # Move the downarrow to the left side
             ('Combobox.downarrow', {'side': 'left', 'sticky': 'ns'}),
-            # The field (text area) will now be on the right, expanding
             ('Combobox.field', {'sticky': 'nswe', 'children': [
                 ('Combobox.padding', {'sticky': 'nswe', 'children': [
                     ('Combobox.textarea', {'sticky': 'nswe', 'expand': 1}) # expand=1 ensures it takes remaining space
@@ -185,6 +260,19 @@ class WormAnalysisApp:
         self.style.layout('MyCombobox.TCombobox', combobox_layout)
     
     def load_icon(self):   
+        """
+        Loads and processes all application icons from disk.
+
+        This includes icons for:
+            - Parameter toggles (e.g. open/close, filters, clock).
+            - Navigation menu (e.g. scan, validation, load, modify, quit).
+            - Main content actions (e.g. play, info, plus, live, snap).
+            - Worm classification (wildtype, mutant).
+            - Worm management (add/remove).
+
+        Each icon is recolored and resized using `flatten_and_resize_icon()`
+        to match the current theme (background/foreground colors).
+        """
         # ---------------- Parameters icon ----------------     
         # Process toggle_open.png
         open_img_path = Path(RESSOURCES_DIR) / "icon" / "toggle_open.png"
@@ -300,6 +388,24 @@ class WormAnalysisApp:
         self.remove_worm_icon_hover = self.flatten_and_resize_icon(remove_worm_path, 30, 30, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
                                                   
     def flatten_and_resize_icon(self, img_path, width, height, bg_color, fg_color):
+        """
+        Loads, recolors, and resizes an image icon.
+
+        Args:
+            img_path (Path or str): Path to the image file to process.
+            width (int): Target width of the final icon.
+            height (int): Target height of the final icon.
+            bg_color (str): Background color (hex or named color) to use behind the icon.
+            fg_color (str): Foreground color used to recolor the icon.
+
+        Returns:
+            ImageTk.PhotoImage: A Tkinter-compatible image object for UI usage.
+
+        Notes:
+            - Preserves original aspect ratio when resizing.
+            - Applies alpha mask to recolor only the visible icon shape.
+            - Centers the recolored icon within the desired dimensions.
+        """
         img_pil = Image.open(str(img_path)).convert("RGBA")
 
         # Resize while preserving aspect ratio
@@ -330,20 +436,31 @@ class WormAnalysisApp:
 
     # Create global interface
     def create_layout(self):
-        # Top bar with title and controls - FIRST and full width
+        """
+        Creates the main layout of the application window.
+
+        This method sets up the visual structure of the GUI by organizing:
+        - The top bar (title and controls)
+        - A horizontal frame that holds:
+            - A sidebar containing the menu (left)
+            - A parameters panel (right)
+            - A central content area
+        It ensures proper packing order to achieve the desired spatial distribution.
+        """
+        # Top bar with title and controls - full width
         self.create_top_bar()
 
         # Below top bar: main horizontal container (sidebar + content + parameters)
         self.body_frame = tk.Frame(self.main_frame, bg=self.colors.theme["primary_background"])
         self.body_frame.pack(fill=tk.BOTH, expand=True)
 
-        # Sidebar (LEFT) - Pack this FIRST to ensure it stays on the left
+        # Sidebar (LEFT)
         self.create_sidebar()
 
-        # Parameters (RIGHT) - Pack this SECOND so it goes to the right
+        # Parameters (RIGHT)
         self.create_parameters_panel()
 
-        # Content frame (CENTER) - Pack this LAST so it fills the remaining space
+        # Content frame (CENTER) - fills the remaining space
         self.content_frame = tk.Frame(self.body_frame, bg=self.colors.theme["primary_background"])
         self.content_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
@@ -352,6 +469,12 @@ class WormAnalysisApp:
         self.main_content.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
     def create_top_bar(self):
+        """
+        Creates the top bar containing the application title and control buttons.
+
+        Adds a title label, a dark mode toggle button, and a parameters panel toggle button.
+        Also includes a subtle border line under the top bar for separation.
+        """
         # Create top bar
         top_frame = tk.Frame(self.main_frame, bg=self.colors.theme["primary_background"], height=64)
         top_frame.pack(fill=tk.X)
@@ -406,6 +529,16 @@ class WormAnalysisApp:
         )
     
     def create_sidebar(self):
+        """
+        Creates the sidebar on the left side of the layout.
+
+        The sidebar includes:
+        - A title label ("Menu")
+        - Menu sections with navigation buttons (e.g., Detection, Analysis, Help)
+        - A Quit button at the bottom
+
+        Each button uses icons and hover effects for enhanced UI experience.
+        """
         # Create the side bar
         self.sidebar = tk.Frame(self.body_frame, bg=self.colors.theme["primary_background"], width=230)
         self.sidebar.pack(side=tk.LEFT, fill=tk.Y)
@@ -456,7 +589,20 @@ class WormAnalysisApp:
             pady=25
         )
         
-    def create_menu_section(self, title, items):        
+    def create_menu_section(self, title, items):
+        """
+        Creates a collapsible menu section in the sidebar.
+
+        Args:
+            title (str): The section title (e.g., "Detection", "Help").
+            items (list of tuple): Each item is a tuple of:
+                (str) button label,
+                (str) page ID,
+                (ImageTk.PhotoImage) icon,
+                (ImageTk.PhotoImage) hover icon.
+
+        Buttons created in the section allow switching pages via `self.switch_page`.
+        """        
         # Section title
         title_label = tk.Label(self.sidebar, text=title, bg=self.colors.theme["primary_background"], fg=self.colors.theme["primary_text"],
                               font=(self.font, 11, 'bold'), anchor='w')
@@ -487,6 +633,15 @@ class WormAnalysisApp:
             )
                          
     def create_parameters_panel(self):
+        """
+        Creates the parameters panel on the right side of the layout.
+
+        This panel is shown only if `self.show_parameters` is True. It includes:
+        - A header with the "Parameters" label and an icon
+        - A scrollable content area populated by `create_parameters_content`
+        - A "Name directory" input field at the bottom
+        """
+        # Create the frame
         self.params_frame = tk.Frame(self.body_frame, bg=self.colors.theme["secondary_background"], width=230)
         if self.show_parameters:
             self.params_frame.pack(side=tk.RIGHT, fill=tk.Y)
@@ -501,7 +656,7 @@ class WormAnalysisApp:
 
         tk.Label(header_frame, image=self.icon_parameter, bg=self.colors.theme["secondary_background"]).pack(side=tk.RIGHT, padx=(0,50))
 
-        # Content frame for parameters (all but the very last "Name directory")
+        # Content frame for parameters 
         self.params_content_frame = tk.Frame(self.params_frame, bg=self.colors.theme["secondary_background"])
         self.params_content_frame.pack(fill=tk.BOTH, expand=True, padx=20)
 
@@ -518,6 +673,19 @@ class WormAnalysisApp:
         )
 
     def create_parameters_content(self):
+        """
+        Populates the parameters panel with configurable options.
+
+        The options include:
+        - Exposure time (ms)
+        - Binning mode (e.g., 2x2, 3x3)
+        - Toggles for shutter and dual view
+        - Display mode selector
+        - Scan and fluorescence objective choices
+        - Scan shape selection
+
+        Each parameter respects its enabled/disabled state and visual design.
+        """
         # Exposure time
         bg = "parameters_button_background" if "exposure_time" in self.enable_parameters_buttons else "parameters_button_disabled_background"
         icon = self.clock_icon if "exposure_time" in self.enable_parameters_buttons else self.clock_icon_disabled
@@ -569,15 +737,34 @@ class WormAnalysisApp:
     
     # Button
     def create_rounded_input(self, parent, variable, bg = "parameters_button_background"): 
+        """
+        Creates a rounded entry input widget inside a canvas.
+
+        This method draws a custom-styled input field with rounded corners and
+        embeds a Tkinter `Entry` widget bound to a StringVar.
+
+        Args:
+            parent (tk.Widget): The parent widget where the input is placed.
+            variable (str | tk.StringVar | None): The initial value or variable to bind. 
+                If a string is passed, it will be wrapped in a StringVar.
+            bg (str, optional): Key name for the background color in the theme. 
+                Defaults to "parameters_button_background".
+
+        Returns:
+            tk.StringVar: The variable bound to the input field.
+        """
+        # Change the variable into a StringVar if needed
         if isinstance(variable, str):
             variable = tk.StringVar(value=variable)
         elif variable is None:
             variable = tk.StringVar() 
             
+        # Dimensions of the canvas
         canvas_width = 190 
         canvas_height = 35
-        radius = 20 # Corner radius
+        radius = 20 
 
+        # Create the canvas
         canvas = tk.Canvas(parent, width=canvas_width, height=canvas_height,
                            bg=parent.cget("bg"), highlightthickness=0) # Use parent's bg for canvas
         canvas.pack(fill=tk.X, pady=(0, 15), padx=20)
@@ -600,16 +787,35 @@ class WormAnalysisApp:
         return variable
     
     def create_rounded_input_with_icon(self, parent, variable, icon, bg = "parameters_button_background"):
+        """
+        Creates a rounded entry input widget with an icon on the left.
+
+        The icon can be an image or a string (e.g., emoji or text). The entry is
+        styled with a rounded background and bound to a `StringVar`.
+
+        Args:
+            parent (tk.Widget): The parent widget to contain the input field.
+            variable (str | tk.StringVar | None): The value or variable to bind.
+            icon (Union[str, ImageTk.PhotoImage]): The icon to display at the start of the input.
+            bg (str, optional): Key name for the background color in the theme. 
+                Defaults to "parameters_button_background".
+
+        Returns:
+            Tuple[tk.StringVar, tk.Entry]: A tuple containing the bound variable and the Entry widget itself.
+        """
+        # Change the variable into a StringVar if needed
         if isinstance(variable, str):
             variable = tk.StringVar(value=variable)
         elif variable is None:
             variable = tk.StringVar() 
         
+        # Dimentions of the canvas
         canvas_width = 190
         canvas_height = 35
         radius = 20
         icon_width = 35
 
+        # Create the canvas
         canvas = tk.Canvas(parent, width=canvas_width, height=canvas_height,
                         bg=parent.cget("bg"), highlightthickness=0)
         canvas.pack(fill=tk.X, pady=(0, 0))
@@ -619,6 +825,7 @@ class WormAnalysisApp:
                             radius, fill=self.colors.theme[bg],
                             outline=self.colors.theme[bg], tag="input_bg")
 
+        # Add the icon
         if isinstance(icon, str):
             # It's a text/emoji icon
             tk.Label(canvas, text=icon, bg=self.colors.theme[bg],
@@ -629,14 +836,14 @@ class WormAnalysisApp:
             canvas.image = icon  # Prevent garbage collection
 
 
-        # Entry widget
+        # Create the Entry widget
         entry = tk.Entry(canvas, textvariable=variable, font=(self.font, 10), bd=0, relief="flat", highlightthickness=0,
                  bg=self.colors.theme[bg], fg=self.colors.theme["tertiary_text"],
                  insertbackground=self.colors.theme["primary_text"], 
                  disabledbackground=self.colors.theme[bg],
                  disabledforeground=self.colors.theme["tertiary_text"])
 
-
+        # Place the entry widget inside the canvas. Adjust x, y for padding.
         entry_width = canvas_width - icon_width - radius
         entry_height = canvas_height - 10
         canvas.create_window(icon_width, canvas_height // 2, window=entry, anchor="w",
@@ -645,23 +852,43 @@ class WormAnalysisApp:
         return variable, entry
      
     def create_rounded_dropdown(self, parent, options, variable, bg = "parameters_button_background"):
+        """Creates a styled dropdown (combobox) with a rounded background.
+
+        The dropdown is placed inside a canvas and styled to match the application's theme.
+        It uses a readonly ttk.Combobox bound to a StringVar.
+
+        Args:
+            parent (tk.Widget): The parent widget where the dropdown is rendered.
+            options (List[str]): List of selectable string options in the dropdown.
+            variable (str | tk.StringVar | None): Initial value or variable to bind.
+            bg (str, optional): Key name for the background color in the theme. 
+                Defaults to "parameters_button_background".
+
+        Returns:
+            Tuple[tk.StringVar, ttk.Combobox]: The bound variable and the dropdown widget.
+        """
+        # Change the variable into a StringVar if needed
         if isinstance(variable, str):
             variable = tk.StringVar(value=variable)
         elif variable is None:
             variable = tk.StringVar()        
         
+        # Dimentions of the canvas
         canvas_width = 190 
         canvas_height = 35 
         radius = 20  # Corner radius
 
+        # Create the canvas
         canvas = tk.Canvas(parent, width=canvas_width, height=canvas_height,
                         bg=parent.cget("bg"), highlightthickness=0)
         canvas.pack(fill=tk.X, pady=(0, 0))
 
+        # Draw the background
         self.draw_rounded_rect(canvas, 0, 0, canvas_width, canvas_height,
                             radius, fill=self.colors.theme[bg],
                             outline=self.colors.theme[bg], tag="dropdown_bg")
 
+        # Create the widget
         combo = ttk.Combobox(
             canvas,
             values=options,
@@ -672,6 +899,7 @@ class WormAnalysisApp:
             style='MyCombobox.TCombobox'
         )
 
+        # Place the widget inside the canvas. Adjust x, y for padding.
         combo_width = canvas_width - 10
         combo_height = canvas_height - 10
         canvas.create_window(5, canvas_height / 2, window=combo, anchor="w",
@@ -680,12 +908,30 @@ class WormAnalysisApp:
         return variable, combo
     
     def create_custom_toggle(self, parent, label, boolean_var):
+        """
+        Creates a custom toggle switch with an icon that reflects its state.
+
+        This toggle displays a label and an image-based switch that changes appearance 
+        when toggled. It binds to a BooleanVar and visually updates when clicked.
+
+        Args:
+            parent (tk.Widget): The parent widget where the toggle will be added.
+            label (str): The text label describing the toggle's function.
+            boolean_var (tk.BooleanVar): The variable controlling the toggle's state. 
+                Clicking the toggle updates this variable.
+
+        Returns:
+            tk.Canvas: The canvas containing the toggle, which includes the image.
+        """
+        # Create the frame where the toggle will be set
         frame = tk.Frame(parent, bg=self.colors.theme["secondary_background"])
         frame.pack(fill=tk.X, pady=(5, 5))
 
+        # Add the label of the toggle
         tk.Label(frame, text=label, bg=self.colors.theme["secondary_background"],
                 fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(side=tk.LEFT)
 
+        # Create the toggle
         toggle_canvas = tk.Canvas(frame, width=self.toggle_open_icon.width(),
                                 height=self.toggle_open_icon.height(),
                                 bg=self.colors.theme["primary_background"], highlightthickness=0)
@@ -710,10 +956,37 @@ class WormAnalysisApp:
                           hover_color, font, width_pixels, height_pixels,
                           corner_radius, side, padx=0, pady=0, padx_text=0, pady_text=0,
                           anchor='center', border_width=0, border_color=None, icon=None, icon_hover=None):
+        """Creates a stylized button with rounded corners and optional icon.
+
+        The button is rendered on a canvas and supports hover effects, click binding,
+        and image swapping when hovered. It can display text only or an icon with text.
+
+        Args:
+            parent (tk.Widget): The parent widget for the button.
+            text (str): The button label.
+            command (Callable): The function to execute on click.
+            bg_color (str): The background color of the button.
+            text_color (str): The text color.
+            hover_color (str): The background color on hover.
+            font (Tuple): Font tuple for the button text.
+            width_pixels (int): Width of the button in pixels.
+            height_pixels (int): Height of the button in pixels.
+            corner_radius (int): Radius of the button's rounded corners.
+            side (str): Packing side for the button (e.g., tk.LEFT, tk.RIGHT).
+            padx (int, optional): Horizontal padding around the button. Defaults to 0.
+            pady (int, optional): Vertical padding around the button. Defaults to 0.
+            padx_text (int, optional): X offset for the text inside the button. Defaults to 0.
+            pady_text (int, optional): Y offset for the text inside the button. Defaults to 0.
+            anchor (str, optional): Anchor point for the text placement. Defaults to 'center'.
+            border_width (int, optional): Width of the border around the button. Defaults to 0.
+            border_color (str, optional): Border color. If None, uses theme default stroke. Defaults to None.
+            icon (PhotoImage, optional): Optional icon to display before the text. Defaults to None.
+            icon_hover (PhotoImage, optional): Optional icon to display on hover. Defaults to None.
+
+        Returns:
+            tk.Canvas: The canvas containing the button.
         """
-        Create a rounded-corner button on a Canvas that responds to clicks, hover, and shows a hand cursor.
-        The entire canvas and its label/widget are bound so that clicks anywhere inside fire `command()`.
-        """
+        # Default color border
         if border_color is None:
             border_color = self.colors.theme["stroke_button"]
 
@@ -727,7 +1000,7 @@ class WormAnalysisApp:
         )
         canvas.pack(side=side, padx=padx, pady=pady)
 
-        # Coordinates
+        # Get coordinates in which to draw the button
         x1, y1 = 0, 0
         x2, y2 = width_pixels, height_pixels
 
@@ -741,7 +1014,6 @@ class WormAnalysisApp:
             outline=border_color,
             tag="button_border"
         )
-
 
         # Draw main shape inset by border_width
         inset = border_width        
@@ -827,7 +1099,23 @@ class WormAnalysisApp:
         return canvas
 
     def draw_rounded_rect(self, canvas, x1, y1, x2, y2, radius, fill, outline, tag):
-        """Draw a full rounded rectangle using polygon and arcs."""
+        """
+        Draws a rounded rectangle on a Tkinter canvas.
+
+        This method creates a smoothed polygon approximating a rounded rectangle
+        using a list of points and splines.
+
+        Args:
+            canvas (tk.Canvas): The canvas where the shape will be drawn.
+            x1 (int): Left coordinate.
+            y1 (int): Top coordinate.
+            x2 (int): Right coordinate.
+            y2 (int): Bottom coordinate.
+            radius (int): The radius of the corners.
+            fill (str): Fill color.
+            outline (str): Outline color.
+            tag (str): A tag name to assign to the drawn shape for later reference.
+        """
         points = [
             (x1 + radius, y1),
             (x2 - radius, y1),
