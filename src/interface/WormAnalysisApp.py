@@ -12,7 +12,7 @@ from src.interface.Tooltip import Tooltip
 from src.interface.colorTheme import ColorTheme
 
 class WormAnalysisApp:
-    def __init__(self, root, initial_dark_mode=False, first_page = "automatic_scan", initial_show_parameters = True):
+    def __init__(self, root, mmc = None, initial_dark_mode=False, first_page = "automatic_scan", initial_show_parameters = True):
         """
         Initializes the Worm Analysis Application interface.
 
@@ -33,6 +33,7 @@ class WormAnalysisApp:
             - Displays the specified initial page.
         """
         self.root = root
+        self.CORE = mmc
         self.root.title("Worm Analysis")
         self.root.geometry("1440x960")
         self.PARAMS_FILE = Path(RESSOURCES_DIR) / "parameters.yaml"
@@ -1137,7 +1138,7 @@ class WormAnalysisApp:
         self.root.configure(bg=self.colors.theme["primary_background"])
         for widget in self.root.winfo_children():
             widget.destroy()
-        self.__init__(self.root, self.dark_mode, self.current_page, self.show_parameters)
+        self.__init__(self.root, self.CORE, self.dark_mode, self.current_page, self.show_parameters)
   
     def refresh_parameters_interface(self):
         if hasattr(self, "params_frame"):
@@ -1229,7 +1230,7 @@ class WormAnalysisApp:
         self.last_scan_area_size = (int(width), int(height))
         
         # --- Resize image accordingly ---
-        if hasattr(self, 'original_image') and hasattr(self, 'img_label'):
+        if hasattr(self, 'original_image') and hasattr(self, 'img_label') and self.img_label.winfo_exists():
             resized_img = self.original_image.resize(self.last_scan_area_size)
             photo = ImageTk.PhotoImage(resized_img)
             self.displayed_image = photo

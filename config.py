@@ -1,8 +1,10 @@
 """
 Global configuration file for the project.
 """
-from pathlib import Path
+import os
 import datetime
+import pymmcore #Library to connect the the Micro-Manager core
+from pathlib import Path
 
 # Get the project root (assuming we run from the project root)
 PROJECT_ROOT = Path.cwd()
@@ -31,7 +33,7 @@ DEFAULT_TEST_SIZE = 0.2  # 20% for testing
 DEFAULT_CV_FOLDS = 5  # Number of cross-validation folds
 
 
-def config_environment():
+def set_up_environment():
     # Create directories if they don't exist
     for directory in [DATA_DIR, MODELS_DIR, RESSOURCES_DIR, SRC_DIR, USER_DIR]:
         directory.mkdir(parents=True, exist_ok=True)
@@ -43,9 +45,14 @@ def config_environment():
         for file in directory.iterdir():
             if file.is_file():
                 file.unlink()
+    
+def loadCore(CONFIG, DIRECTORY):
+    mmc = pymmcore.CMMCore()
+    mmc.setDeviceAdapterSearchPaths([DIRECTORY])
+    mmc.loadSystemConfiguration(os.path.join(DIRECTORY, CONFIG))
+    return mmc
 
-    
-    
+
 
     
 

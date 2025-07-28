@@ -1,7 +1,4 @@
-"""
-Created on Thursday June 12 10:41:44 2025
-@author: Arthur SKOWRONEK, BESSEREAU LAB, INMG, LYON
-"""
+
 
 TEST = True
 
@@ -23,11 +20,6 @@ from src.interface.Live_Track_Page import LiveTrackPage
 
 import src.system.Grid_Search as Crible
 
-#### Loading the MicroManagerCore ####
-if not TEST:
-    Config = "BESSEREAU_Lab.cfg" #The config file has to be in the Micro-Manager root folder. Available : "MMConfig_demo.cfg" "BESSEREAU_Lab.cfg"
-    MM_Directory = "C:/Program Files/Micro-Manager-2.0gamma" #Select the folder which contains Micro-Manager.
-    os.chdir("C:/Users/imagerie/Desktop/CribleGenetic/") #Give the installation directory (or change to a python line to extract current file directory)
 
 
 def main_menu():
@@ -71,49 +63,6 @@ def main_menu():
         return "quit"
     else:
         return "none"
-
-def worm_search_menu():
-    
-    # Create UI instance
-    ui = WormSearchMenu()
-    
-    # Setup OpenCV window
-    cv2.namedWindow("Worm Search", cv2.WINDOW_NORMAL)
-    cv2.resizeWindow("Worm Search", ui.width, ui.height)
-    cv2.setMouseCallback("Worm Search", mouse_callback, ui)
-    
-    # Main loop
-    while True:
-        # Draw interface
-        img = ui.draw_interface()
-        
-        # Display
-        cv2.imshow("Worm Search", img)
-        cv2.moveWindow("Worm Search", 0, 0)
-        
-        # Handle keyboard input
-        key = cv2.waitKey(30) & 0xFF
-        if key == 27 or ui.exit == True:  # ESC to quit
-            ui.exit = True
-            break
-        elif key != 255:  # Any other key
-            ui.handle_key(key)
-        
-        if ui.launch:
-            break
-    
-    # Cleanup
-    cv2.destroyAllWindows()
-    
-    # Return final state
-    return {
-        'obj_scan': ui.obj_scan if not ui.scan_input_active else ui.scan_input.replace('.', ''),  
-        'dual_view': ui.dual_view,
-        'exposure_time': ui.time_exposure,
-        "shape": ui.shape,
-        'user_directory': ui.user_directory.replace(' ', '_'),
-        'exit': ui.exit
-    }
 
 def worm_search_result(SCAN_SHAPE, STICHING_IMG, WORM_POSITIONS, WORM_POSITIONS_PROPORTION):
     """Main application loop"""
