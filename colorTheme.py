@@ -18,6 +18,7 @@ class ColorTheme:
             "dark_mode_button_text": "#000000" if dark_mode else "#ffffff",
             "dark_mode_button_background_hover": "#e1e0e0" if dark_mode else "#5b5a5a",
             "parameters_button_background": "#f7f7f7" if dark_mode else "#ffffff",
+            "parameters_button_disabled_background": "#353535" if dark_mode else "#f1f1f1",
             "main_button_background": "#262626" if dark_mode else "#ffffff",
             "stroke_button": "#e0e0e0",
             "primary_text": "#ffffff" if dark_mode else "#000000",
