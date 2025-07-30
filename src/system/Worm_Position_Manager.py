@@ -40,10 +40,7 @@ class WormPositionManager:
         if new_acquisition:
             self._initialize_csv(table_worm_position)
         else:
-            if os.path.exists(self.csv_file_path):
-                print(f"Fichier CSV existant trouvé : {self.csv_file_path}")
-            else:
-                print(f"Create new csv file. {self.csv_file_path} not found")
+            if not os.path.exists(self.csv_file_path):
                 self._initialize_csv(table_worm_position)
          
     def _initialize_csv(self, table_worm_position = []) -> None:
@@ -96,10 +93,8 @@ class WormPositionManager:
         if [x,y] not in tab_worms:
             df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
             df.to_csv(self.csv_file_path, index=False)
-            print(f"Position ajoutée pour le ver: ({x}, {y})")
             return True
         else:
-            print(f"La position a déjà été sauvegardé: ({x}, {y})")
             return False
             
     def delete_worm(self, worm_id: int) -> bool:
@@ -162,6 +157,18 @@ class WormPositionManager:
         df = pd.read_csv(self.csv_file_path)
         if df is not None and not df.empty:
             positions = df[['x_microscope', 'y_microscope']].values.tolist()
+            return positions
+        else:
+            #print("Le fichier CSV est vide ou introuvable.")
+            return []
+    
+    def get_all_worm_proportion_position(self):
+        """
+        Récupère la position en proportion de tous les vers et leur ID
+        """
+        df = pd.read_csv(self.csv_file_path)
+        if df is not None and not df.empty:
+            positions = df[['worm_id', 'x_proportion', 'y_proportion']].values.tolist()
             return positions
         else:
             #print("Le fichier CSV est vide ou introuvable.")
@@ -307,6 +314,21 @@ class WormPositionManager:
         y_prop = x
             
         return x_prop, y_prop
+        
+    def transform_proportion_into_microscope_positions(self, x_prop, y_prop):
+        parameters = load_config_file()
+        start_corner_x = parameters.get('start_x', 0)
+        start_corner_y = parameters.get('start_y', 0)
+        end_corner_x = parameters.get('end_x', 1)
+        end_corner_y = parameters.get('end_y', 1)
+
+        x = y_prop
+        y = 1 - x_prop
+
+        x_microscope = x * (end_corner_x - start_corner_x) + start_corner_x
+        y_microscope = y * (end_corner_y - start_corner_y) + start_corner_y
+
+        return x_microscope, y_microscope
     
     # Change worm being seen methods            
     def go_to_newt_worm(self):
@@ -503,7 +525,6 @@ class WormPositionManager:
         return img
    
          
-
 
     
     

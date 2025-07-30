@@ -4,7 +4,7 @@ import numpy as np
 from PIL import Image
 from pathlib import Path
 from ultralytics import YOLO
-from tifffile import imsave, imread
+from tifffile import imwrite, imread
 from collections import defaultdict
 
 from config import MODELS_DIR, RESSOURCES_DIR, DATA_DIR, save_corner_positions_into_yaml_config_file
@@ -25,14 +25,15 @@ class ScanSlice:
             overlap_percent: Percentage overlap between images
         """
         self.mmc = mmc
-        self.grossissement = grossissement
-        self.dual_view = dual_view
-        self.scan_shape = scan_shape
+        self.grossissement = int(grossissement.get().replace("x", ""))
+        self.dual_view = dual_view.get()
+        self.scan_shape = scan_shape.get()
         self.overlap_percent = overlap_percent
+        print(f"ScanSlice initialized with grossissement={self.grossissement}, dual_view={self.dual_view}, scan_shape={self.scan_shape}, overlap_percent={self.overlap_percent}")
         
         # Calculate step sizes
-        self.step_size_x = 13180 / grossissement
-        self.step_size_y = self.step_size_x / 2 if dual_view else self.step_size_x
+        self.step_size_x = 13180 / self.grossissement
+        self.step_size_y = self.step_size_x / 2 if self.dual_view else self.step_size_x
         
         # Load YOLO model
         self.model = YOLO(Path(MODELS_DIR) / "YOLO_detection.pt")
@@ -103,7 +104,7 @@ class ScanSlice:
                 self.image = self.mmc.getImage()
                 
                 self.file_name = f"SlideScan_R{y_idx}_C{x_idx}_{self.file_count}.tif"
-                imsave(self.scan_dir / self.file_name, self.image)  # Save image
+                imwrite(self.scan_dir / self.file_name, self.image)  # Save image
                 
                 # Record position info
                 self.positions_info.append([self.file_count, pos_x, pos_y, x_idx, y_idx])
@@ -112,7 +113,7 @@ class ScanSlice:
         
         # Process final image
         if self.image is not None:
-            imsave(self.scan_modified_dir / self.file_name, self.image)
+            imwrite(self.scan_modified_dir / self.file_name, self.image)
         
         # Return to starting position
         self.mmc.setXYPosition(self.mmc.getXYStageDevice(), self.start_x, self.start_y)
@@ -138,10 +139,10 @@ class ScanSlice:
             
             img_half = np.vstack([img_up_right, img_down_right])
             self.image = np.hstack([img_half_left, img_half])
-            imsave(self.scan_modified_dir / self.file_name, self.image)
+            imwrite(self.scan_modified_dir / self.file_name, self.image)
         else:
             self.image, _ = self.worm_detection(self.image, self.file_count - 1, last_pos_x, last_pos_y)
-            imsave(self.scan_modified_dir / self.file_name, self.image)
+            imwrite(self.scan_modified_dir / self.file_name, self.image)
     
     def worm_detection(self, img, id, pos_x=0, pos_y=0, drawing = False):
         """

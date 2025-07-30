@@ -1,6 +1,7 @@
 
-import os
+import cv2
 import yaml
+import numpy as np
 import tkinter as tk
 from pathlib import Path
 from tkinter import ttk, messagebox
@@ -44,12 +45,13 @@ class WormAnalysisApp:
         self.show_parameters = initial_show_parameters
         self.current_page = first_page
         self.dark_mode = initial_dark_mode
-        self.worms_position = WormPositionManager()
+        self.worms_position = None
         self.prediction = 85 # TODO
         self.proportion_mutation = 10 # TODO
         self.id_worm_seen = 1 # TODO
         self.nb_of_worm = 26 # TODO
         self.add_worm_scan_result = True
+        self.bounding_box_size = 15 # Size of the bounding box around worms in pixels
         self.loaded_params = load_config_file()
         self.set_parameters()
         self.enable_parameters_buttons = ["exposure_time","binning","shutter","dual_view","display_mode","scan_objective","fluo_objective","scan_shape"]
@@ -1290,6 +1292,77 @@ class WormAnalysisApp:
         self.worms_position = WormPositionManager(table_worm_position = worms_microscope_position) # save the positions
         scanner.reconstruct_slice() # get the reconstructed slice
         self.switch_page("scan_result") # switch to the result page
+      
+    def draw_prediction_result_box(self):
+        # Load original image
+        image = Image.open(Path(RESSOURCES_DIR) / "stitched_final.jpg")
+        
+        # Convert to numpy array
+        img_with_bounding_box_np = np.array(image)
+        
+        # Convert to color
+        img_with_bounding_box_np = cv2.cvtColor(img_with_bounding_box_np, cv2.COLOR_GRAY2BGR)
+        
+        # Get worms positions
+        if self.worms_position is None:
+            self.worms_position = WormPositionManager(new_acquisition=False)
+            all_worm_data = self.worms_position.get_all_worm_proportion_position()
+            list_of_worm_position = [[x, y] for worm_id, x, y in all_worm_data]
+        else:
+            all_worm_data = self.worms_position.get_all_worm_proportion_position()
+            list_of_worm_position = [[x, y] for worm_id, x, y in all_worm_data]
+          
+        # Draw bounding boxes
+        img_height, img_width = img_with_bounding_box_np.shape[:2]      
+        for worm in list_of_worm_position:
+            x = int(worm[0] * img_width)
+            y = int(worm[1] * img_height)
+            box = (x - self.bounding_box_size, y - self.bounding_box_size, x + self.bounding_box_size, y + self.bounding_box_size)  # (x1, y1, x2, y2)
+            cv2.rectangle(img_with_bounding_box_np, (box[0], box[1]), (box[2], box[3]), (0, 0, 255), 1)
+            
+        # Convert back to PIL Image
+        img_with_bounding_box_np = cv2.cvtColor(img_with_bounding_box_np, cv2.COLOR_BGR2RGB)
+        self.original_image = Image.fromarray(img_with_bounding_box_np)
+        
+        # Create placeholder image for display
+        placeholder_img = self.original_image.resize((10, 10))
+        img_with_bounding_box = ImageTk.PhotoImage(placeholder_img)
+        
+        return img_with_bounding_box
+        
+    def on_stitching_image_click(self, event):
+        # Get clicked coordinates in displayed image
+        x_display, y_display = event.x, event.y
+
+        # Get displayed image size
+        display_width = self.img_label.winfo_width()
+        display_height = self.img_label.winfo_height()
+        
+        # Compute relative position
+        x_mouse = float(x_display / display_width)
+        y_mouse = float(y_display / display_height)
+        x_bounding_box_proportion = float(self.bounding_box_size / display_width)
+        y_bounding_box_proportion = float(self.bounding_box_size / display_height)
+
+        # Check if click is inside any bounding box
+        if not self.add_worm_scan_result:
+            for _, (id, x, y) in enumerate(self.worms_position.get_all_worm_proportion_position()):
+                if x-x_bounding_box_proportion <= x_mouse <= x+x_bounding_box_proportion and y-y_bounding_box_proportion <= y_mouse <= y+y_bounding_box_proportion:
+                    # Remove the worm
+                    self.worms_position.delete_worm(id)
+                    break
+        else:
+            # Add a new worm
+            x_microscope, y_microscope = self.worms_position.transform_proportion_into_microscope_positions(x_mouse, y_mouse)
+            self.worms_position.add_worm_microscope_position(x_microscope, y_microscope)
+            
+        # Redraw image with updated worm positions
+        updated_img = self.draw_prediction_result_box()
+        self.displayed_image = updated_img
+        self.img_label.configure(image=updated_img)
+        self.img_label.image = updated_img  # Prevent image from being garbage collected
+        self.resize_scan_content_area()
+
                
     # Pages   
     def show_automatic_scan_page(self):
@@ -1320,7 +1393,7 @@ class WormAnalysisApp:
             text="",
             icon=self.play_icon,
             icon_hover=self.play_icon_hover,
-            command=self.toggle_parameters, # TODO
+            command=lambda: self.launch_scan(),
             bg_color=self.colors.theme["primary_background"],
             text_color=self.colors.theme["primary_text"],
             hover_color=self.colors.theme["secondary_background"],
@@ -1404,7 +1477,7 @@ class WormAnalysisApp:
             text="",
             icon=add_icon,
             icon_hover=self.add_worm_icon_hover,
-            command=lambda: self.launch_scan(),
+            command=lambda: self.toggle_add_worm_scan_result(),
             bg_color=add_bg,
             text_color=self.colors.theme["primary_text"],
             hover_color=self.colors.theme["secondary_background"],
@@ -1448,7 +1521,7 @@ class WormAnalysisApp:
             text="",
             icon=rmeove_icon,
             icon_hover=self.remove_worm_icon_hover,
-            command=lambda: self.toggle_add_worm_scan_result(), # TODO
+            command=lambda: self.toggle_add_worm_scan_result(),
             bg_color=remove_bg,
             text_color=self.colors.theme["primary_text"],
             hover_color=self.colors.theme["secondary_background"],
@@ -1493,15 +1566,16 @@ class WormAnalysisApp:
                 self._after_ids = []
             self._after_ids.append(after_id)
             
-        # Load and store original image
-        self.original_image = Image.open(Path(RESSOURCES_DIR) / "stitched_final.jpg")
-        # Temporary placeholder — resized correctly after layout
-        placeholder_img = self.original_image.resize((10, 10))  # tiny for now
-        photo = ImageTk.PhotoImage(placeholder_img)
-        self.displayed_image = photo
+        # ----- IMAGE DISPLAY -----        
+        img_with_bounding_box = self.draw_prediction_result_box()
+        self.displayed_image = img_with_bounding_box
+        
         # Create image label and store reference
-        self.img_label = tk.Label(content_area_result_container, image=photo, bg=self.colors.theme["secondary_background"])
+        self.img_label = tk.Label(content_area_result_container, image=img_with_bounding_box, bg=self.colors.theme["secondary_background"])
         self.img_label.pack(expand=True)
+        
+        # Bind click event to the image label
+        self.img_label.bind("<Button-1>", self.on_stitching_image_click)
 
     def show_assist_acquisition_page(self):
         # Clear previous widgets
