@@ -178,11 +178,11 @@ def assist_acquisition(CORE, OBJECTIVE_MAGNIFICATION_SCAN, OBJECTIVE_MAGNIFICATI
         key = cv2.waitKey(30) & 0xFF
         if key == 27 or ui.exit == True:  # ESC to quit
             ui.exit = True
-            pos = WormPosition.get_worm_position(0)
+            pos = WormPosition.get_worm_microscope_position(0)
             CORE.setXYPosition(CORE.getXYStageDevice(), pos[0], pos[1])
             break
         elif ui.analyse:
-            pos = WormPosition.get_worm_position(0)
+            pos = WormPosition.get_worm_microscope_position(0)
             CORE.setXYPosition(CORE.getXYStageDevice(), pos[0], pos[1])
             break
         elif key != 255:  # Any other key
@@ -191,7 +191,7 @@ def assist_acquisition(CORE, OBJECTIVE_MAGNIFICATION_SCAN, OBJECTIVE_MAGNIFICATI
     # Cleanup
     cv2.destroyAllWindows()
     
-    return WormPosition.get_all_worm_position(), ui.exit
+    return WormPosition.get_all_worm_microscope_position(), ui.exit
   
   
 def live_track(CORE, NEW_ACQUISITION = True, worm_positions = [], exposure_time = 100):

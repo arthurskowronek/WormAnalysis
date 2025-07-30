@@ -1,21 +1,18 @@
 import re
-import os
 import cv2
-import time
 import numpy as np
-import pandas as pd
 from PIL import Image
 from pathlib import Path
 from ultralytics import YOLO
 from tifffile import imsave, imread
 from collections import defaultdict
 
-from config import MODELS_DIR, RESSOURCES_DIR, DATA_DIR
-
+from config import MODELS_DIR, RESSOURCES_DIR, DATA_DIR, save_corner_positions_into_yaml_config_file
 
 class ScanSlice:
-    """Class for scanning slides and detecting worms using YOLO"""
-    
+    """
+    Class for scanning slides and detecting worms using YOLO
+    """
     def __init__(self, mmc, grossissement, dual_view=False, scan_shape="square", overlap_percent=10):
         """
         Initialize ScanSlice
@@ -43,8 +40,110 @@ class ScanSlice:
         # Storage for results
         self.list_bounding_boxes = []
         self.positions_info = []
+        self.scan_dir = Path(DATA_DIR) / "Scan"
+        self.scan_modified_dir = Path(DATA_DIR) / "Scan_modified"
     
-    def worm_detection(self, img, id, pos_x=0, pos_y=0):
+    def initialize_scan(self):
+        # Calculate actual steps considering overlap
+        self.actual_step_x = self.step_size_x * (1 - self.overlap_percent / 100)
+        self.actual_step_y = self.step_size_y * (1 - self.overlap_percent / 100)
+        
+        # Get starting position
+        self.start_x, self.start_y = self.mmc.getXYPosition()
+        
+        # Calculate scan area
+        end_x = self.start_x + (26000 if self.scan_shape == "square" else 45000) # TODO: récupérer ces valeurs depuis config machine
+        end_y = self.start_y + 26000
+        
+        # Get the actual corner positions (it was the center before)
+        start_corner_x = self.start_x - self.step_size_x // 2
+        start_corner_y = self.start_y - self.step_size_y // 2
+        end_corner_x = end_x + self.step_size_x // 2
+        end_corner_y = end_y + self.step_size_y // 2
+        save_corner_positions_into_yaml_config_file(start_corner_x, start_corner_y, end_corner_x, end_corner_y)
+        
+        # Compute the scan dimensions
+        self.scan_width = int((end_x - self.start_x) / self.actual_step_x)
+        self.scan_height = int((end_y - self.start_y) / self.actual_step_y)
+        
+        # Move to starting position
+        self.mmc.setXYPosition(self.mmc.getXYStageDevice(), self.start_x, self.start_y)
+        self.mmc.waitForDevice(self.mmc.getXYStageDevice())
+        
+        # Initialize working variables
+        self.file_count = 1
+        self.image = None
+        self.final_end_x = 0
+        self.final_end_y = 0
+    
+    def scan(self):
+        self.initialize_scan()
+        
+        # Scan grid
+        for y_idx in range(self.scan_height):
+            # Alternate X direction for serpentine scanning
+            x_range = range(self.scan_width) if y_idx % 2 == 0 else range(self.scan_width - 1, -1, -1)
+            
+            for x_idx in x_range:
+                # Calculate absolute position
+                pos_x = self.start_x + x_idx * self.actual_step_x
+                pos_y = self.start_y + y_idx * self.actual_step_y
+                self.mmc.setXYPosition(self.mmc.getXYStageDevice(), pos_x, pos_y) # Move to next position
+                
+                # Update final positions (we don't want to get the last position if it is on the same x or y position as the start)
+                if pos_x > final_end_x: final_end_x = pos_x
+                if pos_y > final_end_y: final_end_y = pos_y
+                
+                if self.image is not None: # We process the previous image in order to do the compute during the microscope movement
+                    self.process_image_to_detect_worms()
+                
+                # Wait for movement to complete
+                self.mmc.waitForDevice(self.mmc.getXYStageDevice())
+                self.mmc.snapImage() # Capture image
+                self.image = self.mmc.getImage()
+                
+                self.file_name = f"SlideScan_R{y_idx}_C{x_idx}_{self.file_count}.tif"
+                imsave(self.scan_dir / self.file_name, self.image)  # Save image
+                
+                # Record position info
+                self.positions_info.append([self.file_count, pos_x, pos_y, x_idx, y_idx])
+                self.file_count += 1
+                print(f"Image {self.file_count-1}/{self.scan_width*self.scan_height} captured at X={pos_x:.2f}, Y={pos_y:.2f}")
+        
+        # Process final image
+        if self.image is not None:
+            imsave(self.scan_modified_dir / self.file_name, self.image)
+        
+        # Return to starting position
+        self.mmc.setXYPosition(self.mmc.getXYStageDevice(), self.start_x, self.start_y)
+        
+        return self.get_worms_position()
+
+    def process_image_to_detect_worms(self):
+        # Process previous image for worm detection
+        last_pos_x = self.positions_info[-1][1]
+        last_pos_y = self.positions_info[-1][2]
+        _, tile_w_full = self.image.shape
+        
+        if self.dual_view:
+            img_half = self.image[:, tile_w_full // 2:]
+            img_half_left = self.image[:, :tile_w_full // 2]
+            img_half_left = cv2.normalize(img_half_left, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
+            
+            img_down_right = img_half[tile_w_full // 2:, :]
+            img_down_right, _ = self.worm_detection(img_down_right, self.file_count - 1, last_pos_x, last_pos_y)
+            
+            img_up_right = img_half[:tile_w_full // 2, :]
+            img_up_right, _ = self.worm_detection(img_up_right, self.file_count - 1, last_pos_x, last_pos_y)
+            
+            img_half = np.vstack([img_up_right, img_down_right])
+            self.image = np.hstack([img_half_left, img_half])
+            imsave(self.scan_modified_dir / self.file_name, self.image)
+        else:
+            self.image, _ = self.worm_detection(self.image, self.file_count - 1, last_pos_x, last_pos_y)
+            imsave(self.scan_modified_dir / self.file_name, self.image)
+    
+    def worm_detection(self, img, id, pos_x=0, pos_y=0, drawing = False):
         """
         Detect worms in image using YOLO
         
@@ -57,6 +156,7 @@ class ScanSlice:
         Returns:
             tuple: (processed_image, updated_bounding_boxes_list)
         """
+        # Get the image in the right format
         image = img.copy()
         image = cv2.normalize(image, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
         
@@ -64,7 +164,7 @@ class ScanSlice:
         temp_path = Path(MODELS_DIR) / "temp_converted_image.png"
         cv2.imwrite(str(temp_path), image)
         
-        # Predict
+        # Prediction
         prediction = self.model.predict(source=str(temp_path), save=False, verbose=False)
         temp_path.unlink()  # Remove temp file
         
@@ -72,24 +172,16 @@ class ScanSlice:
         
         if boxes is not None:
             bounding_boxes = boxes.xyxy.cpu().numpy()
-            for bbox in bounding_boxes:
-                print("Worm detected")
-                
+            for bbox in bounding_boxes:                
                 x1, y1, x2, y2 = bbox
                 
-                # Calculate offsets from image center
-                H, W = image.shape[:2]
-                dx_pix1 = x1/W - 0.5
-                dy_pix1 = y1/H - 0.5
-                dx_pix2 = x2/W - 0.5
-                dy_pix2 = y2/H - 0.5
-                
-                # Convert to stage microns
+                # Calculate offsets from image center and convert it to stage microns
                 step = max(self.step_size_x, self.step_size_y)
-                dx_um1 = dx_pix1 * step
-                dy_um1 = dy_pix1 * step
-                dx_um2 = dx_pix2 * step
-                dy_um2 = dy_pix2 * step
+                H, W = image.shape[:2]
+                dx_um1 = (x1/W - 0.5) * step
+                dy_um1 = (y1/H - 0.5) * step
+                dx_um2 = (x2/W - 0.5) * step
+                dy_um2 = (y2/H - 0.5) * step
                 
                 # Calculate true worm position on stage
                 x_worm1 = pos_x + dy_um1
@@ -99,11 +191,68 @@ class ScanSlice:
                 
                 self.list_bounding_boxes.append([id, x_worm1, y_worm1, x_worm2, y_worm2])
                 
-                # Draw bounding box
-                cv2.rectangle(image, (int(x1), int(y1)), (int(x2), int(y2)), (255, 0, 0), 4)
+                if drawing:
+                    # Draw bounding box
+                    cv2.rectangle(image, (int(x1), int(y1)), (int(x2), int(y2)), (255, 0, 0), 4)
         
         return image, self.list_bounding_boxes
+
+    def get_worms_position(self):
+        """Get final worm positions by merging overlapping detections"""
+        overlapping_pairs = []
+        best_matches = defaultdict(dict)  # {idx1: {id2: (idx2, iou)}}
+        
+        for i in range(len(self.list_bounding_boxes)):
+            id_1 = self.list_bounding_boxes[i][0]
+            for j in range(i + 1, len(self.list_bounding_boxes)):
+                id_2 = self.list_bounding_boxes[j][0]
+                
+                if id_1 != id_2:
+                    if self._boxes_overlap(self.list_bounding_boxes[i], self.list_bounding_boxes[j]):
+                        iou = self._compute_iou(self.list_bounding_boxes[i], self.list_bounding_boxes[j])
+                        
+                        # Save best match for i with picture id_2
+                        if id_2 not in best_matches[i] or iou > best_matches[i][id_2][1]:
+                            best_matches[i][id_2] = (j, iou)
+                        
+                        # And best match for j with picture id_1
+                        if id_1 not in best_matches[j] or iou > best_matches[j][id_1][1]:
+                            best_matches[j][id_1] = (i, iou)
+        
+        # Build final list of best overlaps (ensure mutual best match)
+        added_pairs = set()
+        for i, matches in best_matches.items():
+            for id_other, (j, _) in matches.items():
+                # Only keep if mutual best match
+                if best_matches[j].get(self.list_bounding_boxes[i][0], (None, -1))[0] == i:
+                    pair = tuple(sorted((i, j)))
+                    added_pairs.add(pair)
+        
+        overlapping_pairs = list(added_pairs)
+        overlapping_boxes = self._merge_overlapping_sublists(overlapping_pairs)
+        
+        # Add non-overlapping boxes
+        flat_overlapping_boxes = [item for sublist in overlapping_boxes for item in sublist]
+        values_overlapping_boxes = np.unique(np.array(flat_overlapping_boxes))
+        for i in range(len(self.list_bounding_boxes)):
+            if i not in values_overlapping_boxes:
+                overlapping_boxes.append([i])
+        
+        # Get centers
+        positions_worms = []
+        for sublist in overlapping_boxes:
+            tab_x, tab_y = [], []
+            for idx in sublist:
+                _, x1, y1, x2, y2 = self.list_bounding_boxes[idx]
+                tab_x.append((x1 + x2) / 2)
+                tab_y.append((y1 + y2) / 2)
+            x = sum(tab_x) / len(tab_x)
+            y = sum(tab_y) / len(tab_y)
+            positions_worms.append([x, y])
+        
+        return positions_worms
     
+    # Helpers methods for bounding box processing
     def _boxes_overlap(self, box1, box2):
         """Check if two bounding boxes overlap"""
         id_1, x1_1, y1_1, x2_1, y2_1 = box1
@@ -180,99 +329,14 @@ class ScanSlice:
             return 0.0
         
         return inter_area / union_area
-    
-    def get_worms_position(self):
-        """Get final worm positions by merging overlapping detections"""
-        overlapping_pairs = []
-        best_matches = defaultdict(dict)  # {idx1: {id2: (idx2, iou)}}
         
-        for i in range(len(self.list_bounding_boxes)):
-            id_1 = self.list_bounding_boxes[i][0]
-            for j in range(i + 1, len(self.list_bounding_boxes)):
-                id_2 = self.list_bounding_boxes[j][0]
-                
-                if id_1 != id_2:
-                    if self._boxes_overlap(self.list_bounding_boxes[i], self.list_bounding_boxes[j]):
-                        iou = self._compute_iou(self.list_bounding_boxes[i], self.list_bounding_boxes[j])
-                        
-                        # Save best match for i with picture id_2
-                        if id_2 not in best_matches[i] or iou > best_matches[i][id_2][1]:
-                            best_matches[i][id_2] = (j, iou)
-                        
-                        # And best match for j with picture id_1
-                        if id_1 not in best_matches[j] or iou > best_matches[j][id_1][1]:
-                            best_matches[j][id_1] = (i, iou)
-        
-        # Build final list of best overlaps (ensure mutual best match)
-        added_pairs = set()
-        for i, matches in best_matches.items():
-            for id_other, (j, _) in matches.items():
-                # Only keep if mutual best match
-                if best_matches[j].get(self.list_bounding_boxes[i][0], (None, -1))[0] == i:
-                    pair = tuple(sorted((i, j)))
-                    added_pairs.add(pair)
-        
-        overlapping_pairs = list(added_pairs)
-        overlapping_boxes = self._merge_overlapping_sublists(overlapping_pairs)
-        
-        # Add non-overlapping boxes
-        flat_overlapping_boxes = [item for sublist in overlapping_boxes for item in sublist]
-        values_overlapping_boxes = np.unique(np.array(flat_overlapping_boxes))
-        for i in range(len(self.list_bounding_boxes)):
-            if i not in values_overlapping_boxes:
-                overlapping_boxes.append([i])
-        
-        # Get centers
-        positions_worms = []
-        for sublist in overlapping_boxes:
-            tab_x, tab_y = [], []
-            for idx in sublist:
-                _, x1, y1, x2, y2 = self.list_bounding_boxes[idx]
-                tab_x.append((x1 + x2) / 2)
-                tab_y.append((y1 + y2) / 2)
-            x = sum(tab_x) / len(tab_x)
-            y = sum(tab_y) / len(tab_y)
-            positions_worms.append([x, y])
-        
-        return positions_worms
-    
-    def transform_positions_into_proportion(self, end_x, end_y, positions_worms, start_x, start_y):
-        """Transform positions into proportions of the scan area"""
-        # Transform position into proportion of the scan
-        start_corner_x = start_x - self.step_size_x // 2
-        start_corner_y = start_y - self.step_size_y // 2
-        end_corner_x = end_x + self.step_size_x // 2
-        end_corner_y = end_y + self.step_size_y // 2
-        
-        # Write parameters in a csv file
-        csv_path = Path(RESSOURCES_DIR) / "config_positions.csv"
-        pd.DataFrame({
-            'start_corner_x': [start_corner_x],
-            'start_corner_y': [start_corner_y],
-            'end_corner_x': [end_corner_x],
-            'end_corner_y': [end_corner_y]
-        }).to_csv(csv_path, index=False)
-        
-        positions_worms_proportion = []
-        
-        for worm in positions_worms:
-            x = worm[0]
-            y = worm[1]
-            x = (x - start_corner_x) / (end_corner_x - start_corner_x)
-            y = (y - start_corner_y) / (end_corner_y - start_corner_y)
-            # 0,0 is in the top right corner, so we need to change the origin
-            x_prop = 1 - y
-            y_prop = x
-            positions_worms_proportion.append([x_prop, y_prop])
-        
-        return positions_worms_proportion
-    
+    # Others methods
     def reconstruct_slice(self):
         """Reconstruct the full slice from individual tiles"""
-        output_path = Path(RESSOURCES_DIR) / "stitched_final.tif"
+        output_path = Path(RESSOURCES_DIR) / "stitched_final.jpg"
         pattern = r"SlideScan_R(\d+)_C(\d+)_\d+\.tif"
         
-        # Collect image positions
+        # -- 1 -- Collect image positions
         file_list = [f for f in self.scan_dir.iterdir() if f.suffix == ".tif"]
         positions = []
         
@@ -285,12 +349,11 @@ class ScanSlice:
             grid_col = int(m.group(2))
             positions.append((fname, grid_row, grid_col))
         
-        # Determine grid size
+        # --2 -- Determine grid size
         max_x = max(p[1] for p in positions)
         max_y = max(p[2] for p in positions)
         
-        # Read a sample image
-        sample_image = imread(self.scan_dir / positions[0][0])
+        sample_image = imread(self.scan_dir / positions[0][0]) # Read a sample image
         tile_h_full, tile_w_full = sample_image.shape
         tile_w_half = tile_w_full // 2 if self.dual_view else tile_w_full
         
@@ -307,7 +370,7 @@ class ScanSlice:
         stitched_width = (max_x + 1) * crop_h
         stitched_image = np.zeros((stitched_height, stitched_width), dtype=sample_image.dtype)
         
-        # Stitch images
+        # -- 3 -- Stitch images
         i = 0
         for fname, x_idx, y_idx in positions:
             i += 1
@@ -331,13 +394,11 @@ class ScanSlice:
             x_pos = col * crop_w
             stitched_image[y_pos:y_pos + crop_h, x_pos:x_pos + crop_w] = img_cropped
         
-        # Save final image
+        # -- 4 -- Save final image
         img = stitched_image.astype(np.float32)
         img = (img - img.min()) / (img.max() - img.min())
         img = (img * 255).astype(np.uint8)
         pil_image = Image.fromarray(img)
-        pil_image.save(output_path)
-        print(f"✅ Final stitched image saved to: {output_path}")
         
         if pil_image.mode != "L":
             pil_image = pil_image.convert("L")
@@ -349,137 +410,6 @@ class ScanSlice:
             pil_image = pil_image.rotate(270, expand=True)
         
         pil_image = pil_image.convert('RGB')
-        pil_image = np.array(pil_image)
         
-        return pil_image
-    
-    def scan(self):
-        """Main scanning function"""
-        # Calculate actual steps considering overlap
-        actual_step_x = self.step_size_x * (1 - self.overlap_percent / 100)
-        actual_step_y = self.step_size_y * (1 - self.overlap_percent / 100)
-        
-        # Setup camera
-        self.mmc.setAutoShutter(False)
-        self.mmc.setShutterOpen(True)
-        
-        # Get starting position
-        start_x, start_y = self.mmc.getXYPosition()
-        
-        # Calculate scan area
-        end_x = start_x + (26000 if self.scan_shape == "square" else 45000)
-        end_y = start_y + 26000
-        scan_width = int((end_x - start_x) / actual_step_x)
-        scan_height = int((end_y - start_y) / actual_step_y)
-        
-        # Reset storage
-        self.positions_info = []
-        self.list_bounding_boxes = []
-        
-        file_count = 1
-        
-        # Move to starting position
-        self.mmc.setXYPosition(self.mmc.getXYStageDevice(), start_x, start_y)
-        self.mmc.waitForDevice(self.mmc.getXYStageDevice())
-        
-        print(f"Starting scan: {scan_width}x{scan_height} positions")
-        print(f"Starting position: X={start_x}, Y={start_y}")
-        print(f"Step X: {actual_step_x} µm, Step Y: {actual_step_y} µm")
-        print(f"Overlap: {self.overlap_percent}%")
-        
-        start_time = time.time()
-        image = None
-        final_end_x = 0
-        final_end_y = 0
-        
-        # Scan grid
-        for y_idx in range(scan_height):
-            # Alternate X direction for serpentine scanning
-            x_range = range(scan_width) if y_idx % 2 == 0 else range(scan_width - 1, -1, -1)
-            
-            for x_idx in x_range:
-                # Calculate absolute position
-                pos_x = start_x + x_idx * actual_step_x
-                pos_y = start_y + y_idx * actual_step_y
-                self.mmc.setXYPosition(self.mmc.getXYStageDevice(), pos_x, pos_y)
-                
-                if pos_x > final_end_x:
-                    final_end_x = pos_x
-                if pos_y > final_end_y:
-                    final_end_y = pos_y
-                
-                # Process previous image for worm detection
-                if image is not None:
-                    last_pos_x = self.positions_info[-1][1]
-                    last_pos_y = self.positions_info[-1][2]
-                    _, tile_w_full = image.shape
-                    
-                    if self.dual_view:
-                        img_half = image[:, tile_w_full // 2:]
-                        img_half_left = image[:, :tile_w_full // 2]
-                        img_half_left = cv2.normalize(img_half_left, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
-                        
-                        img_down_right = img_half[tile_w_full // 2:, :]
-                        img_down_right, _ = self.worm_detection(img_down_right, file_count - 1, last_pos_x, last_pos_y)
-                        
-                        img_up_right = img_half[:tile_w_full // 2, :]
-                        img_up_right, _ = self.worm_detection(img_up_right, file_count - 1, last_pos_x, last_pos_y)
-                        
-                        img_half = np.vstack([img_up_right, img_down_right])
-                        image = np.hstack([img_half_left, img_half])
-                        imsave(self.scan_modified_dir / file_name, image)
-                    else:
-                        image, _ = self.worm_detection(image, file_count - 1, last_pos_x, last_pos_y)
-                        imsave(self.scan_modified_dir / file_name, image)
-                
-                # Wait for movement to complete
-                self.mmc.waitForDevice(self.mmc.getXYStageDevice())
-                
-                # Capture image
-                self.mmc.snapImage()
-                image = self.mmc.getImage()
-                
-                # Save image
-                file_name = f"SlideScan_R{y_idx}_C{x_idx}_{file_count}.tif"
-                imsave(self.scan_dir / file_name, image)
-                
-                # Record position info
-                self.positions_info.append([file_count, pos_x, pos_y, x_idx, y_idx])
-                file_count += 1
-                print(f"Image {file_count-1}/{scan_width*scan_height} captured at X={pos_x:.2f}, Y={pos_y:.2f}")
-        
-        # Process final image
-        if image is not None:
-            imsave(self.scan_modified_dir / file_name, image)
-        
-        end_time = time.time()
-        total_sec = end_time - start_time
-        nb_min = int(total_sec / 60)
-        nb_sec = round(total_sec - 60 * nb_min, 2)
-        
-        print(f"Scan completed! {file_count - 1} images captured in {nb_min}min and {nb_sec}s.")
-        
-        # Process results
-        positions_worms = self.get_worms_position()
-        positions_worms_proportion = self.transform_positions_into_proportion(
-            final_end_x, final_end_y, positions_worms, start_x, start_y
-        )
-        
-        # Return to starting position
-        self.mmc.setXYPosition(self.mmc.getXYStageDevice(), start_x, start_y)
-        
-        # Close shutter
-        self.mmc.setShutterOpen(False)
-        
-        # Reconstruct slice
-        stitching_img = self.reconstruct_slice()
-        
-        return positions_worms, positions_worms_proportion, stitching_img
-
-
-# Usage example:
-# scanner = ScanSlice(mmc, grossissement=10, dual_view=True, scan_shape="square")
-# positions_worms, positions_worms_proportion, stitching_img = scanner.scan()
-
-
-
+        pil_image.save(output_path, 'JPEG', quality=95)
+        print(f"✅ Final stitched image saved to: {output_path}")

@@ -198,17 +198,17 @@ class AssistAcquisitionPage:
     def go_to_next_worm(self):
         self.worm_positions.go_to_newt_worm()
         id = self.worm_positions.get_id_worm_seen()
-        x,y = self.worm_positions.get_worm_position(id)
+        x,y = self.worm_positions.get_worm_microscope_position(id)
         time.sleep(0.01)
         self.CORE.setXYPosition(self.CORE.getXYStageDevice(), x, y)
         
     def go_to_last_worm(self):
         self.worm_positions.go_to_last_worm()
         id = self.worm_positions.get_id_worm_seen()
-        x,y = self.worm_positions.get_worm_position(id)
+        x,y = self.worm_positions.get_worm_microscope_position(id)
         time.sleep(0.01)
         self.CORE.setXYPosition(self.CORE.getXYStageDevice(), x, y)
 
     def add_new_worm(self):
-        self.worm_positions.add_worm_position(self.pos_x, self.pos_y)
+        self.worm_positions.add_worm_microscope_position(self.pos_x, self.pos_y)
         self.find_worm = True

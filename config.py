@@ -2,6 +2,7 @@
 Global configuration file for the project.
 """
 import os
+import yaml
 import datetime
 import pymmcore #Library to connect the the Micro-Manager core
 from pathlib import Path
@@ -15,6 +16,8 @@ MODELS_DIR = PROJECT_ROOT / "models"
 RESSOURCES_DIR = PROJECT_ROOT / "ressources"
 SRC_DIR = PROJECT_ROOT / "src"
 USER_DIR = PROJECT_ROOT / "user"
+
+PARAMETERS_FILE = Path(RESSOURCES_DIR) / "parameters.yaml"
 
 # Date format for file naming
 DATE_FORMAT = "%Y%m%d_%H%M%S"
@@ -55,7 +58,63 @@ def loadCore():
     mmc.loadSystemConfiguration(os.path.join(DIRECTORY, CONFIG))
     return mmc
 
+def load_config_file():
+    """
+    Loads application parameters from a YAML file.
 
+    Returns:
+        dict: A dictionary containing parameter keys and their saved values.
+            Returns an empty dictionary if the file does not exist.
+
+    Notes:
+        The parameters are loaded from the file defined by `PARAMETERS_FILE`.
+    """
+    if os.path.exists(PARAMETERS_FILE):
+        with open(PARAMETERS_FILE, "r") as f:
+            return yaml.safe_load(f)
+    else:
+        return {}
+
+def save_corner_positions_into_yaml_config_file(start_x, start_y, end_x, end_y):
+    """
+    Updates the corner position parameters (start_x, start_y, end_x, end_y)
+    in the YAML file, preserving the first 9 lines.
+    
+    Parameters:
+        start_x (float/int)
+        start_y (float/int)
+        end_x (float/int)
+        end_y (float/int)
+    """
+    # New values to insert
+    corner_params = {
+        "start_x": start_x,
+        "start_y": start_y,
+        "end_x": end_x,
+        "end_y": end_y
+    }
+
+    # Read the existing file
+    try:
+        with open(PARAMETERS_FILE, "r") as f:
+            lines = f.readlines()
+    except FileNotFoundError:
+        lines = []
+
+    # Dump the corner parameters to YAML-formatted lines
+    corner_yaml_lines = yaml.dump(corner_params, default_flow_style=False).splitlines(keepends=True)
+
+    # Replace or append corner positions starting at line 10
+    # Pad the list if it's shorter than 9 lines
+    while len(lines) < 9:
+        lines.append("\n")
+    
+    # Replace lines 9–12 or add them if not present
+    lines = lines[:9] + corner_yaml_lines + lines[9 + len(corner_yaml_lines):]
+
+    # Write everything back
+    with open(PARAMETERS_FILE, "w") as f:
+        f.writelines(lines)
 
 
     

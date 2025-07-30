@@ -6,10 +6,12 @@ from pathlib import Path
 from tkinter import ttk, messagebox
 from PIL import Image, ImageTk, ImageColor
 
-from config import RESSOURCES_DIR
+from config import RESSOURCES_DIR, PARAMETERS_FILE, load_config_file
 
 from src.interface.Tooltip import Tooltip
 from src.interface.colorTheme import ColorTheme
+from src.system.ScanSlice import ScanSlice
+from src.system.Worm_Position_Manager import WormPositionManager
 
 class WormAnalysisApp:
     def __init__(self, root, mmc = None, initial_dark_mode=False, first_page = "automatic_scan", initial_show_parameters = True):
@@ -36,18 +38,19 @@ class WormAnalysisApp:
         self.CORE = mmc
         self.root.title("Worm Analysis")
         self.root.geometry("1440x960")
-        self.PARAMS_FILE = Path(RESSOURCES_DIR) / "parameters.yaml"
+        self.PARAMS_FILE = PARAMETERS_FILE
 
         # Initialize variables
         self.show_parameters = initial_show_parameters
         self.current_page = first_page
         self.dark_mode = initial_dark_mode
+        self.worms_position = WormPositionManager()
         self.prediction = 85 # TODO
         self.proportion_mutation = 10 # TODO
         self.id_worm_seen = 1 # TODO
         self.nb_of_worm = 26 # TODO
         self.add_worm_scan_result = True
-        self.loaded_params = self.load_parameters()
+        self.loaded_params = load_config_file()
         self.set_parameters()
         self.enable_parameters_buttons = ["exposure_time","binning","shutter","dual_view","display_mode","scan_objective","fluo_objective","scan_shape"]
 
@@ -79,23 +82,6 @@ class WormAnalysisApp:
             self.show_placeholder_page(self.current_page.replace('_', ' ').title())
     
     # Initalization helper function
-    def load_parameters(self):
-        """
-        Loads application parameters from a YAML file.
-
-        Returns:
-            dict: A dictionary containing parameter keys and their saved values.
-                Returns an empty dictionary if the file does not exist.
-
-        Notes:
-            The parameters are loaded from the file defined by `self.PARAMS_FILE`.
-        """
-        if os.path.exists(self.PARAMS_FILE):
-            with open(self.PARAMS_FILE, "r") as f:
-                return yaml.safe_load(f)
-        else:
-            return {}
-    
     def set_parameters(self):
         """
         Initializes and binds UI parameters using Tkinter variables.
@@ -137,14 +123,13 @@ class WormAnalysisApp:
         
         self.user_directory = tk.StringVar(value=self.loaded_params.get("user_directory", 'Arthur_2025_07_24'))
         self.user_directory.trace_add("write", lambda *args: self.save_parameters())
-    
+                
     def save_parameters(self):
         """
-        Saves the current application parameters to a YAML file.
-
-        This method collects the current values of all parameter variables
-        and writes them to the file specified by `self.PARAMS_FILE`.
+        Updates only the first 9 lines of the parameters YAML file
+        with current application parameters.
         """
+        # New parameters to update
         params = {
             "exposure_time": self.exposure_time.get(),
             "binning": self.binning.get(),
@@ -156,9 +141,24 @@ class WormAnalysisApp:
             "shape": self.shape.get(),
             "user_directory": self.user_directory.get()
         }
+
+        # Convert new parameters to YAML lines
+        new_lines = yaml.dump(params, default_flow_style=False).splitlines(keepends=True)
+
+        # Read existing file lines
+        try:
+            with open(self.PARAMS_FILE, "r") as f:
+                old_lines = f.readlines()
+        except FileNotFoundError:
+            old_lines = []
+
+        # Replace first 9 lines with new ones, preserving the rest
+        updated_lines = new_lines[:9] + old_lines[9:]
+
+        # Write updated lines back
         with open(self.PARAMS_FILE, "w") as f:
-            yaml.dump(params, f)
-    
+            f.writelines(updated_lines)
+ 
     def update_colors(self):
         """
         Updates the application's color theme based on the current dark mode setting.
@@ -1283,6 +1283,13 @@ class WormAnalysisApp:
             outline=self.colors.theme["secondary_text"],
             tag="rounded_bg"
         )
+       
+    def launch_scan(self):
+        scanner = ScanSlice(self.CORE, self.scan_objective, self.dual_view, self.shape) # create an instance
+        worms_microscope_position = scanner.scan() # launch scan and get the microscope position of the worms
+        self.worms_position = WormPositionManager(table_worm_position = worms_microscope_position) # save the positions
+        scanner.reconstruct_slice() # get the reconstructed slice
+        self.switch_page("scan_result") # switch to the result page
                
     # Pages   
     def show_automatic_scan_page(self):
@@ -1307,6 +1314,7 @@ class WormAnalysisApp:
         bottom_frame = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
         bottom_frame.pack(fill=tk.X, pady=(20,5))
 
+        # Launch scan button
         self.create_rounded_button(
             parent=bottom_frame,
             text="",
@@ -1396,7 +1404,7 @@ class WormAnalysisApp:
             text="",
             icon=add_icon,
             icon_hover=self.add_worm_icon_hover,
-            command=lambda: self.toggle_add_worm_scan_result(), # TODO
+            command=lambda: self.launch_scan(),
             bg_color=add_bg,
             text_color=self.colors.theme["primary_text"],
             hover_color=self.colors.theme["secondary_background"],
@@ -1486,7 +1494,7 @@ class WormAnalysisApp:
             self._after_ids.append(after_id)
             
         # Load and store original image
-        self.original_image = Image.open(Path(RESSOURCES_DIR) / "stitching_img_resized.jpg")
+        self.original_image = Image.open(Path(RESSOURCES_DIR) / "stitched_final.jpg")
         # Temporary placeholder — resized correctly after layout
         placeholder_img = self.original_image.resize((10, 10))  # tiny for now
         photo = ImageTk.PhotoImage(placeholder_img)
@@ -1494,7 +1502,6 @@ class WormAnalysisApp:
         # Create image label and store reference
         self.img_label = tk.Label(content_area_result_container, image=photo, bg=self.colors.theme["secondary_background"])
         self.img_label.pack(expand=True)
-
 
     def show_assist_acquisition_page(self):
         # Clear previous widgets
