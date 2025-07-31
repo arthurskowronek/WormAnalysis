@@ -7,7 +7,7 @@ from pathlib import Path
 from tkinter import ttk, messagebox
 from PIL import Image, ImageTk, ImageColor
 
-from config import RESSOURCES_DIR, PARAMETERS_FILE, load_config_file
+from config import RESSOURCES_DIR, PARAMETERS_FILE, DATA_DIR, load_config_file
 
 from src.interface.Tooltip import Tooltip
 from src.interface.colorTheme import ColorTheme
@@ -1414,6 +1414,38 @@ class WormAnalysisApp:
         x_microscope, y_microscope = self.CORE.getXYPosition()
         self.worms_position.add_worm_microscope_position(x_microscope, y_microscope)
     
+
+    def update_live_image(self):
+        try:
+            self.CORE.snapImage()
+            image_data = self.CORE.getImage()  # This should return a numpy array or raw buffer
+
+            if isinstance(image_data, np.ndarray):
+                # Convert grayscale numpy array to Image
+                image = Image.fromarray(image_data)
+            else:
+                # Handle other formats if necessary
+                return
+
+            # Resize image to fit the label (optional)
+            label_width = self.live_image_label.winfo_width()
+            label_height = self.live_image_label.winfo_height()
+            if label_width > 0 and label_height > 0:
+                image = image.resize((label_width, label_height), Image.ANTIALIAS)
+
+            # Convert image for tkinter
+            tk_image = ImageTk.PhotoImage(image)
+
+            # Keep reference
+            self.live_image_label.image = tk_image
+            self.live_image_label.config(image=tk_image)
+
+        except Exception as e:
+            pass
+
+        # Repeat after X ms
+        self.root.after(100, self.update_live_image)
+
     # --- Pages ---  
     def show_automatic_scan_page(self):
         # Clear previous widgets if needed
@@ -1691,6 +1723,10 @@ class WormAnalysisApp:
 
         # Bind resize for square behavior
         self.left_live_assist_container_ref.bind("<Configure>", self.resize_live_image)
+        
+        # Placeholder for live image
+        self.live_image_label = tk.Label(live_assist_container, bg="black")
+        self.live_image_label.pack(expand=True, fill=tk.BOTH)
 
         # Bottom: Buttons + label
         bottom_assist_container = tk.Frame(left_live_assist_container, bg=self.colors.theme["primary_background"])
@@ -1788,6 +1824,9 @@ class WormAnalysisApp:
         map_assist_container.place(x=0, y=0, width=0, height=0)
         self.map_assist_containter_ref = map_assist_container
         self.right_map_assist_container_ref.bind("<Configure>", self.resize_map_assist)
+        
+        # Update the live image
+        self.update_live_image()
     
     def show_load_position_page(self):
         # Clear previous widgets
@@ -1823,6 +1862,10 @@ class WormAnalysisApp:
         live_analysis_container.grid(row=0, column=0, sticky="nsew")
         self.live_analysis_container_ref = live_analysis_container
         self.left_live_analysis_container_ref.bind("<Configure>", self.resize_live_image)
+        
+        # Placeholder for live image
+        self.live_image_label = tk.Label(live_analysis_container, bg="black")
+        self.live_image_label.pack(expand=True, fill=tk.BOTH)
 
         # Bottom: Buttons + labels
         bottom_analysis_container = tk.Frame(left_live_analysis_container, bg=self.colors.theme["primary_background"])
@@ -2133,6 +2176,10 @@ class WormAnalysisApp:
             fg=self.colors.theme["secondary_text"],
             font=(self.font, 10)
         ).pack()
+        
+        
+        # Update the live image
+        self.update_live_image()
 
     def show_placeholder_page(self, page_name):
         placeholder = tk.Label(self.main_content, text=f"{page_name} Page\n(Coming soon...)",
