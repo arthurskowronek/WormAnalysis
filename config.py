@@ -34,6 +34,7 @@ IMAGE_SIZE = (1024, 1024)
 DEFAULT_RANDOM_STATE = 42  # For reproducibility
 DEFAULT_TEST_SIZE = 0.2  # 20% for testing
 DEFAULT_CV_FOLDS = 5  # Number of cross-validation folds
+EXPOSURE_TIME_LIVE = 50  # Default exposure time for live mode in milliseconds
 
 
 def set_up_environment():
@@ -56,6 +57,7 @@ def loadCore():
     mmc = pymmcore.CMMCore()
     mmc.setDeviceAdapterSearchPaths([DIRECTORY])
     mmc.loadSystemConfiguration(os.path.join(DIRECTORY, CONFIG))
+    mmc.setExposure(EXPOSURE_TIME_LIVE)
     return mmc
 
 def load_config_file():

@@ -12,13 +12,15 @@ from tifffile import imwrite
 from ultralytics import YOLO
 from PIL import Image, ImageTk, ImageColor
 
-from config import RESSOURCES_DIR, PARAMETERS_FILE, DATA_DIR, MODELS_DIR, DATE_FORMAT, load_config_file
+from config import RESSOURCES_DIR, PARAMETERS_FILE, DATA_DIR, MODELS_DIR, DATE_FORMAT, EXPOSURE_TIME_LIVE, load_config_file
 
 from src.system.dataset_manager import Dataset_Manager
 from src.interface.Tooltip import Tooltip
 from src.system.ScanSlice import ScanSlice
 from src.interface.colorTheme import ColorTheme
 from src.system.Worm_Position_Manager import WormPositionManager
+
+# TODO : let possibility to save the image in snap mode
 
 class WormAnalysisApp:
     def __init__(self, root, mmc = None, initial_dark_mode=False, first_page = "automatic_scan", initial_show_parameters = True):
@@ -108,9 +110,7 @@ class WormAnalysisApp:
         self.shape = tk.StringVar(value=self.loaded_params.get("shape", "square"))
         self.shape.trace_add("write", lambda *args: self.resize_scan_content_area())
         self.shape.trace_add("write", lambda *args: self.save_parameters())
-        
-        self.exposure_time_live = 50
-        self.CORE.setExposure(self.exposure_time_live)
+
         self.exposure_time = tk.StringVar(value=self.loaded_params.get("exposure_time", 100))
         self.exposure_time.trace_add("write", lambda *args: self.save_parameters())
         
@@ -1715,7 +1715,7 @@ class WormAnalysisApp:
         self.CORE.snapImage()
         img = self.CORE.getImage()
         # Reset the exposure time to the live value
-        self.CORE.setExposure(self.exposure_time_live)
+        self.CORE.setExposure(EXPOSURE_TIME_LIVE)
         
         # Show the snapshot (once)
         if isinstance(img, np.ndarray):
