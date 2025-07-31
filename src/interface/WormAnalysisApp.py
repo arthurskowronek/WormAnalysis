@@ -1285,14 +1285,33 @@ class WormAnalysisApp:
             outline=self.colors.theme["secondary_text"],
             tag="rounded_bg"
         )
-       
+               
     def launch_scan(self):
-        scanner = ScanSlice(self.CORE, self.scan_objective, self.dual_view, self.shape) # create an instance
-        worms_microscope_position = scanner.scan() # launch scan and get the microscope position of the worms
-        self.worms_position = WormPositionManager(table_worm_position = worms_microscope_position) # save the positions
-        scanner.reconstruct_slice() # get the reconstructed slice
-        self.switch_page("scan_result") # switch to the result page
-      
+        # Show "Starting scan" message
+        self.scan_status_label.config(text="Launching scan... please wait.")
+        self.scan_status_label.update_idletasks()
+        scanner = ScanSlice(self.CORE, self.scan_objective, self.dual_view, self.shape)
+
+        # Update: scanning
+        self.scan_status_label.config(text="Scanning in progress...")
+        self.scan_status_label.update_idletasks()
+        worms_microscope_position = scanner.scan()
+
+        # Update: saving worm positions
+        self.scan_status_label.config(text="Saving worm positions...")
+        self.scan_status_label.update_idletasks()
+        self.worms_position = WormPositionManager(table_worm_position=worms_microscope_position)
+
+        # Update: reconstructing image
+        self.scan_status_label.config(text="Reconstructing scan result...")
+        self.scan_status_label.update_idletasks()
+        scanner.reconstruct_slice()
+
+        # Update: switching page
+        self.scan_status_label.config(text="Scan complete. Displaying results...")
+        self.scan_status_label.update_idletasks()
+        self.switch_page("scan_result")
+
     def draw_prediction_result_box(self):
         # Load original image
         image = Image.open(Path(RESSOURCES_DIR) / "stitched_final.jpg")
@@ -1411,6 +1430,20 @@ class WormAnalysisApp:
         # Bottom section with launch button
         bottom_frame = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
         bottom_frame.pack(fill=tk.X, pady=(20,5))
+        
+        # Status message for scan steps
+        self.scan_status_label = tk.Label(
+            bottom_frame,
+            text="",
+            fg=self.colors.theme["secondary_text"],
+            bg=self.colors.theme["primary_background"],
+            font=(self.font, 10),
+            relief=tk.SOLID,
+            border=0,
+            padx=0,
+            pady=0
+        )
+        self.scan_status_label.pack(pady=(10, 0))
 
         # Launch scan button
         self.create_rounded_button(

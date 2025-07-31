@@ -117,14 +117,14 @@ def get_synapse_using_graph(image: np.ndarray, worm_mask: np.ndarray) -> tuple:
         
     Returns:
         Tuple of (maxima coordinates, graph, median width, slice difference measure,
-                point segment difference measure)
+                point segment difference measure, number of cords)
     """
     try:
         # Preprocess image
         img, local_max = find_local_maxima(image)
 
         # Get synapses graph
-        maxima, G, median_width, diff_slice, diff_segment, head_mask_1, head_mask_2 = get_synapses_graph(
+        maxima, G, median_width, diff_slice, diff_segment, head_mask_1, head_mask_2, NUMBER_OF_CORDS = get_synapses_graph(
             worm_mask,
             local_max
         )
@@ -159,12 +159,12 @@ def get_synapse_using_graph(image: np.ndarray, worm_mask: np.ndarray) -> tuple:
 
         maxima = list(map(tuple, maxima))
 
-        return maxima, G, median_width, diff_slice, diff_segment
+        return maxima, G, median_width, diff_slice, diff_segment, NUMBER_OF_CORDS
         
     except Exception as e:
         print(f"Error in synapse detection: {str(e)}")
         empty_graph = nx.Graph()
-        return [], empty_graph, 0, 0, 0
+        return [], empty_graph, 0, 0, 0, 0
 
 
 # Utils for get_synapse_using_graph

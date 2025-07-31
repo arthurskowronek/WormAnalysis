@@ -233,7 +233,7 @@ def get_synapses_graph(worm_mask: np.ndarray,
     plt.tight_layout()
     plt.show()"""
     
-    return maxima, G, median_width, measure_diff_slice, measure_diff_points, head_mask_1, head_mask_2
+    return maxima, G, median_width, measure_diff_slice, measure_diff_points, head_mask_1, head_mask_2, NUMBER_OF_CORDS
 
 # Utils functions
 def decompose_worm_segments_into_slice(skel_path, worm_mask, n_segments):

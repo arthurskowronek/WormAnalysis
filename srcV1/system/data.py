@@ -21,6 +21,7 @@ class Data:
         self.feature_names = []
         self.features_selected = []
         self.features_names_selected = []
+        self.number_of_cords = 1
         
     def get_original_data(self):
         """

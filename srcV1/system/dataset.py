@@ -103,10 +103,11 @@ class Dataset:
                             diff_slice = 0
                             diff_segment = 0 
                             coiled = True
+                            NUMBER_OF_CORDS = 1
                         else:
                             # Get synapse data
                             coiled = False
-                            maxima, graph, median_width, diff_slice, diff_segment = get_synapse_using_graph(img, worm_mask)
+                            maxima, graph, median_width, diff_slice, diff_segment, NUMBER_OF_CORDS = get_synapse_using_graph(img, worm_mask)
 
                         # Add data to the new_data object
                         new_data = Data()
@@ -122,6 +123,7 @@ class Dataset:
                         new_data.diff_slice = diff_slice
                         new_data.diff_segment = diff_segment
                         new_data.coiled = coiled
+                        new_data.number_of_cords = NUMBER_OF_CORDS
                         self.add_data(new_data)
                         
                         
