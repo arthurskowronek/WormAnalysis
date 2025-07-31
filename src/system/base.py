@@ -1,10 +1,10 @@
 """
 Base model class that defines the interface for all models.
 """
-from abc import ABC, abstractmethod
 import joblib
-from pathlib import Path
 import numpy as np
+from pathlib import Path
+from abc import ABC, abstractmethod
 from typing import Optional, Tuple, Dict, Any
 
 from config import MODELS_DIR, DEFAULT_RANDOM_STATE

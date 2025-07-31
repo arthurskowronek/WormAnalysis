@@ -10,3 +10,9 @@ python-tsp==0.5.0
 joblib==1.5.1
 scikit-image==0.25.2
 scikit-learn==1.7.1
+pyfeats==1.0.1
+boruta==0.4.3
+shap==0.48.0
+optuna==4.4.0
+seaborn==0.13.2
+skan==0.13.0

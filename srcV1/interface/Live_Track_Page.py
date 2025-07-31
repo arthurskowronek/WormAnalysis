@@ -15,7 +15,7 @@ from typing import Dict, Tuple, Optional
 from config import RESSOURCES_DIR, MODELS_DIR, USER_DIR, DATA_DIR
 from src.interface.button import Button
 from src.interface.theme import Theme
-from src.system.dataset import Dataset
+from src.system.dataset_manager import Dataset_Manager
 
 class LiveTrackPage:
     def __init__(self, mmc, init_pos_x, init_pos_y, best_scaler, best_model, USER_DIRECTORY = "Arthur_2025_07_16", worm_positions = None):
@@ -475,7 +475,7 @@ class LiveTrackPage:
             shutil.move(str(unclassified_path), str(classified_path))
             
             # update label in the big dataset
-            big_dataset = Dataset()
+            big_dataset = Dataset_Manager()
             big_dataset.load_images(compute=False, name_dataset="big_dataset")
             big_dataset.update_label_by_filename(filename, "WT", new_filename)
             
@@ -514,7 +514,7 @@ class LiveTrackPage:
             shutil.move(str(unclassified_path), str(classified_path))
             
             # update label in the big dataset
-            big_dataset = Dataset()
+            big_dataset = Dataset_Manager()
             big_dataset.load_images(compute=False, name_dataset="big_dataset")
             big_dataset.update_label_by_filename(filename, "Mutant", new_filename)
             
@@ -544,14 +544,14 @@ class LiveTrackPage:
         
         # Step 2: Try to predict with model, fallback to random
         try:
-            dataset = Dataset()
+            dataset = Dataset_Manager()
             dataset.load_images()
             dataset.set_features()
             model = dataset.get_model()
             pred = model.predict(dataset.get_features_selected()[0])[0]
             print(f"Model-derived prediction : {pred:.2f}")
             
-            big_dataset = Dataset()
+            big_dataset = Dataset_Manager()
             big_dataset.load_images(compute=False, name_dataset="big_dataset")
             big_dataset.merge_with(dataset)
         except Exception as e:
@@ -588,7 +588,7 @@ class LiveTrackPage:
         self.CORE.setXYPosition(self.CORE.getXYStageDevice(), self.init_pos_x, self.init_pos_y)
             
         # train model with new data
-        big_dataset = Dataset()
+        big_dataset = Dataset_Manager()
         big_dataset.set_features(compute=False, name_dataset="big_dataset")
         big_dataset.remove_unclassified()
         big_dataset.get_model(compute=True)

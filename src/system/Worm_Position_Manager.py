@@ -255,6 +255,37 @@ class WormPositionManager:
         df = pd.read_csv(self.csv_file_path)
         return len(df) if df is not None else 0
 
+    def get_mutant_proportion(self) -> float:
+        """
+        Calculate the proportion of 'Mutant' labels among worms that have a user_label.
+        Only considers worms with non-empty user_label (excludes 'None', '', or empty values).
+        
+        Returns:
+            float: Proportion of mutants (0.0 to 1.0), or 0.0 if no labeled worms exist
+        """
+        df = pd.read_csv(self.csv_file_path)
+        
+        if df.empty:
+            return 0.0
+        
+        # Filter worms that have a user_label (not empty, not 'None', not NaN)
+        labeled_worms = df[
+            (df['user_label'].notna()) & 
+            (df['user_label'] != '') & 
+            (df['user_label'] != 'None')
+        ]
+        
+        if labeled_worms.empty:
+            return 0.0
+        
+        # Count mutants among labeled worms
+        mutant_count = len(labeled_worms[labeled_worms['user_label'] == 'Mutant'])
+        total_labeled = len(labeled_worms)
+        
+        proportion = mutant_count / total_labeled
+        
+        return proportion
+    
     def update_worm_label(self, worm_id: int, user_label: str) -> bool:
         """
         Met à jour le label utilisateur pour un ver donné.

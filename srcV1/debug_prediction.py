@@ -1,12 +1,12 @@
 """
 Main script demonstrating the usage of the codebase.
 """
-from src.system.dataset import Dataset
+from src.system.dataset_manager import Dataset_Manager
 
 def main():
     """Main function demonstrating the workflow."""
     NAME_DATASET = "big_dataset"  # Name of the dataset to be used
-    dataset = Dataset()
+    dataset = Dataset_Manager()
     # 1. Load and preprocess data
     print("Loading and preprocessing data...")
     dataset.load_images(compute=False,

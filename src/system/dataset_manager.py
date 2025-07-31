@@ -23,7 +23,7 @@ from src.system.features import FeatureExtractor
 
 from config import DATA_DIR, IMAGE_SIZE, DEFAULT_PKL_NAME, MODELS_DIR, DATE_FORMAT
 
-class Dataset:
+class Dataset_Manager:
     """Class for managing the dataset loading and preprocessing."""
     
     def __init__(self, data_dir: Path = DATA_DIR):

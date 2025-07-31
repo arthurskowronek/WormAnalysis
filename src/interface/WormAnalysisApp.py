@@ -12,7 +12,7 @@ from PIL import Image, ImageTk, ImageColor
 
 from config import RESSOURCES_DIR, PARAMETERS_FILE, DATA_DIR, MODELS_DIR, DATE_FORMAT, load_config_file
 
-from src.system.dataset import Dataset
+from src.system.dataset_manager import Dataset_Manager
 from src.interface.Tooltip import Tooltip
 from src.system.ScanSlice import ScanSlice
 from src.interface.colorTheme import ColorTheme
@@ -1475,6 +1475,8 @@ class WormAnalysisApp:
     def classify_as_wt(self):
         id = self.worms_position.get_id_worm_seen()
         self.worms_position.update_worm_label(id, 'Wild-Type')
+        self.proportion_wt_label_ref.config(text=f"{int(100*(1-self.worms_position.get_mutant_proportion()))}%")
+        self.proportion_mutant_label_ref.config(text=f"{int(100*(self.worms_position.get_mutant_proportion()))}%")
         
         # save image in the corresponding directory
         filename = f"{id}.tif"
@@ -1489,7 +1491,7 @@ class WormAnalysisApp:
             shutil.move(str(unclassified_path), str(classified_path))
             
             # update label in the big dataset
-            big_dataset = Dataset()
+            big_dataset = Dataset_Manager()
             big_dataset.load_images(compute=False, name_dataset="big_dataset")
             big_dataset.update_label_by_filename(filename, "WT", new_filename)
             
@@ -1520,6 +1522,8 @@ class WormAnalysisApp:
     def classify_as_mutant(self):
         id = self.worms_position.get_id_worm_seen()
         self.worms_position.update_worm_label(id, 'Mutant')
+        self.proportion_wt_label_ref.config(text=f"{int(100*(1-self.worms_position.get_mutant_proportion()))}%")
+        self.proportion_mutant_label_ref.config(text=f"{int(100*(self.worms_position.get_mutant_proportion()))}%")
         
         # save image in the corresponding directory
         filename = f"{id}.tif"
@@ -1534,7 +1538,7 @@ class WormAnalysisApp:
             shutil.move(str(unclassified_path), str(classified_path))
             
             # update label in the big dataset
-            big_dataset = Dataset()
+            big_dataset = Dataset_Manager()
             big_dataset.load_images(compute=False, name_dataset="big_dataset")
             big_dataset.update_label_by_filename(filename, "Mutant", new_filename)
             
@@ -2161,8 +2165,7 @@ class WormAnalysisApp:
 
         tk.Label(sub1_2_analysis_container, text="Wild-Type", bg=self.colors.theme["primary_background"],
                 fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack()
-        text_proportion_wild_type = f"{100-self.proportion_mutation}%"
-        tk.Label(sub1_2_analysis_container, text=text_proportion_wild_type, bg=self.colors.theme["primary_background"],
+        self.proportion_wt_label_ref = tk.Label(sub1_2_analysis_container, text=f"{int(100*(1-self.worms_position.get_mutant_proportion()))}%", bg=self.colors.theme["primary_background"],
                 fg=self.colors.theme["secondary_text"], font=(self.font, 7)).pack()
         
         # 2nd - classify as mutant
@@ -2191,8 +2194,7 @@ class WormAnalysisApp:
 
         tk.Label(sub2_2_analysis_container, text="Mutation", bg=self.colors.theme["primary_background"],
                 fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack()
-        text_proportion_mutation = f"{self.proportion_mutation}%"
-        tk.Label(sub2_2_analysis_container, text=text_proportion_mutation, bg=self.colors.theme["primary_background"],
+        self.proportion_mutant_label_ref = tk.Label(sub2_2_analysis_container, text=f"{int(100*(self.worms_position.get_mutant_proportion()))}%", bg=self.colors.theme["primary_background"],
                 fg=self.colors.theme["secondary_text"], font=(self.font, 7)).pack()
 
         # 3. Text Container

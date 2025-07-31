@@ -1,8 +1,8 @@
 """
 Outlier detection using Mahalanobis distance.
 """
-from scipy.stats import chi2
 import numpy as np
+from scipy.stats import chi2
 
 class MahalanobisOutlierDetector:
     def __init__(self, contamination=0.001):

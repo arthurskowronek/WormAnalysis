@@ -7,9 +7,9 @@ import skimage as ski
 import networkx as nx
 from ultralytics import YOLO
 from skimage.morphology import binary_closing, disk
-        
+
 from config import DATA_DIR, MODELS_DIR
-from .graph_analysis import get_synapses_graph
+from src.system.graph_analysis import get_synapses_graph
 
 def worm_segmentation(img: np.ndarray) -> np.ndarray:
     """
