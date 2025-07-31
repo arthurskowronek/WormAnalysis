@@ -2,17 +2,20 @@
 import cv2
 import yaml
 import time
+import shutil
 import numpy as np
+import pandas as pd
 import tkinter as tk
 from pathlib import Path
-from tkinter import ttk, messagebox
+from tkinter import ttk
 from PIL import Image, ImageTk, ImageColor
 
-from config import RESSOURCES_DIR, PARAMETERS_FILE, DATA_DIR, load_config_file
+from config import RESSOURCES_DIR, PARAMETERS_FILE, DATA_DIR, MODELS_DIR, DATE_FORMAT, load_config_file
 
+from src.system.dataset import Dataset
 from src.interface.Tooltip import Tooltip
-from src.interface.colorTheme import ColorTheme
 from src.system.ScanSlice import ScanSlice
+from src.interface.colorTheme import ColorTheme
 from src.system.Worm_Position_Manager import WormPositionManager
 
 class WormAnalysisApp:
@@ -1469,6 +1472,96 @@ class WormAnalysisApp:
         except:
             pass
     
+    def classify_as_wt(self):
+        id = self.worms_position.get_id_worm_seen()
+        self.worms_position.update_worm_label(id, 'Wild-Type')
+        
+        # save image in the corresponding directory
+        filename = f"{id}.tif"
+        WT_path = Path(DATA_DIR) / "WT_prediction" / filename
+        Mutant_path = Path(DATA_DIR) / "Mutant_prediction" / filename
+        final_directory = Path(DATA_DIR) / "WT"
+        file_count = len(list(final_directory.glob("*")))
+        new_filename = f"WT_{file_count}.tif"
+        classified_path = final_directory / new_filename
+        if WT_path.exists() or Mutant_path.exists():
+            unclassified_path = WT_path if WT_path.exists() else Mutant_path
+            shutil.move(str(unclassified_path), str(classified_path))
+            
+            # update label in the big dataset
+            big_dataset = Dataset()
+            big_dataset.load_images(compute=False, name_dataset="big_dataset")
+            big_dataset.update_label_by_filename(filename, "WT", new_filename)
+            
+            # update model_performance file
+            # Get variables
+            csv_path_best_model = Path(MODELS_DIR) / "best_model_tracking.csv"
+            df_best_model = pd.read_csv(csv_path_best_model)
+            best_row = df_best_model.loc[df_best_model['best_score'].idxmax()]
+            best_scaler = best_row['best_scaler_name']
+            best_model = best_row['best_model_name']
+            new_line = {
+                'date': [pd.Timestamp.now().strftime(DATE_FORMAT)],
+                'best_scaler_name': [best_scaler], 
+                'best_model_name': [best_model],
+                'label_predicted': [self.worms_position.get_worm_prediction(id)],
+                'label_true': ["WT"]
+            }
+            df_new_results = pd.DataFrame(new_line)
+            csv_path = Path(MODELS_DIR) / "model_performance.csv"
+            df_existing_results = pd.read_csv(csv_path)
+            df_combined_results = pd.concat([df_existing_results, df_new_results], ignore_index=True)
+            df_combined_results.to_csv(csv_path, index=False, mode='w')
+            
+        else:
+            img = self.find_worm_segmentation(self.live_img)
+            cv2.imwrite(str(classified_path), img)
+    
+    def classify_as_mutant(self):
+        id = self.worms_position.get_id_worm_seen()
+        self.worms_position.update_worm_label(id, 'Mutant')
+        
+        # save image in the corresponding directory
+        filename = f"{id}.tif"
+        WT_path = Path(DATA_DIR) / "WT_prediction" / filename
+        Mutant_path = Path(DATA_DIR) / "Mutant_prediction" / filename
+        final_directory = Path(DATA_DIR) / "Mutant"
+        file_count = len(list(final_directory.glob("*")))
+        new_filename = f"Mut_{file_count}.tif"
+        classified_path = final_directory / new_filename
+        if WT_path.exists() or Mutant_path.exists():
+            unclassified_path = WT_path if WT_path.exists() else Mutant_path
+            shutil.move(str(unclassified_path), str(classified_path))
+            
+            # update label in the big dataset
+            big_dataset = Dataset()
+            big_dataset.load_images(compute=False, name_dataset="big_dataset")
+            big_dataset.update_label_by_filename(filename, "Mutant", new_filename)
+            
+            # update model_performance file
+            # Get variables
+            csv_path_best_model = Path(MODELS_DIR) / "best_model_tracking.csv"
+            df_best_model = pd.read_csv(csv_path_best_model)
+            best_row = df_best_model.loc[df_best_model['best_score'].idxmax()]
+            best_scaler = best_row['best_scaler_name']
+            best_model = best_row['best_model_name']
+            new_line = {
+                'date': [pd.Timestamp.now().strftime(DATE_FORMAT)],
+                'best_scaler_name': [best_scaler],
+                'best_model_name': [best_model],
+                'label_predicted': [self.worms_position.get_worm_prediction(id)],
+                'label_true': ["Mutant"]
+            }
+            df_new_results = pd.DataFrame(new_line)
+            csv_path = Path(MODELS_DIR) / "model_performance.csv"
+            df_existing_results = pd.read_csv(csv_path)
+            df_combined_results = pd.concat([df_existing_results, df_new_results], ignore_index=True)
+            df_combined_results.to_csv(csv_path, index=False, mode='w')
+            
+        else:
+            img = self.find_worm_segmentation(self.live_img)
+            cv2.imwrite(str(classified_path), img)
+        
     # --- Pages ---  
     def show_automatic_scan_page(self):
         # Clear previous widgets if needed
@@ -2042,7 +2135,7 @@ class WormAnalysisApp:
         mid_buttons_2_analysis_container = tk.Frame(right_map_analysis_container, bg=self.colors.theme["primary_background"])
         mid_buttons_2_analysis_container.grid(row=1, column=1, sticky="ew")
 
-        # 1st
+        # 1st - classify as wild-type
         sub1_2_analysis_container = tk.Frame(mid_buttons_2_analysis_container, bg=self.colors.theme["primary_background"])
         sub1_2_analysis_container.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=10)
 
@@ -2051,7 +2144,7 @@ class WormAnalysisApp:
             text="",
             icon=self.wildtype_icon,
             icon_hover=self.wildtype_icon_hover,
-            command=lambda: self.add_worm_callback, # TODO
+            command=lambda: self.classify_as_wt(),
             bg_color=self.colors.theme["primary_background"],
             text_color=self.colors.theme["primary_text"],
             hover_color=self.colors.theme["secondary_background"],
@@ -2072,7 +2165,7 @@ class WormAnalysisApp:
         tk.Label(sub1_2_analysis_container, text=text_proportion_wild_type, bg=self.colors.theme["primary_background"],
                 fg=self.colors.theme["secondary_text"], font=(self.font, 7)).pack()
         
-        # 2nd
+        # 2nd - classify as mutant
         sub2_2_analysis_container = tk.Frame(mid_buttons_2_analysis_container, bg=self.colors.theme["primary_background"])
         sub2_2_analysis_container.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=10)
 
@@ -2081,7 +2174,7 @@ class WormAnalysisApp:
             text="",
             icon=self.mutant_icon,
             icon_hover=self.mutant_icon_hover,
-            command=lambda: self.add_worm_callback, # TODO
+            command=lambda: self.classify_as_mutant(), 
             bg_color=self.colors.theme["primary_background"],
             text_color=self.colors.theme["primary_text"],
             hover_color=self.colors.theme["secondary_background"],
