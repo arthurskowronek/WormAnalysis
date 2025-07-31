@@ -382,13 +382,13 @@ class WormAnalysisApp:
         
         # Process add_worm.png
         add_worm_path = Path(RESSOURCES_DIR) / "icon" / "add_worm.png" 
-        self.add_worm_icon = self.flatten_and_resize_icon(add_worm_path, 30, 30, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
-        self.add_worm_icon_hover = self.flatten_and_resize_icon(add_worm_path, 30, 30, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
+        self.add_worm_icon = self.flatten_and_resize_icon(add_worm_path, 20, 20, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
+        self.add_worm_icon_hover = self.flatten_and_resize_icon(add_worm_path, 20, 20, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
         
         # Process remove_worm.png
         remove_worm_path = Path(RESSOURCES_DIR) / "icon" / "remove_worm.png" 
-        self.remove_worm_icon = self.flatten_and_resize_icon(remove_worm_path, 30, 30, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
-        self.remove_worm_icon_hover = self.flatten_and_resize_icon(remove_worm_path, 30, 30, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
+        self.remove_worm_icon = self.flatten_and_resize_icon(remove_worm_path, 20, 20, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
+        self.remove_worm_icon_hover = self.flatten_and_resize_icon(remove_worm_path, 20, 20, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
                                                   
     def flatten_and_resize_icon(self, img_path, width, height, bg_color, fg_color):
         """
@@ -1312,6 +1312,7 @@ class WormAnalysisApp:
         self.scan_status_label.update_idletasks()
         self.switch_page("scan_result")
 
+    # Scan result page
     def draw_prediction_result_box(self):
         # Load original image
         image = Image.open(Path(RESSOURCES_DIR) / "stitched_final.jpg")
@@ -1408,7 +1409,12 @@ class WormAnalysisApp:
                 self.img_label.image = updated_img
                 self.resize_scan_content_area()
          
-    # Pages   
+    # Assist acquisition page
+    def add_worm_assist_acquisition(self):
+        x_microscope, y_microscope = self.CORE.getXYPosition()
+        self.worms_position.add_worm_microscope_position(x_microscope, y_microscope)
+    
+    # --- Pages ---  
     def show_automatic_scan_page(self):
         # Clear previous widgets if needed
         for widget in self.main_content.winfo_children():
@@ -1746,7 +1752,7 @@ class WormAnalysisApp:
             text="",
             icon=self.plus_icon,
             icon_hover=self.plus_icon_hover,
-            command=lambda: self.add_worm_callback, # TODO
+            command=lambda: self.add_worm_assist_acquisition,
             bg_color=self.colors.theme["secondary_background"],
             text_color=self.colors.theme["primary_text"],
             hover_color=self.colors.theme["tertiary_background"],
