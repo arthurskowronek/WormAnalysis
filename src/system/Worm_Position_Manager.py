@@ -42,6 +42,9 @@ class WormPositionManager:
         else:
             if not os.path.exists(self.csv_file_path):
                 self._initialize_csv(table_worm_position)
+            else:
+                self.find_shortest_path()
+                self.go_to_first_worm()
          
     def _initialize_csv(self, table_worm_position = []) -> None:
         """
@@ -185,6 +188,17 @@ class WormPositionManager:
         
         return id_seen
     
+    def get_id_path_worm_seen(self):
+        df = pd.read_csv(self.csv_file_path)
+
+        id_path_seen = 0
+        
+        for idx, row in df.iterrows():
+            if row['seen'] == True:
+                id_path_seen = row['id_path'] 
+        
+        return id_path_seen
+    
     def get_worm_label(self, worm_id: int) -> str:
         """
         Récupère le label utilisateur pour un ver donné.
@@ -236,6 +250,10 @@ class WormPositionManager:
         except Exception as e:
             print(f"Erreur lors de la récupération du label: {e}")
             return 'None'
+
+    def get_number_of_worms(self):
+        df = pd.read_csv(self.csv_file_path)
+        return len(df) if df is not None else 0
 
     def update_worm_label(self, worm_id: int, user_label: str) -> bool:
         """
@@ -330,7 +348,28 @@ class WormPositionManager:
 
         return x_microscope, y_microscope
     
-    # Change worm being seen methods            
+    # Change worm being seen methods   
+    def go_to_first_worm(self):
+        """
+        Set 'seen' to True only for the first worm in the path (id_path = 0).
+        All other worms will have 'seen' set to False.
+        """
+        df = pd.read_csv(self.csv_file_path)
+        
+        if df.empty:
+            print("No worms available in the CSV file.")
+            return
+        
+        # Set all worms to not seen
+        df['seen'] = False
+        
+        # Set the first worm in the path (id_path = 0) to seen
+        mask_first = df['id_path'] == 0
+        df.loc[mask_first, 'seen'] = True
+        
+        # Save the updated DataFrame
+        df.to_csv(self.csv_file_path, index=False)
+             
     def go_to_newt_worm(self):
         """
         Change worm being seen, go to the next one

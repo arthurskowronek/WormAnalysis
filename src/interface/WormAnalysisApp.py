@@ -1,6 +1,7 @@
 
 import cv2
 import yaml
+import time
 import numpy as np
 import tkinter as tk
 from pathlib import Path
@@ -48,8 +49,7 @@ class WormAnalysisApp:
         self.worms_position = None
         self.prediction = 85 # TODO
         self.proportion_mutation = 10 # TODO
-        self.id_worm_seen = 1 # TODO
-        self.nb_of_worm = 26 # TODO
+        self.id_worm_seen = 0
         self.add_worm_scan_result = True
         self.bounding_box_size = 15 # Size of the bounding box around worms in pixels
         self.loaded_params = load_config_file()
@@ -1413,7 +1413,7 @@ class WormAnalysisApp:
         x_microscope, y_microscope = self.CORE.getXYPosition()
         self.worms_position.add_worm_microscope_position(x_microscope, y_microscope)
     
-
+    # load position page
     def update_live_image(self):
         try:
             self.CORE.snapImage()
@@ -1445,6 +1445,30 @@ class WormAnalysisApp:
         # Repeat after X ms
         self.root.after(100, self.update_live_image)
 
+    def go_to_next_worm(self):
+        self.worms_position.go_to_newt_worm() # set "seen" to True to the next worm
+        self.id_worm_seen = self.worms_position.get_id_path_worm_seen() # get the id of the newt worm
+        self.id_worm_seen_label.config(text=f"{self.id_worm_seen+1}/{self.worms_position.get_number_of_worms()}")
+
+        x,y = self.worms_position.get_worm_microscope_position(self.worms_position.get_id_worm_seen())
+        time.sleep(0.01)
+        try:
+            self.CORE.setXYPosition(self.CORE.getXYStageDevice(), x, y)
+        except:
+            pass
+        
+    def go_to_last_worm(self):
+        self.worms_position.go_to_last_worm() # set "seen" to True to the last worm
+        self.id_worm_seen = self.worms_position.get_id_path_worm_seen() # get the id of the newt worm
+        self.id_worm_seen_label.config(text=f"{self.id_worm_seen+1}/{self.worms_position.get_number_of_worms()}")
+
+        x,y = self.worms_position.get_worm_microscope_position(self.worms_position.get_id_worm_seen())
+        time.sleep(0.01)
+        try:
+            self.CORE.setXYPosition(self.CORE.getXYStageDevice(), x, y)
+        except:
+            pass
+    
     # --- Pages ---  
     def show_automatic_scan_page(self):
         # Clear previous widgets if needed
@@ -1832,6 +1856,8 @@ class WormAnalysisApp:
         for widget in self.main_content.winfo_children():
             widget.destroy()
             
+        self.worms_position = WormPositionManager(new_acquisition=False)
+            
         # Disable some paramaters buttons   
         self.update_parameter_widgets_state(disabled_widgets=["scan_shape", "scan_objective"]) 
         self.refresh_parameters_interface()
@@ -2079,14 +2105,15 @@ class WormAnalysisApp:
         # 3. Text Container
         text_3_analysis_container = tk.Frame(right_map_analysis_container, bg=self.colors.theme["primary_background"])
         text_3_analysis_container.grid(row=2, column=1, sticky="ew", pady=0, ipady=0)  # Remove all padding
-        text_id_worm_seen = f"{self.id_worm_seen}/{self.nb_of_worm}"
-        tk.Label(
+        self.id_worm_seen_label = tk.Label(
             text_3_analysis_container,
-            text=text_id_worm_seen,
+            text=f"{self.id_worm_seen+1}/{self.worms_position.get_number_of_worms()}",
             bg=self.colors.theme["primary_background"],
             fg=self.colors.theme["tertiary_text"],
             font=(self.font, 10)
-        ).pack(pady=0)
+        )
+        self.id_worm_seen_label.pack(pady=0)
+
 
         # 4. Two Buttons Side by Side - Use same row to eliminate gap
         bottom_buttons_4_analysis_container = tk.Frame(text_3_analysis_container, bg=self.colors.theme["primary_background"])
@@ -2096,7 +2123,7 @@ class WormAnalysisApp:
         buttons_wrapper = tk.Frame(bottom_buttons_4_analysis_container, bg=self.colors.theme["primary_background"])
         buttons_wrapper.pack()
 
-        # 1st
+        # 1st - next worm
         sub1_4_analysis_container = tk.Frame(buttons_wrapper, bg=self.colors.theme["primary_background"])
         sub1_4_analysis_container.pack(side=tk.LEFT, padx=(0, 1))  # Remove expand=True and fill=tk.X
         self.create_rounded_button(
@@ -2104,7 +2131,7 @@ class WormAnalysisApp:
             text="",
             icon=self.last_icon,
             icon_hover=self.last_icon_hover,
-            command=lambda: print(""), # TODO
+            command=lambda: self.go_to_last_worm(), 
             bg_color=self.colors.theme["primary_background"],
             text_color=self.colors.theme["primary_text"],
             hover_color=self.colors.theme["secondary_background"],
@@ -2120,7 +2147,7 @@ class WormAnalysisApp:
             border_color=self.colors.theme["stroke_button"]
         )
 
-        # 2nd
+        # 2nd - last worm
         sub2_4_analysis_container = tk.Frame(buttons_wrapper, bg=self.colors.theme["primary_background"])
         sub2_4_analysis_container.pack(side=tk.LEFT, padx=(1, 0))  # Remove expand=True and fill=tk.X
         self.create_rounded_button(
@@ -2128,7 +2155,7 @@ class WormAnalysisApp:
             text="",
             icon=self.next_icon,
             icon_hover=self.next_icon_hover,
-            command=lambda: print(""), # TODO
+            command=lambda: self.go_to_next_worm(), 
             bg_color=self.colors.theme["primary_background"],
             text_color=self.colors.theme["primary_text"],
             hover_color=self.colors.theme["secondary_background"],
