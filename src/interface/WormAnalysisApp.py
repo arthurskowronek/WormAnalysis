@@ -1363,7 +1363,32 @@ class WormAnalysisApp:
         self.img_label.image = updated_img  # Prevent image from being garbage collected
         self.resize_scan_content_area()
 
-               
+    def on_stitching_image_drag(self, event):
+        if not self.add_worm_scan_result:
+            x_display, y_display = event.x, event.y
+            display_width = self.img_label.winfo_width()
+            display_height = self.img_label.winfo_height()
+
+            x_mouse = float(x_display / display_width)
+            y_mouse = float(y_display / display_height)
+            x_bounding_box_proportion = float(self.bounding_box_size / display_width)
+            y_bounding_box_proportion = float(self.bounding_box_size / display_height)
+
+            removed = False
+            for _, (id, x, y) in enumerate(self.worms_position.get_all_worm_proportion_position()):
+                if x - x_bounding_box_proportion <= x_mouse <= x + x_bounding_box_proportion and \
+                y - y_bounding_box_proportion <= y_mouse <= y + y_bounding_box_proportion:
+                    self.worms_position.delete_worm(id)
+                    removed = True
+                    break
+
+            if removed:
+                updated_img = self.draw_prediction_result_box()
+                self.displayed_image = updated_img
+                self.img_label.configure(image=updated_img)
+                self.img_label.image = updated_img
+                self.resize_scan_content_area()
+         
     # Pages   
     def show_automatic_scan_page(self):
         # Clear previous widgets if needed
@@ -1576,6 +1601,7 @@ class WormAnalysisApp:
         
         # Bind click event to the image label
         self.img_label.bind("<Button-1>", self.on_stitching_image_click)
+        self.img_label.bind("<B1-Motion>", self.on_stitching_image_drag)
 
     def show_assist_acquisition_page(self):
         # Clear previous widgets
