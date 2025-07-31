@@ -1,4 +1,4 @@
-
+import os
 import cv2
 import yaml
 import time
@@ -6,8 +6,10 @@ import shutil
 import numpy as np
 import pandas as pd
 import tkinter as tk
-from pathlib import Path
 from tkinter import ttk
+from pathlib import Path
+from tifffile import imwrite
+from ultralytics import YOLO
 from PIL import Image, ImageTk, ImageColor
 
 from config import RESSOURCES_DIR, PARAMETERS_FILE, DATA_DIR, MODELS_DIR, DATE_FORMAT, load_config_file
@@ -50,10 +52,10 @@ class WormAnalysisApp:
         self.current_page = first_page
         self.dark_mode = initial_dark_mode
         self.worms_position = None
-        self.prediction = 85 # TODO
-        self.proportion_mutation = 10 # TODO
+        self.prediction = 85
         self.id_worm_seen = 0
         self.add_worm_scan_result = True
+        self.live_image = True
         self.bounding_box_size = 15 # Size of the bounding box around worms in pixels
         self.loaded_params = load_config_file()
         self.set_parameters()
@@ -64,6 +66,8 @@ class WormAnalysisApp:
         self.update_colors()
         self.set_color_theme()
         self.load_icon()
+        
+        self.segmentation_model = YOLO(Path(MODELS_DIR) / "YOLO_segmentation.pt")
         
         # Main container
         self.main_frame = tk.Frame(root, bg=self.colors.theme["primary_background"])
@@ -105,6 +109,8 @@ class WormAnalysisApp:
         self.shape.trace_add("write", lambda *args: self.resize_scan_content_area())
         self.shape.trace_add("write", lambda *args: self.save_parameters())
         
+        self.exposure_time_live = 50
+        self.CORE.setExposure(self.exposure_time_live)
         self.exposure_time = tk.StringVar(value=self.loaded_params.get("exposure_time", 100))
         self.exposure_time.trace_add("write", lambda *args: self.save_parameters())
         
@@ -582,7 +588,7 @@ class WormAnalysisApp:
             text="Quit",
             icon=self.quit_icon,
             icon_hover=self.quit_icon_hover,
-            command=self.root.quit,
+            command=lambda: self.end_of_program(),
             bg_color=self.colors.theme["quit_button_background"],
             text_color=self.colors.theme["quit_button_text"],
             hover_color=self.colors.theme["quit_button_background_hover"],
@@ -1100,7 +1106,7 @@ class WormAnalysisApp:
         
         # Also bind the label widget and all its children
         bind_events_recursive(label_widget)
-        
+    
         return canvas
 
     def draw_rounded_rect(self, canvas, x1, y1, x2, y2, radius, fill, outline, tag):
@@ -1293,6 +1299,9 @@ class WormAnalysisApp:
         self.scan_status_label.config(text="Launching scan... please wait.")
         self.scan_status_label.update_idletasks()
         scanner = ScanSlice(self.CORE, self.scan_objective, self.dual_view, self.shape)
+        
+        self.init_pos_x = scanner.start_x
+        self.init_pos_y = scanner.start_y
 
         # Update: scanning
         self.scan_status_label.config(text="Scanning in progress...")
@@ -1314,6 +1323,21 @@ class WormAnalysisApp:
         self.scan_status_label.update_idletasks()
         self.switch_page("scan_result")
 
+    def end_of_program(self):  
+        try:    
+            self.CORE.setXYPosition(self.CORE.getXYStageDevice(), self.init_pos_x, self.init_pos_y)
+                
+            # train model with new data
+            big_dataset = Dataset_Manager()
+            big_dataset.set_features(compute=False, name_dataset="big_dataset")
+            big_dataset.remove_unclassified()
+            big_dataset.get_model(compute=True)
+        except:
+            pass
+        
+        finally:
+            self.root.quit()
+        
     # Scan result page
     def draw_prediction_result_box(self):
         # Load original image
@@ -1433,7 +1457,7 @@ class WormAnalysisApp:
             label_width = self.live_image_label.winfo_width()
             label_height = self.live_image_label.winfo_height()
             if label_width > 0 and label_height > 0:
-                image = image.resize((label_width, label_height), Image.ANTIALIAS)
+                image = image.resize((label_width, label_height), Image.Resampling.LANCZOS)
 
             # Convert image for tkinter
             tk_image = ImageTk.PhotoImage(image)
@@ -1444,9 +1468,11 @@ class WormAnalysisApp:
 
         except Exception as e:
             pass
-
-        # Repeat after X ms
-        self.root.after(100, self.update_live_image)
+        
+        # Only continue the loop if in live mode
+        if self.live_image:
+            # Repeat after X ms
+            self.root.after(100, self.update_live_image)
 
     def go_to_next_worm(self):
         self.worms_position.go_to_newt_worm() # set "seen" to True to the next worm
@@ -1565,6 +1591,145 @@ class WormAnalysisApp:
         else:
             img = self.find_worm_segmentation(self.live_img)
             cv2.imwrite(str(classified_path), img)
+     
+    def find_worm_segmentation(self, img):
+        """
+        Segment worm from background using YOLO
+        
+        Args:
+            img: Input image (2D grayscale or 3D color)
+            
+        Returns:
+            img after applying mask on the segmentation (same shape as input)
+        """
+        
+        model = self.segmentation_model
+        image = img.copy()
+        
+        # Normalize image for YOLO
+        """threshold = 3000
+        image = np.clip(image, 0, threshold).astype(np.uint16)"""
+        
+        # Normalize image for YOLO
+        image = cv2.normalize(image, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
+        
+        # Save temporary image
+        temp_path = Path(MODELS_DIR) / "temp_converted_image.png"
+        cv2.imwrite(str(temp_path), image)
+        
+        # Predict
+        prediction = model.predict(source=str(temp_path), save=False, verbose=False)
+        os.remove(temp_path)
+        
+        masks = prediction[0].masks
+        
+        if masks is None or masks.data.shape[0] == 0:
+            # No mask detected
+            return np.zeros_like(image)
+
+        # Get image center
+        h, w = image.shape[:2]
+        center = np.array([w // 2, h // 2])
+
+        # Find the mask closest to the center
+        min_dist = float('inf')
+        closest_mask = None
+
+        for i, mask in enumerate(masks.data):
+            mask = mask.cpu().numpy()
+            yx = np.column_stack(np.nonzero(mask))
+            if yx.size == 0:
+                continue
+            xy = yx[:, ::-1]  # (x, y)
+
+            distances = np.linalg.norm(xy - center, axis=1)
+            min_distance = distances.min()
+
+            if min_distance < min_dist:
+                min_dist = min_distance
+                closest_mask = mask
+        
+        resized_mask = cv2.resize(closest_mask.astype(np.uint8), (w,h), interpolation=cv2.INTER_NEAREST)
+        mask_bool = resized_mask.astype(bool)
+
+        result = np.zeros_like(image)
+
+        if image.ndim == 2:
+            # Image grayscale 2D
+            result[mask_bool] = image[mask_bool]
+        else:
+            # Image couleur 3D (rare dans ton cas)
+            for c in range(image.shape[2]):
+                result[..., c][mask_bool] = image[..., c][mask_bool]
+
+        return result
+    
+    def analyse_worm(self):
+        # Step 0: Tell the user the analysis is starting
+        self.prediction_label_2.configure(text=f"with a probability of : computing...")
+        
+        # Step 1: Segment the image and save it
+        img = self.find_worm_segmentation(self.captured_image) # TODO
+        id = self.worms_position.get_id_worm_seen()
+        unclassified_path = Path(DATA_DIR) / "Unclassified" / f"{id}.tif"
+        imwrite(str(unclassified_path), img)
+        
+        # Step 2: Try to predict with model, fallback to random
+        try:
+            dataset = Dataset_Manager()
+            dataset.load_images()
+            dataset.set_features()
+            model = dataset.get_model()
+            pred = model.predict(dataset.get_features_selected()[0])[0]
+            print(f"Model-derived prediction : {pred:.2f}")
+            
+            big_dataset = Dataset_Manager()
+            big_dataset.load_images(compute=False, name_dataset="big_dataset")
+            big_dataset.merge_with(dataset)
+        except Exception as e:
+            pred = 0.5
+            print(f"Error during the prediction (error : {e})")
+            time.sleep(2)
+        
+        # Step 3: Save image in the corresponding directory 
+        directory = Path(DATA_DIR) / ("Mutant_prediction" if pred > 0.5 else "WT_prediction")
+        classified_path = directory / f"{id}.tif" 
+        shutil.move(str(unclassified_path), str(classified_path))
+        
+        # Step 4: Update prediction in worm database
+        self.worms_position.update_worm_prediction(id, pred)
+        self.prediction = int(100*pred)
+        self.prediction_label_2.configure(text=f"with a probability of {self.prediction}%")
+    
+    def start_live(self):
+        self.live_image = True
+        self.show_load_position_page()
+        self.update_live_image()  # Restart the live loop
+        
+    def snap_image(self):
+        self.live_image = False
+        
+        # Change the exposure time to have more time to snap the image
+        self.CORE.setExposure(self.exposure_time.get())
+        # Snap the image
+        self.CORE.snapImage()
+        img = self.CORE.getImage()
+        # Reset the exposure time to the live value
+        self.CORE.setExposure(self.exposure_time_live)
+        
+        # Show the snapshot (once)
+        if isinstance(img, np.ndarray):
+            image = Image.fromarray(img)
+            label_width = self.live_image_label.winfo_width()
+            label_height = self.live_image_label.winfo_height()
+            if label_width > 0 and label_height > 0:
+                image = image.resize((label_width, label_height), Image.Resampling.LANCZOS)
+
+            tk_image = ImageTk.PhotoImage(image)
+            self.live_image_label.image = tk_image
+            self.live_image_label.config(image=tk_image)
+        
+        self.show_load_position_page()
         
     # --- Pages ---  
     def show_automatic_scan_page(self):
@@ -2001,13 +2166,15 @@ class WormAnalysisApp:
         button1_analysis_container = tk.Frame(button_label_row_analysis_container, bg=self.colors.theme["primary_background"])
         button1_analysis_container.pack(side=tk.LEFT, padx=10)
 
-        self.create_rounded_button(
+        bg_live_button = self.colors.theme["secondary_background"] if self.live_image else self.colors.theme["primary_background"]
+        icon_live_button = self.live_icon_hover if self.live_image else self.live_icon
+        self.live_button_ref = self.create_rounded_button(
             parent=button1_analysis_container,
             text="",
-            icon=self.live_icon,
+            icon=icon_live_button,
             icon_hover=self.live_icon_hover,
-            command=lambda: self.switch_page("load_position"),
-            bg_color=self.colors.theme["primary_background"],
+            command=lambda: self.start_live(),
+            bg_color=bg_live_button,
             text_color=self.colors.theme["primary_text"],
             hover_color=self.colors.theme["secondary_background"],
             font=(self.font, 16),
@@ -2033,13 +2200,15 @@ class WormAnalysisApp:
         button2_analysis_container = tk.Frame(button_label_row_analysis_container, bg=self.colors.theme["primary_background"])
         button2_analysis_container.pack(side=tk.LEFT, padx=10)
 
-        self.create_rounded_button(
+        bg_snap_button = self.colors.theme["primary_background"] if self.live_image else self.colors.theme["secondary_background"]
+        icon_snap_button = self.snap_icon if self.live_image else self.snap_icon_hover
+        self.snap_button_ref = self.create_rounded_button(
             parent=button2_analysis_container,
             text="",
-            icon=self.snap_icon,
+            icon=icon_snap_button,
             icon_hover=self.snap_icon_hover,
-            command=lambda: self.switch_page("load_position"),
-            bg_color=self.colors.theme["primary_background"],
+            command=lambda: self.snap_image(),
+            bg_color=bg_snap_button,
             text_color=self.colors.theme["primary_text"],
             hover_color=self.colors.theme["secondary_background"],
             font=(self.font, 16),
@@ -2060,8 +2229,6 @@ class WormAnalysisApp:
             fg=self.colors.theme["secondary_text"],
             font=(self.font, 10)
         ).pack()
-
-
 
 
         # ----- RIGHT CONTAINER -----
@@ -2275,7 +2442,7 @@ class WormAnalysisApp:
             text="",
             icon=self.play_icon,
             icon_hover=self.play_icon_hover,
-            command=lambda: print("Final Action"), # TODO
+            command=lambda: self.analyse_worm(),
             bg_color=self.colors.theme["primary_background"],
             text_color=self.colors.theme["primary_text"],
             hover_color=self.colors.theme["secondary_background"],
@@ -2297,8 +2464,7 @@ class WormAnalysisApp:
             fg=self.colors.theme["secondary_text"],
             font=(self.font, 10)
         ).pack()
-        
-        
+
         # Update the live image
         self.update_live_image()
 
