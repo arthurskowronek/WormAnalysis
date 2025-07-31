@@ -302,10 +302,10 @@ class WormPositionManager:
     # Transform coordinates methods
     def transform_microscope_positions_into_proportion(self, x, y):
         parameters = load_config_file()
-        start_corner_x = parameters.get('start_x', 0)
-        start_corner_y = parameters.get('start_y', 0)
-        end_corner_x = parameters.get('end_x', 1)
-        end_corner_y = parameters.get('end_y', 1)
+        start_corner_x = parameters.get('start_corner_x', 0)
+        start_corner_y = parameters.get('start_corner_y', 0)
+        end_corner_x = parameters.get('end_corner_x', 1)
+        end_corner_y = parameters.get('end_corner_y', 1)
         
         x = (x - start_corner_x) / (end_corner_x - start_corner_x)
         y = (y - start_corner_y) / (end_corner_y - start_corner_y)
@@ -317,10 +317,10 @@ class WormPositionManager:
         
     def transform_proportion_into_microscope_positions(self, x_prop, y_prop):
         parameters = load_config_file()
-        start_corner_x = parameters.get('start_x', 0)
-        start_corner_y = parameters.get('start_y', 0)
-        end_corner_x = parameters.get('end_x', 1)
-        end_corner_y = parameters.get('end_y', 1)
+        start_corner_x = parameters.get('start_corner_x', 0)
+        start_corner_y = parameters.get('start_corner_y', 0)
+        end_corner_x = parameters.get('end_corner_x', 1)
+        end_corner_y = parameters.get('end_corner_y', 1)
 
         x = y_prop
         y = 1 - x_prop
