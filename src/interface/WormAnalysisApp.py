@@ -560,8 +560,7 @@ class WormAnalysisApp:
         # Menu sections
         self.create_menu_section("Detection", [
             ("Automatic Scan", "automatic_scan", self.scan_icon, self.scan_icon_hover),
-            ("Scan result", "scan_result", self.validation_icon, self.validation_icon_hover),
-            ("Assist Acquisition", "assist_acquisition", self.modify_icon, self.modify_icon_hover)
+            ("Scan result", "scan_result", self.validation_icon, self.validation_icon_hover)
         ])
         
         self.create_menu_section("Analysis", [
