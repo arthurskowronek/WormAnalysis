@@ -27,5 +27,8 @@ class ColorTheme:
             "danger_zone": "#FEE9E7",
             "danger_stroke": "#EC221F",
             "danger_text": "#900B09",
+            "info_zone": "#E7F3FE",
+            "info_stroke": "#1E90FF",
+            "info_text": "#0B3D8C",
             "stroke": "#535353" if dark_mode else "#e0e0e0"
         }

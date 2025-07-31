@@ -3,18 +3,25 @@ import tkinter as tk
 from src.interface.colorTheme import ColorTheme
 
 class Tooltip:
-    def __init__(self, widget, text, title="Warning", posx=0, posy=0):
+    def __init__(self, widget, text, title="Warning", theme="warning", posx=0, posy=0):
         
         self.colors = ColorTheme()   
         self.widget = widget
         self.text = text
         self.title = title
-        self.bg = self.colors.theme["danger_zone"]
-        self.fg = self.colors.theme["danger_text"]
-        self.border_color = self.colors.theme["danger_stroke"]
         self.tooltip_window = None
+        self.theme = theme
         self.posx = posx
         self.posy = posy
+        
+        if self.theme == "warning":
+            self.bg = self.colors.theme["danger_zone"]
+            self.fg = self.colors.theme["danger_text"]
+            self.border_color = self.colors.theme["danger_stroke"]
+        elif self.theme == "info":
+            self.bg = self.colors.theme["info_zone"]
+            self.fg = self.colors.theme["info_text"]
+            self.border_color = self.colors.theme["info_stroke"]
 
         widget.bind("<Enter>", self.show_tooltip)
         widget.bind("<Leave>", self.hide_tooltip)
@@ -39,7 +46,8 @@ class Tooltip:
         top_row = tk.Frame(inner_frame, bg=self.bg)
         top_row.pack(anchor='w', fill=tk.X)
 
-        icon_label = tk.Label(top_row, text="❗", bg=self.bg, fg=self.fg, font=("Inter", 12, "bold"))
+        icon = "❗" if self.theme == "warning" else "ℹ️"
+        icon_label = tk.Label(top_row, text=icon, bg=self.bg, fg=self.fg, font=("Inter", 12, "bold"))
         icon_label.pack(side=tk.LEFT)
 
         title_label = tk.Label(top_row, text=self.title, bg=self.bg, fg=self.fg, font=("Inter", 10, "bold"))

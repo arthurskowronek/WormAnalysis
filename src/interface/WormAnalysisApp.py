@@ -1496,9 +1496,12 @@ class WormAnalysisApp:
         add_icon = self.add_worm_icon if not self.add_worm_scan_result else self.add_worm_icon_hover
         rmeove_icon = self.remove_worm_icon if self.add_worm_scan_result else self.remove_worm_icon_hover
         
-        # Add worm button
+        # -- Add worm button --
+        add_button_frame = tk.Frame(button_row_frame, bg=self.colors.theme["primary_background"])
+        add_button_frame.pack(side=tk.LEFT, pady=5, padx=30)
+
         self.create_rounded_button(
-            parent=button_row_frame,
+            parent=add_button_frame,
             text="",
             icon=add_icon,
             icon_hover=self.add_worm_icon_hover,
@@ -1510,17 +1513,25 @@ class WormAnalysisApp:
             width_pixels=100,
             height_pixels=60,
             corner_radius=20,
-            side=tk.LEFT, 
-            pady=5,
-            padx=30,
+            side=tk.TOP,
+            pady=0,
+            padx=0,
             padx_text=-6,
             border_width=2,
             border_color=self.colors.theme["stroke_button"]
         )
+
+        add_info_icon = tk.Label(add_button_frame, image=self.info_icon, bg=self.colors.theme["primary_background"])
+        add_info_icon.pack(side=tk.TOP, pady=(4, 0))  # slight spacing above icon
+        Tooltip(add_info_icon, "Click on the image to add a new worm position", title="Info", theme="info", posx=70, posy=-80)
         
-        # Start analysis button
+        
+        # -- Start analysis button --
+        start_button_frame = tk.Frame(button_row_frame, bg=self.colors.theme["primary_background"])
+        start_button_frame.pack(side=tk.LEFT, pady=5, padx=30)
+
         self.create_rounded_button(
-            parent=button_row_frame,
+            parent=start_button_frame,
             text="",
             icon=self.play_icon,
             icon_hover=self.play_icon_hover,
@@ -1532,17 +1543,40 @@ class WormAnalysisApp:
             width_pixels=200,
             height_pixels=60,
             corner_radius=20,
-            side=tk.LEFT,
-            pady=5,
-            padx=30,
+            side=tk.TOP,
+            pady=0,
+            padx=0,
             padx_text=-10,
             border_width=2,
             border_color=self.colors.theme["stroke_button"]
         )
+
+        # Create sub-frame for label + info icon (centered below button)
+        label_info_frame = tk.Frame(start_button_frame, bg=self.colors.theme["primary_background"])
+        label_info_frame.pack(side=tk.TOP, pady=(4, 0), anchor="center")
+
+        # Text label
+        title_launch_analysis_result_container = tk.Label(
+            label_info_frame, text="Start analysis",
+            bg=self.colors.theme["primary_background"], fg=self.colors.theme["tertiary_text"],
+            font=(self.font, 10)
+        )
+        title_launch_analysis_result_container.pack(side=tk.LEFT)
+
+        # Info icon
+        start_info_icon = tk.Label(label_info_frame, image=self.info_icon, bg=self.colors.theme["primary_background"])
+        start_info_icon.pack(side=tk.LEFT, padx=(5, 0))  # slight space between label and icon
+
+        # Tooltip
+        Tooltip(start_info_icon, "Be sure to use the L camera.", posx=70, posy=-70)      
         
-        # Remove worm button
+        
+        # -- Remove worm button --
+        remove_button_frame = tk.Frame(button_row_frame, bg=self.colors.theme["primary_background"])
+        remove_button_frame.pack(side=tk.LEFT, pady=5, padx=30)
+
         self.create_rounded_button(
-            parent=button_row_frame,
+            parent=remove_button_frame,
             text="",
             icon=rmeove_icon,
             icon_hover=self.remove_worm_icon_hover,
@@ -1554,35 +1588,18 @@ class WormAnalysisApp:
             width_pixels=100,
             height_pixels=60,
             corner_radius=20,
-            side=tk.LEFT, 
-            pady=5,
-            padx=30,
+            side=tk.TOP,
+            pady=0,
+            padx=0,
             padx_text=-6,
             border_width=2,
             border_color=self.colors.theme["stroke_button"]
         )
+
+        remove_info_icon = tk.Label(remove_button_frame, image=self.info_icon, bg=self.colors.theme["primary_background"])
+        remove_info_icon.pack(side=tk.TOP, pady=(4, 0))
+        Tooltip(remove_info_icon, "Remove worms by clicking or dragging over them.", title="Info", theme="info", posx=70, posy=-80)
         
-        # Container to hold label + info icon
-        launch_label_frame_result_container = tk.Frame(bottom_frame_result_container, bg=self.colors.theme["primary_background"])
-        launch_label_frame_result_container.pack()
-
-        # Text label
-        title_launch_analysis_result_container = tk.Label(
-            launch_label_frame_result_container, text="Start analysis",
-            bg=self.colors.theme["primary_background"], fg=self.colors.theme["tertiary_text"],
-            font=(self.font, 10)
-        )
-        title_launch_analysis_result_container.pack(side=tk.LEFT)
-
-        # Info icon
-        info_label_result_container = tk.Label(
-            launch_label_frame_result_container, image=self.info_icon,
-            bg=self.colors.theme["primary_background"]
-        )
-        info_label_result_container.pack(side=tk.LEFT, padx=(5, 0))  # small gap between text and icon
-
-        # Tooltip on hover
-        Tooltip(info_label_result_container, "Be sure to use the L camera.", posx=70, posy=-70)
 
         # Trigger resizing after layout completes with error handling
         if hasattr(self, 'main_content') and self.main_content.winfo_exists():
