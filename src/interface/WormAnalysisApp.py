@@ -17,10 +17,10 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 from config import RESSOURCES_DIR, DATA_DIR, MODELS_DIR, USER_DIR, PARAMETERS_FILE, DATE_FORMAT, EXPOSURE_TIME_LIVE, load_config_file
 
-from src.system.dataset_manager import Dataset_Manager
 from src.interface.Tooltip import Tooltip
 from src.system.ScanSlice import ScanSlice
 from src.interface.colorTheme import ColorTheme
+from src.system.dataset_manager import Dataset_Manager
 from src.system.Worm_Position_Manager import WormPositionManager
 
 class WormAnalysisApp:
@@ -30,11 +30,13 @@ class WormAnalysisApp:
 
         Parameters:
             root (tk.Tk): The root window of the Tkinter application.
+            mmc (object): The microscope core object for communication with hardware. Defaults to None.
             initial_dark_mode (bool): If True, enables dark mode by default. Defaults to False.
             first_page (str): The initial page to display. Options include:
                               "automatic_scan", "scan_result", "load_position", "documentation", "tutorial", "machine_config".
                               Defaults to "automatic_scan".
             initial_show_parameters (bool): If True, shows parameters section on startup. Defaults to True.
+            initial_live_image (bool): If True, enables live image display on startup. Defaults to True.
 
         This constructor:
             - Sets up main window dimensions and title.
@@ -91,7 +93,7 @@ class WormAnalysisApp:
         elif self.current_page == "configuration":
             self.show_placeholder_page(self.current_page.replace('_', ' ').title())
     
-    # Initalization helper function
+    # --- Initalization helper function ---
     def set_parameters(self):
         """
         Initializes and binds UI parameters using Tkinter variables.
@@ -445,7 +447,7 @@ class WormAnalysisApp:
 
         return ImageTk.PhotoImage(background)
 
-    # Create global interface
+    # --- Create global interface ---
     def create_layout(self):
         """
         Creates the main layout of the application window.
@@ -745,7 +747,7 @@ class WormAnalysisApp:
             self.params_content_frame, ["square", "rectangle"], self.shape, bg
         )
     
-    # Button
+    # --- Button ---
     def create_rounded_input(self, parent, variable, bg = "parameters_button_background"): 
         """
         Creates a rounded entry input widget inside a canvas.
@@ -1142,19 +1144,46 @@ class WormAnalysisApp:
         ]
         canvas.create_polygon(points, fill=fill, outline=outline, smooth=True, splinesteps=36, tags=tag)
 
-    # Command
-    def refresh_ui(self):        
+    # --- Command ---
+    def refresh_ui(self):   
+        """
+        Refreshes the entire user interface by destroying all current widgets
+        and rebuilding them from scratch.
+
+        This method is typically called when a major state change occurs, such as
+        switching pages or toggling dark mode. It ensures that the UI accurately
+        reflects the current state of the application and its parameters.
+        """     
         self.root.configure(bg=self.colors.theme["primary_background"])
         for widget in self.root.winfo_children():
             widget.destroy()
         self.__init__(self.root, self.CORE, self.dark_mode, self.current_page, self.show_parameters, self.live_image)
   
     def refresh_parameters_interface(self):
+        """
+        Destroys and recreates the parameters panel.
+
+        This is a more focused refresh than `refresh_ui` and is used to update
+        the parameter widgets without rebuilding the entire application. It is
+        useful when parameters might have changed and need to be redrawn.
+        """
         if hasattr(self, "params_frame"):
             self.params_frame.destroy()
         self.create_parameters_panel()
         
     def update_parameter_widgets_state(self, disabled_widgets):
+        """
+        Updates the state of parameter widgets, enabling or disabling them
+        based on the application's current mode or settings.
+
+        This ensures that users can only interact with relevant parameters at
+        any given time, preventing invalid input. For example, some parameters
+        might be disabled during a live scan.
+
+        Args:
+            disabled_widgets (list): A list of strings, where each string is the
+                                    key of a widget to be disabled.
+        """
         all_widgets = {
             "exposure_time": self.exposure_time_entry,
             "binning": self.binning_dropdown,
@@ -1184,11 +1213,25 @@ class WormAnalysisApp:
         self.enable_parameters_buttons = [key for key in all_widgets if key not in disabled_widgets]
 
     def toggle_dark_mode(self):
+        """
+        Toggles the application's color theme between light and dark mode.
+
+        This method updates the internal `dark_mode` state, retrieves the new
+        color palette, and then calls `refresh_ui` to apply the changes
+        to all widgets.
+        """
         self.dark_mode = not self.dark_mode
         self.update_colors()
         self.refresh_ui()
 
     def toggle_parameters(self):
+        """
+        Toggles the visibility of the parameters panel.
+
+        This method shows or hides the `params_frame` and then resizes the
+        main content area if the current page is a scan-related page, ensuring
+        the layout adapts correctly to the change in panel visibility.
+        """
         self.show_parameters = not self.show_parameters
         if self.show_parameters:
             self.params_frame.pack(side=tk.RIGHT, fill=tk.Y)
@@ -1203,14 +1246,40 @@ class WormAnalysisApp:
             self._after_ids.append(after_id)
     
     def toggle_add_worm_scan_result(self):
+        """
+        Toggles the state for adding a new worm scan result and refreshes the
+        scan result page.
+
+        This is used in a specific workflow where the user is adding new data
+        to the result set. It triggers the `show_result_scan_page` method to
+        update the UI.
+        """
         self.add_worm_scan_result = not self.add_worm_scan_result   
         self.show_result_scan_page()
     
     def switch_page(self, page_id):
+        """
+        Switches the application to a new page.
+
+        This is the core navigation method. It updates the internal `current_page`
+        state and calls `refresh_ui` to rebuild the interface for the new page.
+
+        Args:
+            page_id (str): A string identifier for the new page.
+        """
         self.current_page = page_id
         self.refresh_ui()
     
     def resize_scan_content_area(self):
+        """
+        Resizes the main content area for scan-related pages (`automatic_scan`
+        and `scan_result`) to fit within its container, maintaining a specified
+        aspect ratio (e.g., square or rectangle).
+
+        This ensures that the live image or scan result image is always centered
+        and properly sized within the available space. It also resizes the
+        displayed image accordingly.
+        """
         if self.current_page == "automatic_scan":
             middle_container = self.middle_container_ref
             content_area = self.content_area_ref
@@ -1246,6 +1315,17 @@ class WormAnalysisApp:
             self.img_label.configure(image=photo)
         
     def resize_live_image(self, event):
+        """
+        Resizes and centers the live image container for the `assist_acquisition`
+        and `load_position` pages.
+
+        This function is typically bound to a `Configure` event, allowing the
+        live image display to dynamically resize as the main window changes.
+
+        Args:
+            event (tk.Event): The event object from the `Configure` event,
+                            containing the new width and height.
+        """
         w, h = event.width, event.height
         size = min(w, h - 80)  # leave space for bottom button
         x = (w - size) // 2
@@ -1255,6 +1335,15 @@ class WormAnalysisApp:
             self.live_analysis_container_ref.place(x=x, y=0, width=size, height=size)
     
     def resize_map_assist(self, event):
+        """
+        Resizes and repositions the map container for the `assist_acquisition` page.
+
+        This ensures the map remains a square and is positioned correctly at the
+        bottom of the container, adapting to window size changes.
+
+        Args:
+            event (tk.Event): The event object from the `Configure` event.
+        """
         w, h = event.width, event.height
         size = min(w, h) 
         x = (w - size) // 2
@@ -1262,6 +1351,16 @@ class WormAnalysisApp:
         self.map_assist_containter_ref.place(x=x, y=y, width=size, height=size)
        
     def resize_prediction_result_box(self, event):
+        """
+        Resizes and repositions a rounded rectangle on a canvas to center it
+        within the canvas.
+
+        This function is used to create a visually centered and responsive
+        container for a prediction result label.
+
+        Args:
+            event (tk.Event): The event object from the `Configure` event.
+        """
         canvas_width = event.width
         canvas_height = event.height
         self.top_label_canvas.coords(self.top_label_frame_window, canvas_width / 2, canvas_height / 2)   
@@ -1294,6 +1393,16 @@ class WormAnalysisApp:
         )
                
     def launch_scan(self):
+        """
+        Initiates and manages the worm scanning process.
+
+        This method orchestrates a series of steps:
+        1. Displays status messages to the user.
+        2. Initializes the scanner and starts the physical scan.
+        3. Saves the positions of any detected worms.
+        4. Reconstructs the final image from the scan.
+        5. Switches the page to display the scan results.
+        """
         # Show "Starting scan" message
         self.scan_status_label.config(text="Launching scan... please wait.")
         self.scan_status_label.update_idletasks()
@@ -1322,7 +1431,19 @@ class WormAnalysisApp:
         self.scan_status_label.update_idletasks()
         self.switch_page("scan_result")
 
-    def end_of_program(self):  
+    def end_of_program(self): 
+        """
+        Performs cleanup tasks and prepares the application for shutdown.
+
+        This includes:
+        - Returning the microscope stage to its initial position.
+        - Training a new machine learning model with the collected data.
+        - Quitting the main application window.
+        
+        This method is designed to be robust, using a `try...except...finally`
+        block to ensure that the application window quits even if an error
+        occurs during the cleanup process.
+        """ 
         try:    
             self.CORE.setXYPosition(self.CORE.getXYStageDevice(), self.init_pos_x, self.init_pos_y)
                 
@@ -1339,6 +1460,21 @@ class WormAnalysisApp:
         
     # Scan result page
     def draw_prediction_result_box(self):
+        """
+        Loads a stitched scan image, draws bounding boxes around detected worm
+        positions, and prepares the image for display in the UI.
+
+        The function first loads a base image, then retrieves the proportional
+        coordinates of all detected worms. It converts these proportional
+        coordinates to pixel coordinates and draws a bounding box for each worm.
+        The modified image is stored as a PIL Image object for later use and
+        a small placeholder image is returned for initial display, which will be
+        resized later by `resize_scan_content_area`.
+
+        Returns:
+            ImageTk.PhotoImage: A placeholder Tkinter-compatible photo image of the
+                                modified stitched scan.
+        """
         # Load original image
         image = Image.open(Path(RESSOURCES_DIR) / "stitched_final.jpg")
         
@@ -1376,6 +1512,19 @@ class WormAnalysisApp:
         return img_with_bounding_box
         
     def on_stitching_image_click(self, event):
+        """
+        Handles click events on the stitched scan image to either remove an
+        existing worm or add a new one.
+
+        This function determines if a click falls within a worm's bounding box
+        and, depending on the `add_worm_scan_result` flag, either deletes that
+        worm's data or adds a new worm at the clicked location. It then redraws
+        the image to reflect the changes.
+
+        Args:
+            event (tk.Event): The event object from the click, containing
+                            the `x` and `y` coordinates of the click.
+        """
         # Get clicked coordinates in displayed image
         x_display, y_display = event.x, event.y
 
@@ -1409,6 +1558,18 @@ class WormAnalysisApp:
         self.resize_scan_content_area()
 
     def on_stitching_image_drag(self, event):
+        """
+        Handles drag events on the stitched scan image to remove worms.
+
+        This function is similar to `on_stitching_image_click` but is triggered
+        by a drag event. It is designed to remove a worm if the drag starts
+        within its bounding box. This functionality is only enabled when not
+        in `add_worm_scan_result` mode.
+
+        Args:
+            event (tk.Event): The event object from the drag, containing
+                            the `x` and `y` coordinates.
+        """
         if not self.add_worm_scan_result:
             x_display, y_display = event.x, event.y
             display_width = self.img_label.winfo_width()
@@ -1436,11 +1597,28 @@ class WormAnalysisApp:
          
     # Assist acquisition page
     def add_worm_assist_acquisition(self):
+        """
+        Adds a new worm position to the dataset based on the current microscope
+        stage coordinates.
+
+        This method is used on the `assist_acquisition` page to manually record
+        the position of a worm that the user has found. It retrieves the
+        current x and y coordinates from the microscope core and adds them
+        to the worm position manager.
+        """
         x_microscope, y_microscope = self.CORE.getXYPosition()
         self.worms_position.add_worm_microscope_position(x_microscope, y_microscope)
     
     # load position page
     def update_live_image(self):
+        """
+        Snaps a new image from the microscope and updates the live image display.
+
+        This function continuously captures images from the microscope core,
+        converts them to a format suitable for Tkinter, and displays them in
+        the `live_image_label` widget. The process is repeated in a loop
+        controlled by `self.root.after()` as long as `self.live_image` is True.
+        """
         try:
             self.CORE.snapImage()
             image_data = self.CORE.getImage()  # This should return a numpy array or raw buffer
@@ -1474,6 +1652,14 @@ class WormAnalysisApp:
             self.root.after(100, self.update_live_image)
 
     def go_to_next_worm(self):
+        """
+        Navigates the microscope stage to the position of the next worm in the
+        recorded list.
+
+        This method updates the internal state to point to the next worm,
+        updates the UI label showing the current worm ID, and then commands
+        the microscope stage to move to the new worm's coordinates.
+        """
         self.worms_position.go_to_newt_worm() # set "seen" to True to the next worm
         self.id_worm_seen = self.worms_position.get_id_path_worm_seen() # get the id of the newt worm
         self.id_worm_seen_label.config(text=f"{self.id_worm_seen+1}/{self.worms_position.get_number_of_worms()}")
@@ -1486,6 +1672,15 @@ class WormAnalysisApp:
             pass
         
     def go_to_last_worm(self):
+        """
+        Navigates the microscope stage to the position of the last seen worm in
+        the recorded list.
+
+        This method updates the internal state to point to the last worm,
+        updates the UI label showing the current worm ID, and then commands
+        the microscope stage to move to the new worm's coordinates. This is
+        useful for reviewing or re-analyzing a previously seen worm.
+        """
         self.worms_position.go_to_last_worm() # set "seen" to True to the last worm
         self.id_worm_seen = self.worms_position.get_id_path_worm_seen() # get the id of the newt worm
         self.id_worm_seen_label.config(text=f"{self.id_worm_seen+1}/{self.worms_position.get_number_of_worms()}")
@@ -1498,6 +1693,17 @@ class WormAnalysisApp:
             pass
     
     def classify_as_wt(self):
+        """
+        Classifies the currently viewed worm as "Wild-Type" (WT).
+
+        This function performs several actions:
+        1. Updates the worm's label in the position manager.
+        2. Updates the UI to show the new proportions of WT and mutant worms.
+        3. Moves the segmented image of the worm from a prediction directory
+        to a final "WT" directory.
+        4. Updates a master dataset and a model performance tracking file
+        with the new classification.
+        """
         id = self.worms_position.get_id_worm_seen()
         self.worms_position.update_worm_label(id, 'Wild-Type')
         self.proportion_wt_label_ref.config(text=f"{int(100*(1-self.worms_position.get_mutant_proportion()))}%")
@@ -1545,6 +1751,14 @@ class WormAnalysisApp:
             cv2.imwrite(str(classified_path), img)
     
     def classify_as_mutant(self):
+        """
+        Classifies the currently viewed worm as "Mutant".
+
+        This function performs the same actions as `classify_as_wt`, but for the
+        "Mutant" class. It updates the worm's label, the UI, moves the segmented
+        image to the "Mutant" directory, and updates the master dataset and
+        model performance tracking file.
+        """
         id = self.worms_position.get_id_worm_seen()
         self.worms_position.update_worm_label(id, 'Mutant')
         self.proportion_wt_label_ref.config(text=f"{int(100*(1-self.worms_position.get_mutant_proportion()))}%")
@@ -1593,15 +1807,21 @@ class WormAnalysisApp:
      
     def find_worm_segmentation(self, img):
         """
-        Segment worm from background using YOLO
-        
+        Segments a worm from the background in an image using a YOLO model.
+
+        This function takes an input image, normalizes it, and uses a pre-trained
+        YOLO segmentation model to find a mask for the worm. It identifies the
+        mask closest to the center of the image to ensure the correct worm is
+        selected, and then applies this mask to the original image to isolate
+        the worm.
+
         Args:
-            img: Input image (2D grayscale or 3D color)
-            
+            img (np.ndarray): The input image (2D grayscale or 3D color).
+
         Returns:
-            img after applying mask on the segmentation (same shape as input)
+            np.ndarray: The input image with the background masked out, resulting
+                        in only the worm being visible.
         """
-        
         model = self.segmentation_model
         image = img.copy()
         
@@ -1664,6 +1884,15 @@ class WormAnalysisApp:
         return result
     
     def analyse_worm(self):
+        """
+        Performs a prediction on the currently viewed worm using a trained model.
+
+        This function is activated when the application is in "snap" mode. It
+        first segments the worm from the image, saves the segmented image, and
+        then uses a machine learning model to predict its class (e.g., WT or
+        mutant). The prediction result is saved and displayed to the user.
+        If the model fails, a default prediction is used.
+        """
         if self.live_image == False: # we have to be in the snap mode to analyse the worm
             # Step 0: Tell the user the analysis is starting
             self.prediction_label_2.configure(text=f"with a probability of : computing...")
@@ -1704,11 +1933,24 @@ class WormAnalysisApp:
             self.prediction_label_2.configure(text=f"with a probability of {self.prediction}%")
     
     def start_live(self):
+        """
+        Starts the live image acquisition loop.
+
+        This function sets the `live_image` flag to True, switches the UI to the
+        `load_position` page, and begins the continuous `update_live_image` loop.
+        """
         self.live_image = True
         self.show_load_position_page()
         self.update_live_image()  # Restart the live loop
         
     def snap_image(self):
+        """
+        Snaps a single image from the microscope and displays it.
+
+        This function stops the live image loop, captures a single image with a
+        specific exposure time, and then displays it in the UI. It also opens
+        a separate window for contrast and brightness adjustment.
+        """
         self.live_image = False
 
         try:
@@ -1729,6 +1971,15 @@ class WormAnalysisApp:
         self.open_contrast_histogram_window()
         
     def open_contrast_histogram_window(self):
+        """
+        Opens a separate window for adjusting the brightness and contrast of a
+        snapped image.
+
+        This window contains a histogram of the image's pixel intensities and
+        two sliders for `vmin` and `vmax` to control the contrast. The image
+        in the main UI and the histogram in the new window are updated in
+        real-time as the sliders are moved.
+        """
         if not isinstance(self.snap_img, np.ndarray):
             return
 
@@ -1781,6 +2032,14 @@ class WormAnalysisApp:
         self.update_image_and_histogram()
     
     def update_image_and_histogram(self):
+        """
+        Updates the displayed image and the contrast window's histogram.
+
+        This function is called by the `vmin` and `vmax` sliders. It clips and
+        rescales the `original_snap_array` based on the slider values, updates
+        the image in the main UI, and redraws the histogram with vertical lines
+        indicating the current `vmin` and `vmax`.
+        """
         if not hasattr(self, "original_snap_array"):
             return
 
@@ -1814,6 +2073,13 @@ class WormAnalysisApp:
         self.hist_canvas.draw()
  
     def display_snap_image(self):
+        """
+        Displays the most recently snapped image.
+
+        This function is called after a short delay following `snap_image`. It
+        takes the snapped image, normalizes its pixel intensity range, converts
+        it to a Tkinter-compatible format, and displays it in the `live_image_label`.
+        """
         if isinstance(self.snap_img, np.ndarray): 
             img = self.snap_img.copy().astype(np.float32)
             img = (img - img.min()) / (img.max() - img.min()) * 255
@@ -1830,7 +2096,15 @@ class WormAnalysisApp:
             self.live_image_label.config(image=tk_image)
      
     def save_snap_image(self):
-         if self.live_image == False: 
+        """
+        Saves the currently displayed snapped image to a user-specified directory.
+
+        This function only operates when not in live mode. It displays a "Saved"
+        message, saves the `snap_img` to a file with a timestamped filename
+        inside the user's chosen directory, and then removes the "Saved" message
+        after a short delay.
+        """
+        if self.live_image == False: 
             self.save_button_label_ref.configure(text="Saved")
             self.root.update_idletasks()
             
@@ -1846,6 +2120,16 @@ class WormAnalysisApp:
               
     # --- Pages ---  
     def show_automatic_scan_page(self):
+        """
+        Constructs the UI for the automatic scanning page.
+
+        This function sets up a user interface for launching an automated
+        microscope scan. It creates a main content area for displaying
+        the scan, a status label to provide feedback to the user during the
+        scan process, and a launch button. It also configures the layout
+        to be responsive, ensuring the content area resizes correctly when
+        the window is resized.
+        """
         # Clear previous widgets if needed
         for widget in self.main_content.winfo_children():
             widget.destroy()
@@ -1932,6 +2216,15 @@ class WormAnalysisApp:
             self._after_ids.append(after_id)
     
     def show_result_scan_page(self):
+        """
+        Constructs the UI for the scan results page.
+
+        This page displays the stitched image from a completed scan, showing
+        bounding boxes around detected worms. It provides controls for users
+        to manually add or remove worms from the results and to initiate the
+        next step, which is the analysis of each worm. All scan-related
+        parameters are disabled on this page.
+        """
         # Clear previous widgets if needed
         for widget in self.main_content.winfo_children():
             widget.destroy()
@@ -2090,6 +2383,15 @@ class WormAnalysisApp:
         self.img_label.bind("<B1-Motion>", self.on_stitching_image_drag)
 
     def show_assist_acquisition_page(self):
+        """
+        Constructs the UI for the assisted worm acquisition page.
+
+        This page is designed to help users manually find and save the positions
+        of worms. It features a live image feed, a button to save the current
+        position, and a small map to visualize the saved positions. Users can
+        then proceed to the analysis stage once they have acquired all their
+        worm positions.
+        """
         # Clear previous widgets
         for widget in self.main_content.winfo_children():
             widget.destroy()
@@ -2227,6 +2529,15 @@ class WormAnalysisApp:
         self.update_live_image()
     
     def show_load_position_page(self):
+        """
+        Constructs the UI for the worm analysis and classification page.
+
+        This page allows users to review individual worms from the scan results,
+        capture snapshots, manually classify them as Wild-Type or Mutant, and
+        view model predictions. It features a live/snapped image display,
+        navigation buttons, and a panel for showing prediction results and
+        manual classification buttons.
+        """
         # Clear previous widgets
         for widget in self.main_content.winfo_children():
             widget.destroy()
@@ -2614,6 +2925,12 @@ class WormAnalysisApp:
             self.update_live_image()
 
     def show_placeholder_page(self, page_name):
+        """
+        Constructs a placeholder page with a message indicating that the page is coming soon.
+
+        Args:
+            page_name (str): The name of the page to display in the placeholder.
+        """
         placeholder = tk.Label(self.main_content, text=f"{page_name} Page\n(Coming soon...)",
                              bg=self.colors.theme["primary_background"], fg=self.colors.theme["primary_text"], font=(self.font, 16))
         placeholder.pack(expand=True)
