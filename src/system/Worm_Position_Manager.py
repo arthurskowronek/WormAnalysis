@@ -186,7 +186,7 @@ class WormPositionManager:
             positions = df[['x_microscope', 'y_microscope']].values.tolist()
             return positions
         else:
-            #print("Le fichier CSV est vide ou introuvable.")
+            #print("CSV file is empty or not found")
             return []
     
     def get_all_worm_proportion_position(self):
@@ -202,7 +202,7 @@ class WormPositionManager:
             positions = df[['worm_id', 'x_proportion', 'y_proportion']].values.tolist()
             return positions
         else:
-            #print("Le fichier CSV est vide ou introuvable.")
+            #print("CSV file is empty or not found")
             return []
     
     def get_id_worm_seen(self):

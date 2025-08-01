@@ -16,16 +16,37 @@ def get_synapses_graph(worm_mask: np.ndarray,
                       maxima_coords: np.ndarray,
                       n_segments: int = 20) -> Tuple[np.ndarray, nx.Graph, float, float, float, np.ndarray, np.ndarray]:
     """
-    Create graph representation of synapses.
-    
+    Creates a graph representation of potential synapses by analyzing their distribution
+    along the worm's skeleton and body.
+
+    This function performs a multi-step analysis:
+    1. It skeletonizes the worm mask and simplifies the skeleton to its main branch(es).
+    2. It divides the skeleton into segments to analyze the local distribution of maxima.
+    3. It calculates various metrics related to the variability of maxima counts across
+       segments and perpendicular "slices" of the worm.
+    4. It builds a graph by connecting maxima that are spatially close and aligned
+       with the skeleton's direction.
+    5. Finally, it prunes the graph to keep only the main synapse network.
+
     Args:
-        worm_mask: Binary mask of worm
-        maxima_coords: Coordinates of maxima points
-        n_segments: Number of segments to divide worm into
-        
+        worm_mask (np.ndarray): A binary mask of the segmented worm.
+        maxima_coords (np.ndarray): An array of (y, x) coordinates of local maxima,
+                                    representing potential synapse locations.
+        n_segments (int): The number of segments to divide the worm's skeleton into
+                          for analysis. Defaults to 20.
+
     Returns:
-        Tuple of (maxima coordinates, graph, median width, slice difference measure,
-                point segment difference measure, mask head, mask queue)
+        Tuple[np.ndarray, nx.Graph, float, float, float, int]: A tuple containing:
+            - np.ndarray: The final filtered coordinates of the maxima that lie on
+                          the main skeleton branch(es).
+            - nx.Graph: The NetworkX graph representing the final synapse network.
+            - float: The median width of the worm's body, measured across the segments.
+            - float: A metric quantifying the variability of maxima counts across
+                     perpendicular slices of the worm.
+            - float: A metric quantifying the variability of maxima counts across
+                     the length segments of the skeleton.
+            - int: The estimated number of neural cords (e.g., 1 or 2), determined
+                   by the distribution of maxima.
     """
     # Default return value for error cases
     DEFAULT_RETURN = (np.array([]), nx.Graph(), 0.0, 0.0, 0.0, np.array([]), np.array([]))
@@ -77,7 +98,7 @@ def get_synapses_graph(worm_mask: np.ndarray,
     # -- 5 -- Decompose segments into slices
     # Set entire border to black
     worm_mask[0, :] = worm_mask[-1, :] = worm_mask[:, 0] = worm_mask[:, -1] = 0
-    dic_segments, median_width = decompose_worm_segments_into_slice(skel_path, worm_mask, n_segments)
+    dic_segments, median_width = _decompose_worm_segments_into_slice(skel_path, worm_mask, n_segments)
         
     # Assign each maxima to the slice it belongs to
     labels_slice = np.zeros(len(maxima_coords), dtype=int)
@@ -189,8 +210,28 @@ def get_synapses_graph(worm_mask: np.ndarray,
     return maxima, G, median_width, measure_diff_slice, measure_diff_points, NUMBER_OF_CORDS
 
 # Utils functions
-def decompose_worm_segments_into_slice(skel_path, worm_mask, n_segments):
-    """Analyze worm segments and return dic_segments with visualization."""
+def _decompose_worm_segments_into_slice(skel_path, worm_mask, n_segments):
+    """
+    Divides a worm's skeleton path into segments and analyzes each segment by taking
+    perpendicular "slices" across the worm's mask.
+
+    This function is used to calculate local properties of the worm's body, such as
+    its width, at multiple points along its length. It does this by finding the
+    points where a line perpendicular to the skeleton intersects the worm's boundary.
+
+    Args:
+        skel_path (list): A list of (y, x) coordinates representing the worm's skeleton.
+        worm_mask (np.ndarray): The binary mask of the segmented worm.
+        n_segments (int): The number of segments to divide the skeleton into.
+
+    Returns:
+        Tuple[dict, float]: A tuple containing:
+            - dic_segments (dict): A dictionary where keys are segment indices (0 to n_segments-1)
+              and values are tuples containing various calculated properties for each segment.
+              The tuple format is (start, mid_pos, mid_neg, end_pos, end_neg, length_mid_pos,
+              length_mid_neg, length_end_pos, length_end_neg, length_total).
+            - median_width (float): The median width of all segments along the skeleton.
+    """
     seg_len = len(skel_path) // n_segments
     
     # Find coordinate of the middle of each segment
@@ -222,11 +263,40 @@ def decompose_worm_segments_into_slice(skel_path, worm_mask, n_segments):
     return dic_segments, median_width
 
 def _clamp_coordinates(coords, max_val=1024):
-    """Clamp coordinates to valid image bounds."""
+    """
+    Clamps coordinate values to ensure they are within a valid image range [0, max_val].
+
+    This utility function prevents array index out-of-bounds errors when
+    working with coordinates derived from calculations.
+
+    Args:
+        coords (tuple): A tuple of coordinates (e.g., (y, x)).
+        max_val (int): The maximum value allowed for any coordinate. Defaults to 1024.
+
+    Returns:
+        tuple: The new coordinates, where each value is clamped to the range [0, max_val].
+    """
     return tuple(np.clip(coords, 0, max_val))
 
 def _find_mask_intersection(start, direction, worm_mask, max_distance=1000):
-    """Find intersection point with mask boundary along a direction."""
+    """
+    Finds the first point of intersection with the boundary of a binary mask
+    along a specified direction from a starting point.
+
+    This function simulates a ray cast from `start` in `direction` and checks
+    pixels along the path until it finds a pixel outside the mask (value == 0).
+
+    Args:
+        start (tuple): The starting point (y, x) inside the mask.
+        direction (np.ndarray): The unit vector representing the direction of the ray.
+        worm_mask (np.ndarray): The binary mask to find the boundary of.
+        max_distance (int): A maximum distance to search, preventing infinite loops.
+                            Defaults to 1000.
+
+    Returns:
+        tuple: The coordinates (y, x) of the first point found on the mask boundary,
+               clamped to the image dimensions.
+    """
     end_point = start + direction * max_distance
     end_point = np.round(end_point).astype(int)
     
@@ -242,7 +312,32 @@ def _find_mask_intersection(start, direction, worm_mask, max_distance=1000):
     return _clamp_coordinates(end_point, max(worm_mask.shape) - 1)
 
 def _calculate_segment_properties(start, end_pos, end_neg):
-    """Calculate all segment properties and return as tuple matching original format."""
+    """
+    Calculates various geometric properties for a worm segment, including midpoints
+    and lengths, based on a skeleton point and two boundary intersection points.
+
+    This is a helper function for `_decompose_worm_segments_into_slice`.
+
+    Args:
+        start (tuple): The start point (y, x) on the worm's skeleton.
+        end_pos (tuple): The intersection point (y, x) on the mask boundary in the
+                         positive perpendicular direction.
+        end_neg (tuple): The intersection point (y, x) on the mask boundary in the
+                         negative perpendicular direction.
+
+    Returns:
+        Tuple: A tuple of 10 calculated properties:
+            - start: The starting coordinates on the skeleton.
+            - mid_pos: Midpoint between start and end_pos.
+            - mid_neg: Midpoint between start and end_neg.
+            - end_pos: The intersection point in the positive direction.
+            - end_neg: The intersection point in the negative direction.
+            - length_mid_pos: The Euclidean distance between start and mid_pos.
+            - length_mid_neg: The Euclidean distance between start and mid_neg.
+            - length_end_pos: The Euclidean distance between start and end_pos.
+            - length_end_neg: The Euclidean distance between start and end_neg.
+            - length_total: The total length of the segment (width of the worm).
+    """
     mid_pos = ((start[0] + end_pos[0]) // 2, (start[1] + end_pos[1]) // 2)
     mid_neg = ((start[0] + end_neg[0]) // 2, (start[1] + end_neg[1]) // 2)
     
@@ -259,15 +354,27 @@ def _find_endpoints_graph(G: nx.Graph,
                   maxima_coords: np.ndarray,
                   angle_threshold_degrees: float = 90) -> Tuple[List, List]:
     """
-    Find endpoints and angle junctions in a graph.
-    
+    Identifies endpoints and angle junctions in a skeleton graph.
+
+    Endpoints are defined as nodes with a degree of 1. Angle junctions are
+    nodes with a degree of 2 or more where the angle between any pair of
+    neighboring branches is below a specified threshold, indicating a
+    sharp turn rather than a true branching point.
+
     Args:
-        G: NetworkX graph
-        maxima_coords: Coordinates of maxima points
-        angle_threshold_degrees: Threshold for angle detection
-        
+        G (nx.Graph): A NetworkX graph representing the skeleton.
+        maxima_coords (np.ndarray): An array of (y, x) coordinates for all
+                                    potential maxima points, indexed by node ID.
+        angle_threshold_degrees (float): The angle threshold in degrees. If the
+                                         angle between two branches is >= this value,
+                                         it is not considered a sharp junction.
+                                         Defaults to 90 degrees.
+
     Returns:
-        Tuple of (endpoints, angle junctions) as lists of coordinate tuples
+        Tuple[List, List]: A tuple containing two lists of coordinate tuples:
+            - endpoints (List): A list of (y, x) coordinates of graph endpoints.
+            - angle_junctions (List): A list of (y, x) coordinates of identified
+                                      angle junctions.
     """
     
     # Input validation
@@ -293,11 +400,11 @@ def _find_endpoints_graph(G: nx.Graph,
         
         if len(neighbors) >= 2:
             coords = []
-            # Gérer le cas où les nœuds sont déjà des coordonnées
+            # Handle cases where nodes are already coordinates or are indices.
             if isinstance(node, tuple):
                 node_coords = np.array(node)
                 coords = [np.array(n) for n in neighbors]
-            # Gérer le cas où les nœuds sont des indices
+            # Handle cases where nodes are indices into maxima_coords
             elif isinstance(node, (int, np.integer)) and node < len(maxima_coords):
                 node_coords = maxima_coords[node]
                 coords = [maxima_coords[n] for n in neighbors if isinstance(n, (int, np.integer)) and n < len(maxima_coords)]
@@ -334,13 +441,19 @@ def _find_endpoints_graph(G: nx.Graph,
 
 def _skeleton_to_graph(skel: np.ndarray) -> nx.Graph:
     """
-    Convert skeleton image to graph.
-    
+    Converts a binary skeleton image into a NetworkX graph.
+
+    Each non-zero pixel in the skeleton becomes a node in the graph, and
+    an edge is created between nodes that are 8-connected (i.e., immediate
+    neighbors, including diagonals).
+
     Args:
-        skel: Skeleton image
-        
+        skel (np.ndarray): A 2D binary numpy array representing the skeleton.
+
     Returns:
-        NetworkX graph
+        nx.Graph: A NetworkX graph where nodes are (y, x) coordinates and
+                  edges connect neighboring pixels. Returns an empty graph
+                  if the input skeleton is invalid.
     """
     import networkx as nx
     # Input validation
@@ -370,14 +483,21 @@ def _skeleton_to_graph(skel: np.ndarray) -> nx.Graph:
 def _graph_to_skeleton(G: 'nx.Graph',
                      shape: Optional[Tuple[int, int]] = None) -> np.ndarray:
     """
-    Convert graph to skeleton image.
-    
+    Converts a NetworkX graph representation of a skeleton back into a
+    binary image.
+
+    The function draws the nodes and edges of the graph onto a black canvas
+    of a specified shape, effectively reconstructing the skeleton image.
+
     Args:
-        G: NetworkX graph
-        shape: Output image shape
-        
+        G (nx.Graph): The NetworkX graph to convert.
+        shape (Optional[Tuple[int, int]]): The desired shape (height, width)
+                                           of the output binary image. If None,
+                                           it must be provided from the calling context.
+
     Returns:
-        Binary skeleton image
+        np.ndarray: A binary numpy array representing the skeleton image.
+                    Returns an empty array if the input graph is invalid.
     """
     # Input validation
     if G is None or len(G.nodes) == 0 : 
@@ -406,6 +526,21 @@ def _graph_to_skeleton(G: 'nx.Graph',
     return skel
 
 def _order_skeleton_points_skan(skeleton):
+    """
+    Orders all points of a skeleton image by path using the `skan` library.
+
+    This is useful for obtaining a single, continuous list of coordinates
+    that follow the main branches of the skeleton, even if it has junctions.
+    It handles potential inconsistencies in `skan.summarize` by trying
+    different separators.
+
+    Args:
+        skeleton (np.ndarray): A binary numpy array representing the skeleton.
+
+    Returns:
+        list: A flat list of (y, x) coordinate tuples for all points on the
+              skeleton, ordered along their respective paths.
+    """
     # Create the Skeleton object
     skel_obj = skan.csr.Skeleton(skeleton)
     summary = skan.summarize(skel_obj, separator='-')
@@ -433,16 +568,24 @@ def _skeleton_keep_main_branch(G: 'nx.Graph',
                             maxima_coords: np.ndarray,
                             keep: int = 1) -> Tuple['nx.Graph', np.ndarray]:
     """
-    Keep only the main branches of a skeleton.
-    
+    Identifies and keeps only the main branches of a skeleton, discarding minor
+    or irrelevant ones.
+
+    This function finds all possible paths between endpoints, splits them at
+    junctions, and then selects the `keep` best paths based on the number of
+    points (maxima) they contain. It is useful for simplifying a complex
+    skeleton to represent the primary body of a worm.
+
     Args:
-        G: Input graph
-        skel: Skeleton image
-        maxima_coords: Coordinates of maxima points
-        keep: Number of branches to keep
-        
+        G (nx.Graph): The input NetworkX graph of the skeleton.
+        skel (np.ndarray): The binary skeleton image.
+        maxima_coords (np.ndarray): An array of coordinates corresponding to the nodes.
+        keep (int): The number of main branches to retain. Defaults to 1.
+
     Returns:
-        Tuple of (processed graph, main branch mask)
+        Tuple[nx.Graph, np.ndarray]: A tuple containing:
+            - The processed graph with only the main branches.
+            - A new binary mask representing the selected main branch(es).
     """
     # Input validation
     if (skel is None or skel.size == 0 or 
@@ -486,7 +629,21 @@ def _skeleton_keep_main_branch(G: 'nx.Graph',
     return G, main_branch
 
 def _split_path_at_junctions(path, angle_junction_set):
-    """Split a path at junction points and return list of subpaths with metrics."""
+    """
+    Splits a skeleton path (a list of nodes) into subpaths at all junction points.
+
+    This is a helper function for `_skeleton_keep_main_branch`. It ensures that
+    each path is treated as a single, continuous branch without including
+    branching points.
+
+    Args:
+        path (list): A list of (y, x) coordinates representing a skeleton path.
+        angle_junction_set (set): A set of (y, x) coordinates identified as junctions.
+
+    Returns:
+        list: A list of dictionaries, where each dictionary represents a subpath
+              and includes the path coordinates (`path`) and its length (`maxima_count`).
+    """
     
     # Find junction indices in the path
     junction_indices = []
@@ -516,7 +673,21 @@ def _split_path_at_junctions(path, angle_junction_set):
         return subpaths
 
 def _select_best_paths(all_paths, keep):
-    """Select the best paths based on maxima count, avoiding overlap."""
+    """
+    Selects a specified number of non-overlapping "best" paths from a list.
+
+    The paths are sorted by `maxima_count` (path length). If `keep` is greater
+    than 1, it selects paths that do not share any nodes with already
+    selected paths, ensuring the selected branches are distinct.
+
+    Args:
+        all_paths (list): A list of dictionaries, each containing a "path"
+                          and a "maxima_count".
+        keep (int): The number of paths to select.
+
+    Returns:
+        list: A list of the selected path coordinates.
+    """
     sorted_paths = sorted(all_paths, key=lambda x: x["maxima_count"], reverse=True)
     
     selected_paths = []
@@ -539,6 +710,28 @@ def _select_best_paths(all_paths, keep):
     return selected_paths
 
 def _signed_distance_to_segment_2d(seg, p1):
+    """
+    Calculates the signed distance from a point to a 2D line segment.
+
+    This function is based on the cross-product method to determine both the
+    distance from a point to the infinite line defined by the segment and the
+    side of the line the point lies on. The sign of the distance indicates
+    the orientation of the point relative to the segment's direction.
+
+    Args:
+        seg (list or np.ndarray): A list or array of two points, [(y1, x1), (y2, x2)],
+                                  that define the line segment.
+        p1 (list or np.ndarray): The point [y, x] to which the distance is measured.
+
+    Returns:
+        Tuple[float, int]: A tuple containing:
+            - float: The absolute Euclidean distance from point `p1` to the
+                     infinite line defined by `seg`.
+            - int: The sign of the cross product (1, -1, or 0), indicating the
+                   side of the line `p1` is on. A value of 1 or -1 means the
+                   point is on one side or the other, while 0 means it is
+                   collinear.
+    """
     seg = np.array(seg)  # Convert 'seg' to a NumPy array
     if seg.shape[0] < 2:
         # Handle cases where 'seg' doesn't define a segment
@@ -555,16 +748,3 @@ def _signed_distance_to_segment_2d(seg, p1):
     distance = np.abs(cross_product) / segment_length
     return distance, np.sign(cross_product)
 
-    """Create a binary mask for the selected paths."""
-    main_branch = np.zeros(shape, dtype=bool)
-
-    print(f"Shape: {shape}")
-
-    
-    for path in selected_paths:
-        for node in path:
-            x, y = maxima_coords[node]
-            if 0 <= y < shape[0] and 0 <= x < shape[1]:
-                main_branch[y, x] = True
-    
-    return main_branch

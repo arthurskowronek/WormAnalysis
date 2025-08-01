@@ -16,7 +16,7 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler, Ma
 
 from src.system.data import Data
 from src.system.visualization import plot_heatmap, plot_synapse_detection
-from src.system.preprocessing import worm_segmentation, is_coiled_worm, get_synapse_using_graph
+from src.system.preprocessing import Preprocessing
 from src.system.classifiers import ClassifierFactory, evaluate_models_with_scalers
 from src.system.outlier import MahalanobisOutlierDetector
 from src.system.features import FeatureExtractor
@@ -126,12 +126,13 @@ class Dataset_Manager:
                         # Basic image loading and preprocessing
                         img = imread(img_path)
                         img = self._preprocess_image(img)
+                        preprocessing = Preprocessing()
 
                         # Get worm mask
-                        worm_mask = worm_segmentation(img)
+                        worm_mask = preprocessing.worm_segmentation(img)
                         
                         # Skip coiled worms if requested
-                        if is_coiled_worm(worm_mask):
+                        if preprocessing.is_coiled_worm(worm_mask):
                             print(f"Skipping coiled worm in {img_path}")
                             empty_graph = nx.Graph()
                             maxima = []
@@ -144,7 +145,7 @@ class Dataset_Manager:
                         else:
                             # Get synapse data
                             coiled = False
-                            maxima, graph, median_width, diff_slice, diff_segment, NUMBER_OF_CORDS = get_synapse_using_graph(img, worm_mask)
+                            maxima, graph, median_width, diff_slice, diff_segment, NUMBER_OF_CORDS = preprocessing.get_synapse_using_graph(img, worm_mask)
 
                         # Create a new Data object and populate its attributes.
                         new_data = Data()
