@@ -51,12 +51,29 @@ def set_up_environment():
     Directories are created with `parents=True` and `exist_ok=True` to handle nested 
     paths and avoid errors if they already exist.
     """
-    # Create directories if they don't exist
+    # Create root-level directories
     for directory in [DATA_DIR, MODELS_DIR, RESSOURCES_DIR, SRC_DIR, USER_DIR]:
         directory.mkdir(parents=True, exist_ok=True)
-        
-    # Initialize directory
-    dirs_to_clear = ["Unclassified","Mutant_prediction","WT_prediction","Scan","Scan_modified"]
+
+    # List of subdirectories to create in DATA_DIR
+    data_subdirs = [
+        "Dataset_pkl",
+        "Mutant",
+        "Mutant_prediction",
+        "Scan",
+        "Scan_modified",
+        "Unclassified",
+        "WT",
+        "WT_prediction"
+    ]
+
+    # Create all subdirectories in DATA_DIR
+    for subdir in data_subdirs:
+        subdir_path = Path(DATA_DIR) / subdir
+        subdir_path.mkdir(parents=True, exist_ok=True)
+
+    # Clear specific subdirectories
+    dirs_to_clear = ["Unclassified", "Mutant_prediction", "WT_prediction", "Scan", "Scan_modified"]
     for subdir in dirs_to_clear:
         directory = Path(DATA_DIR) / subdir
         for file in directory.iterdir():
