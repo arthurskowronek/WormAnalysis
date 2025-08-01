@@ -48,7 +48,7 @@ def set_up_environment():
     It also clears the contents of predefined subdirectories inside the data directory 
     (e.g., 'Unclassified', 'Mutant_prediction', etc.) by deleting all files within them.
     
-    Directories are created with `parents=True` and `exist_ok=True` to handle nested 
+    Directories are created with parents=True and exist_ok=True to handle nested 
     paths and avoid errors if they already exist.
     """
     # Create directories if they don't exist
@@ -62,7 +62,7 @@ def set_up_environment():
         for file in directory.iterdir():
             if file.is_file():
                 file.unlink()
-    
+                  
 def loadCore():
     """
     Initialize and configure the Micro-Manager core interface.
