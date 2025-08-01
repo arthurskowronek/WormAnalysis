@@ -11,7 +11,9 @@ from tkinter import ttk
 from pathlib import Path
 from tifffile import imwrite
 from ultralytics import YOLO
+import matplotlib.pyplot as plt
 from PIL import Image, ImageTk, ImageColor
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 from config import RESSOURCES_DIR, DATA_DIR, MODELS_DIR, USER_DIR, PARAMETERS_FILE, DATE_FORMAT, EXPOSURE_TIME_LIVE, load_config_file
 
@@ -22,7 +24,7 @@ from src.interface.colorTheme import ColorTheme
 from src.system.Worm_Position_Manager import WormPositionManager
 
 class WormAnalysisApp:
-    def __init__(self, root, mmc = None, initial_dark_mode=False, first_page = "automatic_scan", initial_show_parameters = True):
+    def __init__(self, root, mmc = None, initial_dark_mode=False, first_page = "automatic_scan", initial_show_parameters = True, initial_live_image = True):
         """
         Initializes the Worm Analysis Application interface.
 
@@ -56,7 +58,7 @@ class WormAnalysisApp:
         self.prediction = 85
         self.id_worm_seen = 0
         self.add_worm_scan_result = True
-        self.live_image = True
+        self.live_image = initial_live_image
         self.bounding_box_size = 15 # Size of the bounding box around worms in pixels
         self.loaded_params = load_config_file()
         self.set_parameters()
@@ -1147,7 +1149,7 @@ class WormAnalysisApp:
         self.root.configure(bg=self.colors.theme["primary_background"])
         for widget in self.root.winfo_children():
             widget.destroy()
-        self.__init__(self.root, self.CORE, self.dark_mode, self.current_page, self.show_parameters)
+        self.__init__(self.root, self.CORE, self.dark_mode, self.current_page, self.show_parameters, self.live_image)
   
     def refresh_parameters_interface(self):
         if hasattr(self, "params_frame"):
@@ -1673,12 +1675,14 @@ class WormAnalysisApp:
             id = self.worms_position.get_id_worm_seen()
             unclassified_path = Path(DATA_DIR) / "Unclassified" / f"{id}.tif"
             imwrite(str(unclassified_path), img)
+            self.prediction_label_2.configure(text=f"with a probability of : segmenting...")
             
             # Step 2: Try to predict with model, fallback to random
             try:
                 dataset = Dataset_Manager()
                 dataset.load_images()
                 dataset.set_features()
+                self.prediction_label_2.configure(text=f"with a probability of : set features...")
                 model = dataset.get_model()
                 pred = model.predict(dataset.get_features_selected()[0])[0]
                 print(f"Model-derived prediction : {pred:.2f}")
@@ -1708,18 +1712,116 @@ class WormAnalysisApp:
         
     def snap_image(self):
         self.live_image = False
+
+        try:
+            self.CORE.setExposure(self.exposure_time.get())
+            self.CORE.snapImage()
+            self.snap_img = self.CORE.getImage()
+            self.CORE.setExposure(EXPOSURE_TIME_LIVE)
+        except:
+            file_path = Path(DATA_DIR) / "default_img.jpg" 
+            self.snap_img = cv2.imread(str(file_path), cv2.IMREAD_GRAYSCALE)
+
+        # Now show the page, which creates the display widgets
+        self.show_load_position_page()
+
+        # Then delay the display of the image so widgets have time to exist
+        self.root.after(100, self.display_snap_image)
+
+        self.open_contrast_histogram_window()
         
-        # Change the exposure time to have more time to snap the image
-        self.CORE.setExposure(self.exposure_time.get())
-        # Snap the image
-        self.CORE.snapImage()
-        self.snap_img = self.CORE.getImage()
-        # Reset the exposure time to the live value
-        self.CORE.setExposure(EXPOSURE_TIME_LIVE)
-        
-        # Show the snapshot (once)
-        if isinstance(self.snap_img, np.ndarray):
-            image = Image.fromarray(self.snap_img)
+    def open_contrast_histogram_window(self):
+        if not isinstance(self.snap_img, np.ndarray):
+            return
+
+        img_array = self.snap_img.copy()
+        self.original_snap_array = img_array  # Keep for processing
+
+        # Default vmin/vmax
+        vmin = float(np.min(img_array))
+        vmax = float(np.max(img_array))
+
+        self.vmin_var = tk.DoubleVar(value=vmin)
+        self.vmax_var = tk.DoubleVar(value=vmax)
+
+        # Create window
+        win = tk.Toplevel()
+        win.title("Adjust Brightness / Contrast")
+
+        # --- Histogram with matplotlib ---
+        self.hist_fig, self.hist_ax = plt.subplots(figsize=(5, 3))
+        self.hist_canvas = FigureCanvasTkAgg(self.hist_fig, master=win)
+        self.hist_canvas.get_tk_widget().pack(pady=5)
+
+        # --- Sliders frame below histogram ---
+        slider_frame = tk.Frame(win)
+        slider_frame.pack(pady=10)
+
+        # vmin slider
+        vmin_label = tk.Label(slider_frame, text="vmin")
+        vmin_label.grid(row=0, column=0, padx=5)
+        vmin_slider = tk.Scale(
+            slider_frame, from_=vmin, to=vmax, variable=self.vmin_var,
+            orient=tk.HORIZONTAL, length=400, resolution=1
+        )
+        vmin_slider.grid(row=0, column=1, padx=5)
+
+        # vmax slider
+        vmax_label = tk.Label(slider_frame, text="vmax")
+        vmax_label.grid(row=1, column=0, padx=5, pady=(10, 0))
+        vmax_slider = tk.Scale(
+            slider_frame, from_=vmin, to=vmax, variable=self.vmax_var,
+            orient=tk.HORIZONTAL, length=400, resolution=1
+        )
+        vmax_slider.grid(row=1, column=1, padx=5, pady=(10, 0))
+
+        # Update only on mouse release (avoids lag)
+        vmin_slider.bind("<ButtonRelease-1>", lambda e: self.update_image_and_histogram())
+        vmax_slider.bind("<ButtonRelease-1>", lambda e: self.update_image_and_histogram())
+
+        # Initial draw
+        self.update_image_and_histogram()
+    
+    def update_image_and_histogram(self):
+        if not hasattr(self, "original_snap_array"):
+            return
+
+        img_array = self.original_snap_array
+        vmin_val = self.vmin_var.get()
+        vmax_val = self.vmax_var.get()
+
+        # Clip and scale
+        clipped = np.clip(img_array, vmin_val, vmax_val)
+        scaled = ((clipped - vmin_val) / (vmax_val - vmin_val + 1e-8) * 255).astype(np.uint8)
+        image = Image.fromarray(scaled)
+
+        # Resize only once per size
+        label_width = self.live_image_label.winfo_width()
+        label_height = self.live_image_label.winfo_height()
+        if label_width > 0 and label_height > 0:
+            image = image.resize((label_width, label_height), Image.Resampling.LANCZOS)
+
+        tk_image = ImageTk.PhotoImage(image)
+        self.live_image_label.configure(image=tk_image)
+        self.live_image_label.image = tk_image
+
+        # Update histogram with vertical lines
+        self.hist_ax.clear()
+        self.hist_ax.hist(img_array.ravel(), bins=256, color="gray", alpha=0.8)
+        self.hist_ax.axvline(vmin_val, color='red', linestyle='--', linewidth=1.5, label='vmin')
+        self.hist_ax.axvline(vmax_val, color='blue', linestyle='--', linewidth=1.5, label='vmax')
+        self.hist_ax.set_title("Pixel Intensity Histogram")
+        self.hist_ax.set_xlim(np.min(img_array), np.max(img_array))
+        self.hist_ax.legend()
+        self.hist_canvas.draw()
+ 
+    def display_snap_image(self):
+        if isinstance(self.snap_img, np.ndarray): 
+            img = self.snap_img.copy().astype(np.float32)
+            img = (img - img.min()) / (img.max() - img.min()) * 255
+            img = img.astype(np.uint8)
+
+            image = Image.fromarray(img)
             label_width = self.live_image_label.winfo_width()
             label_height = self.live_image_label.winfo_height()
             if label_width > 0 and label_height > 0:
@@ -1728,12 +1830,12 @@ class WormAnalysisApp:
             tk_image = ImageTk.PhotoImage(image)
             self.live_image_label.image = tk_image
             self.live_image_label.config(image=tk_image)
-        
-        self.show_load_position_page()
-        
+     
     def save_snap_image(self):
          if self.live_image == False: 
             self.save_button_label_ref.configure(text="Saved")
+            self.root.update_idletasks()
+            
             CURRENT_DATE = datetime.datetime.now().strftime(DATE_FORMAT) 
             filename = f"{CURRENT_DATE}.tif"
             user_directory = Path(USER_DIR) / str(self.user_directory.get())
@@ -1741,8 +1843,8 @@ class WormAnalysisApp:
             if not user_directory.exists():
                 user_directory.mkdir(parents=True, exist_ok=True)
             imwrite(str(path), self.snap_img) 
-            time.sleep(2)
-            self.save_button_label_ref.configure(text="")
+            
+            self.root.after(2000, lambda: self.save_button_label_ref.configure(text=""))
               
     # --- Pages ---  
     def show_automatic_scan_page(self):
@@ -2270,7 +2372,8 @@ class WormAnalysisApp:
             bg=self.colors.theme["primary_background"],
             fg=self.colors.theme["tertiary_text"],
             font=(self.font, 10)
-        ).pack()
+        )
+        self.save_button_label_ref.pack()
 
 
 
@@ -2509,7 +2612,8 @@ class WormAnalysisApp:
         ).pack()
 
         # Update the live image
-        self.update_live_image()
+        if self.live_image:
+            self.update_live_image()
 
     def show_placeholder_page(self, page_name):
         placeholder = tk.Label(self.main_content, text=f"{page_name} Page\n(Coming soon...)",
