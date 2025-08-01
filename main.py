@@ -9,6 +9,7 @@ from config import set_up_environment, loadCore
 def main():
     # Setup environment
     set_up_environment()
+    # Launch connection with the microscope
     try: mmc = loadCore()
     except: mmc = None
     

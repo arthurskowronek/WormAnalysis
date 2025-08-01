@@ -1,5 +1,9 @@
 """
-Base model class that defines the interface for all models.
+Base model class that defines the interface for all machine learning models.
+
+Provides a consistent structure for fitting, predicting, saving, and loading models,
+along with parameter and feature importance management. Intended to be subclassed
+by specific model implementations (e.g., RandomForestModel, SVMModel, etc.).
 """
 import joblib
 import numpy as np
@@ -10,9 +14,29 @@ from typing import Optional, Tuple, Dict, Any
 from config import MODELS_DIR, DEFAULT_RANDOM_STATE
 
 class BaseModel(ABC):
-    """Abstract base class for all models."""
+    """
+    Abstract base class for all models.
+
+    Subclasses must implement:
+        - fit()
+        - predict()
+        - get_params()
+        - set_params()
+
+    Attributes:
+        random_state (int): Random seed for reproducibility.
+        model (Any): Underlying fitted model instance.
+        is_fitted (bool): Flag indicating whether the model has been trained.
+        feature_names (list or None): Names of the features used for training.
+    """
     
     def __init__(self, random_state: int = DEFAULT_RANDOM_STATE):
+        """
+        Initialize the base model.
+
+        Args:
+            random_state (int): Random seed for reproducibility.
+        """
         self.random_state = random_state
         self.model = None
         self.is_fitted = False
@@ -48,10 +72,13 @@ class BaseModel(ABC):
     
     def save(self, filename: str) -> None:
         """
-        Save the model to disk.
-        
+        Save the fitted model to disk using joblib.
+
         Args:
-            filename: Name of the file to save to
+            filename (str): File name to save the model under in the MODELS_DIR directory.
+
+        Raises:
+            ValueError: If the model has not been fitted.
         """
         if not self.is_fitted:
             raise ValueError("Model must be fitted before saving")

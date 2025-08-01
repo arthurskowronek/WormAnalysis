@@ -4,7 +4,7 @@ Global configuration file for the project.
 import os
 import yaml
 import datetime
-import pymmcore #Library to connect the the Micro-Manager core
+import pymmcore 
 from pathlib import Path
 
 # Get the project root (assuming we run from the project root)
@@ -17,6 +17,7 @@ RESSOURCES_DIR = PROJECT_ROOT / "ressources"
 SRC_DIR = PROJECT_ROOT / "src"
 USER_DIR = PROJECT_ROOT / "user"
 
+# Path to the parameters file
 PARAMETERS_FILE = Path(RESSOURCES_DIR) / "parameters.yaml"
 
 # Date format for file naming
@@ -32,12 +33,24 @@ IMAGE_SIZE = (1024, 1024)
 
 # Model parameters
 DEFAULT_RANDOM_STATE = 42  # For reproducibility
-DEFAULT_TEST_SIZE = 0.2  # 20% for testing
 DEFAULT_CV_FOLDS = 5  # Number of cross-validation folds
+
+# Microscope parameters
 EXPOSURE_TIME_LIVE = 50  # Default exposure time for live mode in milliseconds
 
 
 def set_up_environment():
+    """
+    Set up the project's directory structure and clear specific subdirectories.
+
+    This function ensures that all required directories (e.g., for data, models, 
+    resources, source code, and user-specific files) exist by creating them if needed. 
+    It also clears the contents of predefined subdirectories inside the data directory 
+    (e.g., 'Unclassified', 'Mutant_prediction', etc.) by deleting all files within them.
+    
+    Directories are created with `parents=True` and `exist_ok=True` to handle nested 
+    paths and avoid errors if they already exist.
+    """
     # Create directories if they don't exist
     for directory in [DATA_DIR, MODELS_DIR, RESSOURCES_DIR, SRC_DIR, USER_DIR]:
         directory.mkdir(parents=True, exist_ok=True)
@@ -51,6 +64,19 @@ def set_up_environment():
                 file.unlink()
     
 def loadCore():
+    """
+    Initialize and configure the Micro-Manager core interface.
+
+    This function sets the working directory to the script's location, initializes a 
+    `CMMCore` object from the Micro-Manager API, sets the device adapter search path, 
+    loads a specified configuration file, and sets the default exposure time.
+
+    Returns:
+        pymmcore.CMMCore: The initialized Micro-Manager core object ready for device control.
+
+    Raises:
+        Any exception raised by pymmcore methods (e.g., loading configuration or setting devices).
+    """
     DIRECTORY = "C:/Program Files/Micro-Manager-2.0gamma" # Select the folder which contains Micro-Manager.
     CONFIG = "BESSEREAU_Lab.cfg" # Name of the config file (has to be in the Micro-Manager root folder)
     os.chdir(os.path.dirname(os.path.abspath(__file__))) # Set the current working directory
@@ -117,7 +143,3 @@ def save_corner_positions_into_yaml_config_file(start_x, start_y, end_x, end_y):
     # Write everything back
     with open(PARAMETERS_FILE, "w") as f:
         f.writelines(lines)
-
-
-    
-

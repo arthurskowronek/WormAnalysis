@@ -32,7 +32,7 @@ class WormAnalysisApp:
             root (tk.Tk): The root window of the Tkinter application.
             initial_dark_mode (bool): If True, enables dark mode by default. Defaults to False.
             first_page (str): The initial page to display. Options include:
-                              "automatic_scan", "scan_result", "assist_acquisition", "load_position", "documentation", "tutorial", "machine_config".
+                              "automatic_scan", "scan_result", "load_position", "documentation", "tutorial", "machine_config".
                               Defaults to "automatic_scan".
             initial_show_parameters (bool): If True, shows parameters section on startup. Defaults to True.
 
@@ -82,8 +82,6 @@ class WormAnalysisApp:
             self.show_automatic_scan_page()
         elif self.current_page == "scan_result":   
             self.show_result_scan_page()
-        elif self.current_page == "assist_acquisition":
-            self.show_assist_acquisition_page()
         elif self.current_page == "load_position":
             self.show_load_position_page()
         elif self.current_page == "documentation":

@@ -3,9 +3,17 @@ import networkx as nx
 
 class Data:
     """
-    Class for managing the data.
+    A class for managing and storing data related to an analysis, likely of
+    biological images (e.g., worms).
+
+    This class holds various attributes such as image filenames, labels,
+    mutant types, and extracted features, providing methods to access and
+    manipulate this data.
     """
     def __init__(self):
+        """
+        Initializes a new Data object with default, empty attributes.
+        """
         self.filename = []
         self.label = []
         self.mutant_type = [] 
@@ -25,45 +33,51 @@ class Data:
         
     def get_original_data(self):
         """
-        Get the original image and label.
+        Retrieves the original image and its associated label.
         
         Returns:
-            Original image and label.
+            tuple: A tuple containing the original image data and the label.
         """
         return self.original_image, self.label
     
     def get_features(self):
         """
-        Get the features and feature names.
+        Retrieves the complete set of features and their corresponding names.
         
         Returns:
-            Features and feature names.
+            tuple: A tuple containing the numpy array of all features and a list
+                   of their names.
         """
         return self.features, self.feature_names
     
     def get_features_selected(self):
         """
-        Get the selected features and feature names.
+        Retrieves the subset of selected features and their corresponding names.
+        
+        Returns:
+            tuple: A tuple containing the numpy array of selected features and a list
+                   of their names.
         """
         return self.features_selected, self.features_names_selected
     
     def set_features(self, features: np.ndarray, feature_names: list):
         """
-        Set the features and feature names.
+        Sets the full set of features and their names for the dataset.
         
         Args:
-            features: Numpy array of features.
-            feature_names: List of feature names.
+            features (np.ndarray): The numpy array containing all the features.
+            feature_names (list): The list of strings for the feature names.
         """
         self.features = features
         self.feature_names = feature_names
         
     def set_features_selected(self, features: np.ndarray, feature_names: list):
         """
-        Set the selected features and feature names.
+        Sets the selected subset of features and their corresponding names.
+        
         Args:
-            features: Numpy array of selected features.
-            feature_names: List of selected feature names.
+            features (np.ndarray): The numpy array containing the selected features.
+            feature_names (list): The list of strings for the selected feature names.
         """
         self.features_selected = features
         self.features_names_selected = feature_names
