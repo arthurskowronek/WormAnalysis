@@ -20,10 +20,12 @@ Ce projet utilise `tkinter`, qui est inclus par défaut avec Python sous Windows
 
 ### ✅ Étapes à suivre
 
-1. **Installer Python 3.13+**
+Start by verifying if the computer already has a good version of python using : python --version
+
+1. **Installer Python 3.12+**
 
    * Rendez-vous sur [https://www.python.org/downloads/windows/](https://www.python.org/downloads/windows/)
-   * Téléchargez l’installeur de **Python 3.13.x (64-bit)**
+   * Téléchargez l’installeur de **Python 3.12.x (64-bit)**
    * Lors de l’installation :
 
      * ✅ Cochez **“Add Python to PATH”**

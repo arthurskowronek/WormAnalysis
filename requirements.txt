@@ -8,7 +8,7 @@ tifffile==2025.6.11
 pymmcore==11.9.0.73.0
 python-tsp==0.5.0
 joblib==1.5.1
-scikit-image==0.25.2
+scikit-image==0.24.0
 scikit-learn==1.7.1
 pyfeats==1.0.1
 boruta==0.4.3

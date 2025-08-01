@@ -2,7 +2,6 @@ Cache
 __pycache__
 .DS_Store
 data
-ressources
 user
 models
 .venv
