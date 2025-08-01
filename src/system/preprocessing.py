@@ -122,40 +122,12 @@ def get_synapse_using_graph(image: np.ndarray, worm_mask: np.ndarray) -> tuple:
     try:
         # Preprocess image
         img, local_max = find_local_maxima(image)
-
+        
         # Get synapses graph
-        maxima, G, median_width, diff_slice, diff_segment, head_mask_1, head_mask_2, NUMBER_OF_CORDS = get_synapses_graph(
+        maxima, G, median_width, diff_slice, diff_segment, NUMBER_OF_CORDS = get_synapses_graph(
             worm_mask,
             local_max
         )
-
-        
-        # HEAD
-        """
-        mean_intensity_1 = round(np.mean(img[head_mask_1 == 1]), 2) if np.any(head_mask_1 == 1) else float('inf')
-        mean_intensity_2 = round(np.mean(img[head_mask_2 == 1]), 2) if np.any(head_mask_2 == 1) else float('inf')
-        median_intensity_1 = round(np.median(img[head_mask_1 == 1]), 2) if np.any(head_mask_1 == 1) else float('inf')
-        median_intensity_2 = round(np.median(img[head_mask_2 == 1]), 2) if np.any(head_mask_2 == 1) else float('inf')
-        import matplotlib.pyplot as plt
-        plt.figure(figsize=(12, 8))
-        plt.imshow(worm_mask, cmap='gray', alpha=0.8)
-        plt.imshow(img, cmap='gray', alpha=0.8)
-        plt.imshow(np.ma.masked_where(head_mask_1 == 0, head_mask_1), 
-                cmap='Blues', alpha=0.6, vmin=0, vmax=1)
-        plt.imshow(np.ma.masked_where(head_mask_2 == 0, head_mask_2), 
-                cmap='Greens', alpha=0.6, vmin=0, vmax=1)
-        plt.title('Worm Head Detection Analysis', fontsize=14)
-        plt.legend()
-        from matplotlib.patches import Patch
-        legend_elements = [
-            Patch(facecolor='blue', alpha=0.6, label=f'Head Mask 1 (mean : {mean_intensity_1} ; median : {median_intensity_1})'),
-            Patch(facecolor='green', alpha=0.6, label=f'Head Mask 2 (mean : {mean_intensity_2} ; median : {median_intensity_2})'),
-            Patch(facecolor='white', alpha=0.8, label='Worm Mask')
-        ]
-        plt.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(1.15, 1))
-        plt.axis('off')  # Remove axes for cleaner look
-        plt.tight_layout()
-        plt.show()"""
 
         maxima = list(map(tuple, maxima))
 

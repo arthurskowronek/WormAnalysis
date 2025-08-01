@@ -186,54 +186,7 @@ def get_synapses_graph(worm_mask: np.ndarray,
                       and 0 <= node[1] < skeleton.shape[1] and skeleton[node[0], node[1]] == 1])                  
     if len(maxima) == 0: print("Warning: No valid maxima points found in skeleton"); return DEFAULT_RETURN
                 
-    # -- 9 -- Get the nerve ring
-
-    # Find the head - compare width
-    head_is_first = dic_segments[0][9] > dic_segments[n_segments-1][9]
-
-    # Find the head - compare intensity - create two masks : one for each extremity
-    head_mask_1 = np.zeros_like(worm_mask)
-    head_mask_2 = np.zeros_like(worm_mask)
-    mask_coords = np.column_stack(np.where(worm_mask))  # Shape: (N, 2) as (row, col)
-    head_center_1 = np.array(dic_segments[0][0])  # (row, col)
-    head_center_2 = np.array(dic_segments[n_segments-1][0])  # (row, col)
-    distances_1 = np.linalg.norm(mask_coords - head_center_1, axis=1) # Calculate distance
-    distances_2 = np.linalg.norm(mask_coords - head_center_2, axis=1)
-    threshold = 150
-    close_to_head_1 = distances_1 <= threshold
-    close_to_head_2 = distances_2 <= threshold
-    head_mask_1[mask_coords[close_to_head_1, 0], mask_coords[close_to_head_1, 1]] = 1
-    head_mask_2[mask_coords[close_to_head_2, 0], mask_coords[close_to_head_2, 1]] = 1
- 
-
-    # IMAGE_DIAPO
-    """plt.figure(figsize=(12, 8))
-    plt.imshow(worm_mask, cmap='gray', alpha=0.8)
-    plt.imshow(np.ma.masked_where(head_mask_1 == 0, head_mask_1), 
-            cmap='Blues', alpha=0.6, vmin=0, vmax=1)
-    plt.imshow(np.ma.masked_where(head_mask_2 == 0, head_mask_2), 
-            cmap='Greens', alpha=0.6, vmin=0, vmax=1)
-    if head_is_first:
-        head_point = dic_segments[0][0]
-        plt.plot(head_point[1], head_point[0], 'ro', markersize=8, label='Head (First segment)')
-    else:
-        head_point = dic_segments[n_segments-1][0]
-        plt.plot(head_point[1], head_point[0], 'ro', markersize=8, label='Head (Last segment)')
-    plt.title('Worm Head Detection Analysis', fontsize=14)
-    plt.legend()
-    from matplotlib.patches import Patch
-    legend_elements = [
-        Patch(facecolor='red', label='Head Point'),
-        Patch(facecolor='blue', alpha=0.6, label='Head Mask 1 (First segment)'),
-        Patch(facecolor='green', alpha=0.6, label='Head Mask 2 (Last segment)'),
-        Patch(facecolor='white', alpha=0.8, label='Worm Mask')
-    ]
-    plt.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(1.15, 1))
-    plt.axis('off')  # Remove axes for cleaner look
-    plt.tight_layout()
-    plt.show()"""
-    
-    return maxima, G, median_width, measure_diff_slice, measure_diff_points, head_mask_1, head_mask_2, NUMBER_OF_CORDS
+    return maxima, G, median_width, measure_diff_slice, measure_diff_points, NUMBER_OF_CORDS
 
 # Utils functions
 def decompose_worm_segments_into_slice(skel_path, worm_mask, n_segments):
@@ -302,7 +255,7 @@ def _calculate_segment_properties(start, end_pos, end_neg):
     return (start, mid_pos, mid_neg, end_pos, end_neg, 
             length_mid_pos, length_mid_neg, length_end_pos, length_end_neg, length_total)
 
-def _find_endpoints_graph(G: 'nx.Graph', 
+def _find_endpoints_graph(G: nx.Graph, 
                   maxima_coords: np.ndarray,
                   angle_threshold_degrees: float = 90) -> Tuple[List, List]:
     """
@@ -379,7 +332,7 @@ def _find_endpoints_graph(G: 'nx.Graph',
     
     return endpoints, angle_junctions
 
-def _skeleton_to_graph(skel: np.ndarray) -> 'nx.Graph':
+def _skeleton_to_graph(skel: np.ndarray) -> nx.Graph:
     """
     Convert skeleton image to graph.
     
@@ -389,10 +342,10 @@ def _skeleton_to_graph(skel: np.ndarray) -> 'nx.Graph':
     Returns:
         NetworkX graph
     """
-        
+    import networkx as nx
     # Input validation
     if skel is None or skel.size == 0: print("Warning: Empty skeleton provided to skeleton_to_graph"); return nx.Graph()
-            
+           
     G = nx.Graph()
         
     # Find non-zero coordinates
@@ -409,7 +362,7 @@ def _skeleton_to_graph(skel: np.ndarray) -> 'nx.Graph':
                 if 0 <= ny < skel.shape[0] and 0 <= nx < skel.shape[1]:
                     if skel[ny, nx]:
                         G.add_edge((y, x), (ny, nx))
-                            
+                          
     if len(G.nodes) == 0: print("Warning: No nodes added to graph")
     
     return G
@@ -455,6 +408,7 @@ def _graph_to_skeleton(G: 'nx.Graph',
 def _order_skeleton_points_skan(skeleton):
     # Create the Skeleton object
     skel_obj = skan.csr.Skeleton(skeleton)
+    summary = skan.summarize(skel_obj, separator='-')
     
     # Get the summary with branch information
     try:

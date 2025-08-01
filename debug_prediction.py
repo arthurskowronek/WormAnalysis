@@ -9,16 +9,16 @@ def main():
     dataset = Dataset_Manager()
     # 1. Load and preprocess data
     print("Loading and preprocessing data...")
-    dataset.load_images(compute=False,
+    dataset.load_images(compute=True,
         name_dataset=NAME_DATASET,
-        production=False,
+        training=True,
         visualize=False,  # Set to True if you want to visualize the preprocessing results
     )
     
     # 2. Extract features
     print("\nExtracting features...")
-    dataset.set_features(compute = False,
-        production = False,
+    dataset.set_features(compute = True,
+        save_features = False,
         name_dataset=NAME_DATASET,
         feature_reduction=False,  # Set to True if you want to apply a feature reduction (PCA)
         selection_method='saved',  # Change to 'saved' or ('kbest', 'boruta', 'mRMR', 'elasticnet' or 'lasso') or 'none'
@@ -28,7 +28,7 @@ def main():
     # 3. Compute models
     print("\nComputing models...")
     model = dataset.get_model(compute=True,
-        production = False,
+        retrain = False,
         model_type = 'classifier', # 'outlier' or 'classifier'
         outlier_type = 'mahalanobis_chi2', # 'elliptic_envelope' or 'mahalanobis_chi2'
         #classifier_type = ['svm'], # ['hist_gradient_boosting', 'svm', 'random_forest', 'knn', 'mlp']

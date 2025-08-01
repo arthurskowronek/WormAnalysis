@@ -22,14 +22,25 @@ from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 
 class FeatureExtractor:
-    """Class for extracting features from images."""
+    """
+    A class for extracting a wide range of features from images, particularly
+    from segmented regions of interest (ROIs) like synapses.
+
+    This class supports feature computation, dimensionality reduction (PCA),
+    and various feature selection methods (e.g., Lasso, Boruta, mRMR).
+    It manages the process of creating a feature vector for each image
+    based on texture, shape, and spatial properties.
+    """
         
     def __init__(self, dataset=None):
         """
-        Initialize the FeatureExtractor with an optional dataset.
+        Initializes the FeatureExtractor with an optional dataset.
         
         Args:
-            dataset: numpy Dataset to extract features from
+            dataset (Optional[object]): An optional dataset object, likely from
+                                        the `Dataset_Manager` class, to initialize
+                                        the feature matrix. If provided, the
+                                        feature matrix is pre-allocated.
         """
         self.feature_names = []
         self.set_feature_names()
@@ -44,16 +55,25 @@ class FeatureExtractor:
       
     def get_features(self):
         """
-        Get the features.
+        Retrieves the extracted features and their corresponding names.
+        
+        Returns:
+            Tuple[np.ndarray, List[str]]: A tuple containing the feature matrix
+                                          and a list of feature names.
         """
         return self.features, self.feature_names
 
     def set_features(self, dataset):
         """
-        Set the features.
+        Computes and sets the features for the provided dataset.
+
+        This is the main method for feature extraction. It iterates through
+        each image in the dataset, segments regions of interest (synapses),
+        and calculates a variety of texture, spatial, and shape features.
 
         Args:
-            dataset: Dataset object
+            dataset (Dataset_Manager): The dataset object containing the images
+                                       and pre-computed masks/graphs.
         """      
         self.set_feature_names()
         
@@ -113,7 +133,7 @@ class FeatureExtractor:
                 texture_feat = self._extract_texture_features(roi_intensity, roi_mask, prop, median_width[i])
                 region_features.append(texture_feat)
             
-            # Agréger les caractéristiques de toutes les régions
+            # Aggregate features from all regions into a single vector.
             image_features.extend(self._aggregate_region_features(region_features))
             
             # Spatial features
@@ -138,7 +158,12 @@ class FeatureExtractor:
     
     def set_feature_names(self):
         """
-        Initialize feature names.
+        Initializes the list of all possible feature names.
+
+        This method populates `self.feature_names` with a comprehensive list
+        of names for all features that can be extracted, including first-order
+        statistics, texture features (from PyFeats), shape parameters, and
+        spatial features.
         """
         self.feature_names = []
         # Initialize feature names once
@@ -196,6 +221,14 @@ class FeatureExtractor:
         self.feature_names.extend(measurement_feature_names)
 
     def feature_reduction(self, y, indices_coiled):
+        """
+        Performs dimensionality reduction using Principal Component Analysis (PCA)
+        and visualizes the results.
+        
+        Args:
+            y (np.ndarray): The labels corresponding to the features.
+            indices_coiled (List[int]): A list of indices for coiled worms to exclude.
+        """
         features, _, y = self._process_features(y, indices_coiled)         
         
         scaler = StandardScaler() 
@@ -246,6 +279,27 @@ class FeatureExtractor:
         plt.show()
     
     def feature_selection(self, y, method='lasso', k=10, coiled_worms=None, verbose_features_selected=True):
+        """
+        Performs feature selection on the dataset using a specified method.
+
+        Args:
+            y (np.ndarray): The target labels for the features.
+            method (str): The feature selection method to use. Options are
+                          'kbest', 'boruta', 'lasso', 'mRMR', or 'elasticnet'.
+                          Defaults to 'lasso'.
+            k (int): The number of features to select when using 'kbest'. Defaults to 10.
+            coiled_worms (Optional[List[int]]): A list of indices for coiled worms
+                                                to exclude from selection. Defaults to None.
+            verbose_features_selected (bool): If True, prints the names of the
+                                              selected features. Defaults to True.
+        
+        Returns:
+            Tuple[np.ndarray, List[str]]: A tuple containing the reduced feature
+                                          matrix and the list of selected feature names.
+        
+        Raises:
+            ValueError: If an unknown feature selection method is provided.
+        """
         features, feature_names, y = self._process_features(y, coiled_worms) 
         # Remove features with all 0s
         scaler = StandardScaler()
@@ -362,15 +416,17 @@ class FeatureExtractor:
     # Utils functions
     def _create_synapse_mask(self, original_image, coords_synapses, disk_radius=5):
         """
-        Create a mask for synapses in the image.
+        Creates a binary mask where synapses are represented by filled disks.
         
         Args:
-            original_image (np.ndarray): The original image
-            coords_synapses (list): List of coordinates for synapses
-            disk_radius (int, optional): Radius of the disk for each synapse. Defaults to 5.
+            original_image (np.ndarray): The original image to get dimensions from.
+            coords_synapses (List[Tuple[int, int]]): A list of (row, column)
+                                                      coordinates for each synapse.
+            disk_radius (int): The radius of the disk to draw for each synapse.
+                               Defaults to 5.
         
         Returns:
-            np.ndarray: The masked image with only synapses visible
+            np.ndarray: A binary mask with synapses marked as 1.
         """
         mask_synapse = np.zeros_like(original_image)
         height, width = original_image.shape
@@ -386,37 +442,59 @@ class FeatureExtractor:
         
         return mask_synapse
 
-    def _watershed_segmentation(coordinates, image, mask):
-        """Helper function for watershed segmentation"""
+    def _watershed_segmentation(self, coordinates, image, mask):
+        """
+        Performs watershed segmentation using synapse coordinates as markers.
+        
+        Args:
+            coordinates (List[Tuple[int, int]]): The coordinates of the markers.
+            image (np.ndarray): The image to be segmented.
+            mask (np.ndarray): A binary mask constraining the segmentation.
+            
+        Returns:
+            np.ndarray: The labeled image from the watershed algorithm.
+        """
         markers = np.zeros_like(image, dtype=np.int32)
         for i, (x, y) in enumerate(coordinates, 1):
             markers[int(x), int(y)] = i + 100
         return ski.segmentation.watershed(-image, connectivity=1, markers=markers, mask=mask)
 
-    def _find_additional_synapses(region, image, rough_segmented):
-        """Helper function to find additional synapses in a region"""
+    def _find_additional_synapses(self, region, image, rough_segmented):
+        """
+        Identifies and finds additional potential synapses within a segmented region.
+        
+        This helper function looks for local maxima that are brighter than the
+        region's boundary intensity, suggesting a potential synapse not caught
+        in the initial segmentation.
+        
+        Args:
+            region (ski.measure._regionprops.RegionProperties): The properties
+                                                                of the current region.
+            image (np.ndarray): The image intensity data.
+            rough_segmented (np.ndarray): The initial segmented image.
+            
+        Returns:
+            List[Tuple[int, int]]: A list of new synapse coordinates.
+        """
         minr, minc, maxr, maxc = region.bbox
         mask = (rough_segmented[minr:maxr, minc:maxc] == region.label)
         
-        # Calcul de l'intensité moyenne des bordures
+        # Calculate the mean intensity of the region's boundary
         boundary = ski.morphology.dilation(mask, ski.morphology.disk(1)) ^ mask
         
-        # Si aucun pixel de bord n'est trouvé, on ne peut pas calculer l'intensité moyenne
         if not image[minr:maxr, minc:maxc][boundary].size:
             return []
             
-        # Calcul de l'intensité moyenne des pixels de bord
-        # Cette valeur servira de référence pour détecter les synapses
         mean_boundary = np.mean(image[minr:maxr, minc:maxc][boundary])
         
-        # Création de la fenêtre d'analyse en remplaçant l'arrière-plan par l'intensité moyenne des bords
+        # Create a window for analysis, replacing the background with the mean boundary intensity.
         window = image[minr:maxr, minc:maxc].copy()
         window[~mask] = mean_boundary
         
-        # Détection des maxima locaux
+        # Detect local maxima within the window.
         local_maxima = ski.feature.peak_local_max(window, min_distance=2, exclude_border=False)
         
-        # Filtrage des maxima : ne garde que ceux plus intenses que la moyenne des bords
+        # Filter maxima to keep only those more intense than the boundary
         synapse_centers = [(x + minr, y + minc) 
                             for x, y in local_maxima 
                             if window[x, y] > mean_boundary]
@@ -425,39 +503,43 @@ class FeatureExtractor:
 
     def _get_regions_of_interest(self, coord, image_original, binary_mask):
         """
-        Get regions of interest from the image using watershed segmentation.
+        Performs a refined watershed segmentation to get precise regions of interest.
+
+        This function uses a two-pass approach: an initial watershed, followed by
+        a search for additional synapses, and a final, refined segmentation using
+        K-means clustering to improve region boundaries.
         
         Args:
-            coord: List of coordinates of synapse centers
-            image_original: Original image
-            binary_mask: Binary mask of the image
+            coord (List[Tuple[int, int]]): Initial coordinates of synapse centers.
+            image_original (np.ndarray): The original image.
+            binary_mask (np.ndarray): The binary mask of the area to segment.
             
         Returns:
-            Tuple of (region properties, segmented image)
+            Tuple[List[ski.measure._regionprops.RegionProperties], np.ndarray]:
+                A tuple containing the properties of the final regions and the
+                final labeled segmented image.
         """
         
-        # Première passe de segmentation
+        # First pass of segmentation.
         rough_segmented = self._watershed_segmentation(coord, image_original, binary_mask)
         
-        # Blurring the image
+        # Smooth the image to reduce noise before refinement.
         image_smooth = ski.filters.gaussian(image_original, sigma=0.5)
         
-        # Recherche de synapses supplémentaires
+        # Find and add additional synapse candidates.
         additional_synapses = []
 
         for region in ski.measure.regionprops(rough_segmented, intensity_image=image_smooth):
             new_centers = self._find_additional_synapses(region, image_smooth, rough_segmented)
             additional_synapses.extend(new_centers)
         
-        # Mise à jour des coordonnées et suppression des doublons
         coord = list(set(coord + additional_synapses))
 
-        
-        # Segmentation finale
+        # Final segmentation with refined markers.
         final_segmented = self._watershed_segmentation(coord, image_smooth, binary_mask)
         refined_segmented = np.zeros_like(final_segmented)
         
-        # Raffinement des régions
+        # Refine each region using K-means clustering.
         for region in ski.measure.regionprops(final_segmented, intensity_image=image_smooth):
             minr, minc, maxr, maxc = region.bbox
             mask = (final_segmented[minr:maxr, minc:maxc] == region.label)
@@ -474,7 +556,7 @@ class FeatureExtractor:
             new_window = image_smooth[minr:maxr, minc:maxc].copy()
             new_window[~mask] = mean_boundary  # Replace background with mean boundary intensity
 
-            # Step 5: Apply K-means
+            # Apply K-means to the intensity and binary mask.
             I = new_window / new_window.max()  # Normalize intensities
             B = mask.astype(float) * 0  # Binary weight
             features = np.column_stack((I.flatten(), B.flatten()))  # 2D feature space
@@ -495,11 +577,10 @@ class FeatureExtractor:
             kmeans = KMeans(n_clusters=2, random_state=0, n_init=10)
             labels = kmeans.fit_predict(features)
         
-            # Step 6: Determine foreground and update segmentation
+            # Determine foreground and update segmentation
             refined_region = labels.reshape(mask.shape)
             foreground_label = np.argmax([np.mean(I[refined_region == 0]), np.mean(I[refined_region == 1])])
             foreground_mask = (refined_region == foreground_label)
-            
             
             # Keep only the largest connected component in the foreground        
             labeled_fg = ski.measure.label(foreground_mask, connectivity=1)
@@ -538,23 +619,23 @@ class FeatureExtractor:
             # Show the combined image
             plt.show()"""
         
-        # Calcul des propriétés finales des régions
+        # Calculate region properties for the refined segmented image
         region_props = ski.measure.regionprops(refined_segmented, intensity_image=image_original)
         
         return region_props, refined_segmented
 
     def _extract_texture_features(self, roi_intensity: np.ndarray, roi_mask: np.ndarray, prop, median_width) -> np.ndarray:
         """
-        Extract texture features from region of interest of an image.
-
+        Extracts texture, shape, and statistical features from a single region.
+        
         Args:
-            roi_intensity: numpy array of the intensity of the region of interest
-            roi_mask: numpy array of the mask of the region of interest
-            prop: region properties of the region of interest
-            median_width: median width of the worm, used for normalization
+            roi_intensity (np.ndarray): The intensity values of the ROI.
+            roi_mask (np.ndarray): The binary mask of the ROI.
+            prop (ski.measure._regionprops.RegionProperties): The properties of the region.
+            median_width (float): The median width of the worm, used for normalization.
 
         Returns:
-            numpy array of the texture features
+            np.ndarray: A single numpy array containing all extracted features.
         """
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -580,19 +661,6 @@ class FeatureExtractor:
                 features.extend(glds_feat)
             except Exception as e:
                 features.extend([0.0] * 5)
-            
-            """try: # Statistical Feature Matrix
-                height, width = roi_intensity.shape
-                min_dim = min(height, width)
-                if min_dim >= 4:
-                    Lr = Lc = min(4, min_dim // 2)  # Utiliser au maximum 4 ou la moitié de la plus petite dimension
-                    sfm_feat, _ = pyfeats.sfm_features(roi_intensity, roi_mask, Lr=Lr, Lc=Lc)
-                    sfm_feat = np.nan_to_num(sfm_feat, nan=0.0, posinf=0.0, neginf=0.0)
-                    features.extend(sfm_feat)
-                else:
-                    features.extend([0.0] * 4)  # SFM retourne 4 caractéristiques
-            except Exception as e:
-                features.extend([0.0] * 4)"""
             
             try: # Statistical Feature Matrix
                 sfm_feat, _ = pyfeats.sfm_features(roi_intensity, roi_mask, Lr=4, Lc=4)
@@ -634,14 +702,17 @@ class FeatureExtractor:
     
     def _extract_spatial_features(self, graph: nx.Graph, component_props) -> np.ndarray:
         """
-        Extract spatial features from the graph, including both node distances and edge statistics.
+        Extracts spatial features from the graph, including node distances and
+        edge statistics.
         
         Args:
-            graph: NetworkX graph containing node positions and edges
-            component_props: List of region properties for the components in the graph
+            graph (nx.Graph): The NetworkX graph representing the worm skeleton
+                              and synapse connections.
+            component_props (List[ski.measure._regionprops.RegionProperties]):
+                                A list of region properties for the synapse components.
             
         Returns:
-            Array of spatial features
+            np.ndarray: A numpy array of spatial features.
         """
         # Get node positions from the graph
         centroid_positions = np.array([prop.centroid for prop in component_props])
@@ -718,42 +789,54 @@ class FeatureExtractor:
     
     def _aggregate_region_features(self, region_features: List) -> List[float]:
         """
-        Agrège les caractéristiques de toutes les régions en calculant des statistiques.
+        Aggregates features from multiple regions into a single vector.
         
         Args:
-            region_features: Liste des caractéristiques pour chaque région
-            
+            region_features (List[np.ndarray]): A list of feature vectors, one for each region.
+
         Returns:
-            Liste des caractéristiques agrégées
+            np.ndarray: A single, aggregated feature vector.
         """
         aggregated_features = []
         
         if region_features:
-            # Convertir en array numpy pour faciliter les calculs
             region_features = np.array(region_features)
             
-            # Calculer les statistiques
+            # Calculate mean, std, min, and max for each feature across all regions.
             mean_features = np.mean(region_features, axis=0)
             std_features = np.std(region_features, axis=0)
             min_features = np.min(region_features, axis=0)
             max_features = np.max(region_features, axis=0)
             
-            # Ajouter toutes les statistiques aux caractéristiques
+            # Add all features to the aggregated list
             aggregated_features.extend(mean_features)
             aggregated_features.extend(std_features)
             
-            # Pour certaines caractéristiques importantes (FOS et NGTDM), ajouter aussi min et max
+            # Add min and max for FOS and NGTDM features
             aggregated_features.extend(min_features[:21])
             aggregated_features.extend(max_features[:21])
         else:
-            # Si pas de régions, ajouter des zéros
+            # If no regions, fill with zeros
             n_features = 62
-            aggregated_features.extend([0.0] * n_features * 2)  # Pour mean et std
-            aggregated_features.extend([0.0] * 21 * 2)  # Pour min et max des FOS et NGTDM
+            aggregated_features.extend([0.0] * n_features * 2)  # mean and std
+            aggregated_features.extend([0.0] * 21 * 2)  # min and max for FOS and NGTDM
             
         return aggregated_features
 
     def _process_features(self, y, indices_coiled):
+        """
+        Helper function to prepare features and labels for feature selection.
+        
+        It removes features and labels corresponding to coiled worms.
+        
+        Args:
+            y (np.ndarray): The original labels.
+            indices_coiled (List[int]): Indices of coiled worms to be removed.
+            
+        Returns:
+            Tuple[np.ndarray, List[str], np.ndarray]: A tuple containing the
+                filtered features, feature names, and labels.
+        """
         features = np.zeros((len(self.features), len(self.feature_names)))
         for i in range(len(self.features)):
             if i not in indices_coiled:
