@@ -9,20 +9,23 @@ from typing import List, Optional, Tuple
 from sklearn.metrics import ConfusionMatrixDisplay
 
 def plot_synapse_detection(
-    original_image: np.ndarray,
-    worm_mask: np.ndarray,
-    maxima: List[Tuple[int, int]],
-    title: str = 'Synapse Detection Results'
-) -> None:
+                            original_image: np.ndarray,
+                            worm_mask: np.ndarray,
+                            maxima: List[Tuple[int, int]],
+                            title: str = 'Synapse Detection Results'
+                        ) -> None:
     """
-    Plot synapse detection results.
+    Plot synapse detection results, including the original image, worm mask, and detected synapses.
     
+    This function generates a three-panel figure to visualize the different stages
+    of synapse detection: the original input image, the segmented worm mask, and
+    the detected synapse locations overlaid on the original image.
+
     Args:
-        original_image: Original microscopy image
-        worm_mask: Binary mask of segmented worm
-        maxima: List of synapse coordinates
-        graph: NetworkX graph of synapses
-        title: Plot title
+        original_image (np.ndarray): The original microscopy image, expected to be grayscale.
+        worm_mask (np.ndarray): The binary mask representing the segmented worm.
+        maxima (List[Tuple[int, int]]): A list of (row, column) coordinates for each detected synapse.
+        title (str): The main title for the entire plot. Defaults to 'Synapse Detection Results'.
     """
     fig, axes = plt.subplots(1, 3, figsize=(12, 8))
     fig.suptitle(title, fontsize=16)
@@ -53,13 +56,17 @@ def plot_images(images: List[np.ndarray],
                 cmap: str = 'gray',
                 figsize: Tuple[int, int] = (12, 4)) -> None:
     """
-    Plot multiple images in a row.
+    Plot a list of images side-by-side in a single row.
     
+    This utility function is useful for visualizing a sequence of images,
+    such as different stages of an image processing pipeline.
+
     Args:
-        images: List of images to plot
-        titles: Optional list of titles for each image
-        cmap: Colormap to use
-        figsize: Figure size
+        images (List[np.ndarray]): A list of images to be displayed.
+        titles (Optional[List[str]]): An optional list of titles for each image.
+                                      If None, default titles 'Image 1', 'Image 2', etc., are used.
+        cmap (str): The colormap to use for plotting the images. Defaults to 'gray'.
+        figsize (Tuple[int, int]): The size of the entire figure. Defaults to (12, 4).
     """
     n_images = len(images)
     if titles is None:
@@ -79,11 +86,16 @@ def plot_images(images: List[np.ndarray],
 
 def plot_heatmap(data_df: pd.DataFrame,):
     """
-    Plot heatmap of model accuracy for different scaling methods.
-    This function visualizes the accuracy of different models with various scaling methods.
+    Plots a heatmap of model accuracy for different scaling methods.
+    
+    This function visualizes the accuracy of various machine learning models
+    with different data scaling techniques, providing a clear comparison.
+    The values in the heatmap are presented as percentages.
 
     Args:
-        data_df (pd.DataFrame): DataFrame containing model accuracies.
+        data_df (pd.DataFrame): A DataFrame where the index represents the models,
+                                the columns represent the scaling methods, and the
+                                cell values are the accuracy scores.
     """
     plt.figure(figsize=(12, 8))
     sns.heatmap(data_df.T * 100, annot=True, fmt='.2f', cmap='viridis',
@@ -96,15 +108,28 @@ def plot_heatmap(data_df: pd.DataFrame,):
 
 def plot_confusion_matrix_and_learning_curve(cm, train_sizes, train_mean, train_std, test_mean, test_std):
     """
-    Plot confusion matrix and learning curve.
+    Plots a confusion matrix and a learning curve side-by-side.
+    
+    This function is a useful tool for model evaluation, showing both the
+    classification performance (confusion matrix) and the model's learning
+    dynamics as the training set size increases (learning curve).
+
+    Args:
+        cm (np.ndarray): The confusion matrix as a numpy array.
+        train_sizes (np.ndarray): The number of training examples used to generate
+                                  the learning curve.
+        train_mean (np.ndarray): The mean accuracy scores on the training sets.
+        train_std (np.ndarray): The standard deviation of the training scores.
+        test_mean (np.ndarray): The mean accuracy scores on the cross-validation sets.
+        test_std (np.ndarray): The standard deviation of the cross-validation scores.
     """
     # Subplots
     fig, axs = plt.subplots(1, 2, figsize=(16, 6))
-    # Matrice de confusion
+    # Confusion matrix
     disp = ConfusionMatrixDisplay(confusion_matrix=cm)
     disp.plot(ax=axs[0], cmap='Blues', colorbar=False)
     axs[0].set_title(f"Confusion Matrix")
-    # Courbe d'apprentissage
+    # Learning curve
     axs[1].fill_between(train_sizes, train_mean - train_std, train_mean + train_std, alpha=0.1, color="blue")
     axs[1].fill_between(train_sizes, test_mean - test_std, test_mean + test_std, alpha=0.1, color="orange")
     axs[1].plot(train_sizes, train_mean, 'o-', color="blue", label="Training score")

@@ -7,34 +7,42 @@ from typing import Optional
 
 from config import RESSOURCES_DIR, load_config_file
 
-from python_tsp.exact import solve_tsp_dynamic_programming # moins de 25 pts
-from python_tsp.heuristics import solve_tsp_local_search # plus de de 25 pts
+from python_tsp.exact import solve_tsp_dynamic_programming # more than 25 pts
+from python_tsp.heuristics import solve_tsp_local_search # less than 25 pts
 
 class WormPositionManager:
     """
-    Gestionnaire pour les positions de vers
+    Manager for worm positions and related data.
     
-    Cette classe permet de gérer un fichier CSV contenant les positions de vers
-    avec leurs prédictions et labels utilisateur.
+    This class handles a CSV file that stores information about worm positions,
+    including microscope coordinates, proportional coordinates, model predictions,
+    and user-assigned labels. It also manages the order of worms to visit by
+    calculating the shortest path using the Traveling Salesman Problem (TSP) algorithm.
     """
     
     def __init__(self, output_folder = Path(RESSOURCES_DIR), new_acquisition = True, table_worm_position = [], filename: str = 'worm_positions.csv'):
         """
-        Initialise le gestionnaire de positions de vers.
+        Initializes the WormPositionManager.
         
         Args:
-            output_folder (str): Dossier de sortie pour le fichier CSV
-            table_worm_position : 
-            filename (str): Nom du fichier CSV (par défaut: 'worm_positions.csv')
+            output_folder (Path): The directory where the CSV file will be stored.
+                                  Defaults to the RESSOURCES_DIR.
+            new_acquisition (bool): If True, a new CSV file is created. If False,
+                                    an existing file is loaded, and the shortest
+                                    path is re-calculated. Defaults to True.
+            table_worm_position (List): A list of initial worm positions to populate
+                                        the CSV file. Each element should be a tuple
+                                        or list `(x, y)`. Defaults to an empty list.
+            filename (str): The name of the CSV file. Defaults to 'worm_positions.csv'.
         """
         self.output_folder = output_folder
         self.filename = filename
         self.csv_file_path = os.path.join(output_folder, filename)
         
-        # Colonnes du DataFrame
+        # Define the columns for the DataFrame.
         self.columns = ['worm_id', 'id_path', 'x_microscope', 'y_microscope', 'x_proportion', 'y_proportion', 'prediction', 'user_label', 'seen']
         
-        # Créer le dossier s'il n'existe pas
+        # Create the output directory if it does not exist.
         os.makedirs(output_folder, exist_ok=True)
         
         if new_acquisition:
@@ -48,7 +56,13 @@ class WormPositionManager:
          
     def _initialize_csv(self, table_worm_position = []) -> None:
         """
-        Create csv file with worm position if given
+        Creates and initializes a new CSV file with worm position headers.
+        
+        If `table_worm_position` is provided, it populates the CSV with these
+        positions and then calculates the optimal path.
+
+        Args:
+            table_worm_position (List): A list of initial worm positions.
         """
         data = {col: [] for col in self.columns}
         df = pd.DataFrame(data)
@@ -64,20 +78,22 @@ class WormPositionManager:
     def add_worm_microscope_position(self, x: float, y: float, 
                          prediction: float = -1, user_label: str = 'None') -> bool:
         """
-        Ajoute une nouvelle position (microscope) de ver.
+        Adds a new worm's position to the CSV file.
         
         Args:
-            x: Coordonnée X
-            y: Coordonnée Y
-            prediction: Prédiction du modèle (float entre 0 et 1)
-            user_label: Label utilisateur (str) (par défaut: 'None')
+            x (float): The x-coordinate from the microscope.
+            y (float): The y-coordinate from the microscope.
+            prediction (float): The model's prediction for the worm (0 to 1). Defaults to -1.
+            user_label (str): The user's label for the worm. Defaults to 'None'.
             
         Returns:
-            bool: True si l'ajout a réussi, False sinon
+            bool: True if the worm was added successfully (i.e., a new position),
+                  False if the position already exists.
         """
-        # Lire le DataFrame existant
+        # read the CSV file
         df = pd.read_csv(self.csv_file_path)
         tab_worms = self.get_all_worm_microscope_position()
+        # Convert microscope coordinates to proportional coordinates.
         x_proportion, y_proportion = self.transform_microscope_positions_into_proportion(x,y)
         
         new_row = {
@@ -92,7 +108,7 @@ class WormPositionManager:
             'seen': False if len(df) > 0 else True
         }
         
-        # Ajouter la nouvelle ligne
+        # Add the new line
         if [x,y] not in tab_worms:
             df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
             df.to_csv(self.csv_file_path, index=False)
@@ -102,13 +118,16 @@ class WormPositionManager:
             
     def delete_worm(self, worm_id: int) -> bool:
         """
-        Supprime un ver par son ID.
+        Deletes a worm from the CSV file by its unique ID.
         
+        After deletion, the `worm_id` and `id_path` columns are reset, and the
+        shortest path is re-calculated.
+
         Args:
-            worm_id: Identifiant du ver à supprimer
+            worm_id (int): The unique identifier of the worm to delete.
             
         Returns:
-            bool: True si la suppression a réussi, False sinon
+            bool: True if the worm was successfully deleted, False otherwise.
         """
         df = pd.read_csv(self.csv_file_path)
         if df.empty:
@@ -120,7 +139,7 @@ class WormPositionManager:
         df = df[df['worm_id'] != worm_id].reset_index(drop=True)
 
         df['worm_id'] = range(len(df))
-        df['id_path'] = range(len(df))  # temporairement pour réinitialiser
+        df['id_path'] = range(len(df))  # Reset id_path after deletion
         df.to_csv(self.csv_file_path, index=False)
 
         self.find_shortest_path()
@@ -130,13 +149,14 @@ class WormPositionManager:
     # Getters and Setters methods
     def get_worm_microscope_position(self, worm_id: int) -> Optional[pd.Series]:
         """
-        Récupère la position microscope d'un ver par son ID.
+        Retrieves the microscope coordinates for a specific worm.
         
         Args:
-            worm_id: Identifiant du ver
+            worm_id (int): The unique identifier of the worm.
             
         Returns:
-            pd.Series ou None: Données du ver ou None si non trouvé
+            Tuple[float, float]: The (x, y) coordinates of the worm. Returns (0, 0)
+                                 if the worm is not found.
         """
         df = pd.read_csv(self.csv_file_path)
         if df is not None and not df.empty:
@@ -149,13 +169,17 @@ class WormPositionManager:
                 y = worm['y_microscope']
                 return x, y
             else:
-                print(f"Ver ID {worm_id} non trouvé")
+                print(f"Worm ID {worm_id} not find")
                 return 0, 0
         return 0, 0
     
     def get_all_worm_microscope_position(self):
         """
-        Récupère la position microscope de tous les vers
+        Retrieves the microscope coordinates for all worms.
+        
+        Returns:
+            List[List[float]]: A list of `[x, y]` coordinate pairs for all worms.
+                               Returns an empty list if no worms are found.
         """
         df = pd.read_csv(self.csv_file_path)
         if df is not None and not df.empty:
@@ -167,7 +191,11 @@ class WormPositionManager:
     
     def get_all_worm_proportion_position(self):
         """
-        Récupère la position en proportion de tous les vers et leur ID
+        Retrieves the proportional coordinates and ID for all worms.
+        
+        Returns:
+            List[List[float]]: A list of `[worm_id, x_proportion, y_proportion]`
+                               for all worms. Returns an empty list if no worms are found.
         """
         df = pd.read_csv(self.csv_file_path)
         if df is not None and not df.empty:
@@ -178,6 +206,12 @@ class WormPositionManager:
             return []
     
     def get_id_worm_seen(self):
+        """
+        Gets the `worm_id` of the worm currently marked as 'seen'.
+        
+        Returns:
+            int: The `worm_id` of the seen worm. Returns 0 if no worm is marked as seen.
+        """
         df = pd.read_csv(self.csv_file_path)
 
         id_seen = 0
@@ -189,6 +223,12 @@ class WormPositionManager:
         return id_seen
     
     def get_id_path_worm_seen(self):
+        """
+        Gets the `id_path` of the worm currently marked as 'seen'.
+        
+        Returns:
+            int: The `id_path` of the seen worm. Returns 0 if no worm is marked as seen.
+        """
         df = pd.read_csv(self.csv_file_path)
 
         id_path_seen = 0
@@ -201,13 +241,14 @@ class WormPositionManager:
     
     def get_worm_label(self, worm_id: int) -> str:
         """
-        Récupère le label utilisateur pour un ver donné.
+        Retrieves the user-assigned label for a specific worm.
         
         Args:
-            worm_id: Identifiant du ver
+            worm_id (int): The unique identifier of the worm.
             
         Returns:
-            str or None: Label du ver donné, ou None si non trouvé ou erreur
+            str: The user label ('Mutant', 'Wild-Type', 'None', etc.).
+                 Returns 'None' if the worm is not found or an error occurs.
         """
         try:
             df = pd.read_csv(self.csv_file_path)
@@ -216,24 +257,25 @@ class WormPositionManager:
 
             row = df[df['worm_id'] == worm_id]
             if row.empty:
-                print(f"Ver ID {worm_id} non trouvé.")
+                print(f"Worm ID {worm_id} not find.")
                 return 'None'
 
             return row.iloc[0]['user_label']
 
         except Exception as e:
-            print(f"Erreur lors de la récupération du label: {e}")
+            print(f"Error when getting the label: {e}")
             return 'None'
         
     def get_worm_prediction(self, worm_id: int) -> str:
         """
-        Récupère le label prédit pour un ver donné.
+        Retrieves the model's prediction for a specific worm.
         
         Args:
-            worm_id: Identifiant du ver
+            worm_id (int): The unique identifier of the worm.
             
         Returns:
-            str or None: Label du ver donné, ou None si non trouvé ou erreur
+            float: The prediction value (typically between 0 and 1).
+                   Returns -1.0 if the worm is not found or an error occurs.
         """
         try:
             df = pd.read_csv(self.csv_file_path)
@@ -242,26 +284,33 @@ class WormPositionManager:
 
             row = df[df['worm_id'] == worm_id]
             if row.empty:
-                print(f"Ver ID {worm_id} non trouvé.")
+                print(f"Worm ID {worm_id} not find.")
                 return 'None'
 
             return row.iloc[0]['prediction']
 
         except Exception as e:
-            print(f"Erreur lors de la récupération du label: {e}")
+            print(f"Error when getting the prediction: {e}")
             return 'None'
 
     def get_number_of_worms(self):
+        """
+        Returns the total number of worms in the dataset.
+        
+        Returns:
+            int: The count of worms. Returns 0 if the CSV file is empty or not found.
+        """
         df = pd.read_csv(self.csv_file_path)
         return len(df) if df is not None else 0
 
     def get_mutant_proportion(self) -> float:
         """
-        Calculate the proportion of 'Mutant' labels among worms that have a user_label.
-        Only considers worms with non-empty user_label (excludes 'None', '', or empty values).
+        Calculates the proportion of worms labeled 'Mutant' among all worms that
+        have been manually labeled by a user.
         
         Returns:
-            float: Proportion of mutants (0.0 to 1.0), or 0.0 if no labeled worms exist
+            float: The proportion of mutants (0.0 to 1.0). Returns 0.0 if no
+                   worms have a user label.
         """
         df = pd.read_csv(self.csv_file_path)
         
@@ -288,14 +337,14 @@ class WormPositionManager:
     
     def update_worm_label(self, worm_id: int, user_label: str) -> bool:
         """
-        Met à jour le label utilisateur pour un ver donné.
+        Updates the user-assigned label for a specific worm.
         
         Args:
-            worm_id: Identifiant du ver
-            user_label: Nouveau label utilisateur
+            worm_id (int): The unique identifier of the worm.
+            user_label (str): The new label to assign.
             
         Returns:
-            bool: True si la mise à jour a réussi
+            bool: True if the update was successful, False otherwise.
         """
         try:
             df = pd.read_csv(self.csv_file_path)
@@ -304,29 +353,28 @@ class WormPositionManager:
                 
             mask = df['worm_id'] == worm_id
             if not mask.any():
-                print(f"Ver ID {worm_id} non trouvé pour mise à jour")
+                print(f"Worm ID {worm_id} not find for update")
                 return False
             
             df.loc[mask, 'user_label'] = str(user_label)
             df.to_csv(self.csv_file_path, index=False)
             
-            #print(f"Label mis à jour pour le ver {worm_id}: {user_label}")
             return True
             
         except Exception as e:
-            print(f"Erreur lors de la mise à jour: {e}")
+            print(f"Error when updating: {e}")
             return False
     
     def update_worm_prediction(self, worm_id: int, prediction: float) -> bool:
         """
-        Met à jour le label utilisateur pour un ver donné.
+        Updates the model's prediction for a specific worm.
         
         Args:
-            worm_id: Identifiant du ver
-            prediction: Prédiction du modèle (float entre 0 et 1)
+            worm_id (int): The unique identifier of the worm.
+            prediction (float): The new prediction value (0 to 1).
             
         Returns:
-            bool: True si la mise à jour a réussi
+            bool: True if the update was successful, False otherwise.
         """
         try:
             df = pd.read_csv(self.csv_file_path)
@@ -335,21 +383,30 @@ class WormPositionManager:
                 
             mask = df['worm_id'] == worm_id
             if not mask.any():
-                print(f"Ver ID {worm_id} non trouvé pour mise à jour")
+                print(f"Worm ID {worm_id} not find for update")
                 return False
             
             df.loc[mask, 'prediction'] = float(prediction)
             df.to_csv(self.csv_file_path, index=False)
             
-            #print(f"Label mis à jour pour le ver {worm_id}: {prediction}")
             return True
             
         except Exception as e:
-            print(f"Erreur lors de la mise à jour: {e}")
+            print(f"Error when updating: {e}")
             return False
     
     # Transform coordinates methods
     def transform_microscope_positions_into_proportion(self, x, y):
+        """
+        Transforms microscope coordinates to proportional coordinates (0 to 1).
+        
+        Args:
+            x (float): Microscope x-coordinate.
+            y (float): Microscope y-coordinate.
+            
+        Returns:
+            Tuple[float, float]: The transformed (x_prop, y_prop) coordinates.
+        """
         parameters = load_config_file()
         start_corner_x = parameters.get('start_corner_x', 0)
         start_corner_y = parameters.get('start_corner_y', 0)
@@ -365,6 +422,16 @@ class WormPositionManager:
         return x_prop, y_prop
         
     def transform_proportion_into_microscope_positions(self, x_prop, y_prop):
+        """
+        Transforms proportional coordinates (0 to 1) back to microscope coordinates.
+        
+        Args:
+            x_prop (float): Proportional x-coordinate.
+            y_prop (float): Proportional y-coordinate.
+            
+        Returns:
+            Tuple[float, float]: The transformed (x_microscope, y_microscope) coordinates.
+        """
         parameters = load_config_file()
         start_corner_x = parameters.get('start_corner_x', 0)
         start_corner_y = parameters.get('start_corner_y', 0)
@@ -382,8 +449,8 @@ class WormPositionManager:
     # Change worm being seen methods   
     def go_to_first_worm(self):
         """
-        Set 'seen' to True only for the first worm in the path (id_path = 0).
-        All other worms will have 'seen' set to False.
+        Sets the first worm in the TSP-calculated path as the currently 'seen' worm.
+        All other worms are marked as 'not seen'.
         """
         df = pd.read_csv(self.csv_file_path)
         
@@ -403,7 +470,11 @@ class WormPositionManager:
              
     def go_to_newt_worm(self):
         """
-        Change worm being seen, go to the next one
+        Navigates to the next worm in the TSP-calculated path.
+        
+        The current 'seen' worm is marked as 'not seen', and the worm with
+        the next `id_path` is marked as 'seen'. Wraps around to the beginning
+        if at the end of the path.
         """
         df = pd.read_csv(self.csv_file_path)
         
@@ -423,7 +494,12 @@ class WormPositionManager:
         df.to_csv(self.csv_file_path, index=False)
          
     def go_to_next_mutant(self):
+        """
+        Navigates to the next worm in the path that has the user label 'Mutant'.
         
+        Continues iterating through the path until a 'Mutant' is found. If no
+        mutants exist, a message is printed.
+        """
         df = pd.read_csv(self.csv_file_path)
         
         label = ''
@@ -437,7 +513,11 @@ class WormPositionManager:
             
     def go_to_last_worm(self):
         """
-        Change worm being seen, go to the last one
+        Navigates to the previous worm in the TSP-calculated path.
+        
+        The current 'seen' worm is marked as 'not seen', and the worm with
+        the previous `id_path` is marked as 'seen'. Wraps around to the end
+        if at the beginning of the path.
         """
         df = pd.read_csv(self.csv_file_path)
         
@@ -458,7 +538,12 @@ class WormPositionManager:
         df.to_csv(self.csv_file_path, index=False)
         
     def go_to_last_mutant(self):
+        """
+        Navigates to the previous worm in the path that has the user label 'Mutant'.
         
+        Continues iterating backward through the path until a 'Mutant' is found.
+        If no mutants exist, a message is printed.
+        """
         df = pd.read_csv(self.csv_file_path)
         
         label = ''
@@ -473,25 +558,25 @@ class WormPositionManager:
     # Others methods
     def find_shortest_path(self):
         """
-        Trouve le chemin le plus court entre les positions des vers.
-        Utilise l'algorithme de TSP (Travelling Salesman Problem) pour calculer le chemin.
+        Calculates the shortest path to visit all worm positions.
+        
+        This method solves the Traveling Salesman Problem (TSP) using either an
+        exact algorithm (for <= 25 worms) or a heuristic local search (for > 25 worms).
+        The calculated path is stored in the `id_path` column, and the DataFrame
+        is sorted and saved.
         """
-
         # Compute dist_matrix from worm positions
         df = pd.read_csv(self.csv_file_path)
         if df.empty:
-            #print("Aucune position de ver disponible pour le calcul du chemin.")
             return
         positions = df[['x_microscope', 'y_microscope']].values
         dist_matrix = np.linalg.norm(positions[:, np.newaxis] - positions, axis=2)
         
         if len(df) <= 25:
             # Use exact method
-            #print("Utilisation de la méthode exacte pour les chemins courts.")
             permutation, dist_opt = solve_tsp_dynamic_programming(dist_matrix)
         else:
             # Use local search method
-            #print("Utilisation de la méthode de recherche locale pour les chemins courts.")
             permutation, dist_approx = solve_tsp_local_search(dist_matrix)
             
         for i in range(len(df)):
@@ -503,6 +588,18 @@ class WormPositionManager:
         sorted_df.to_csv(self.csv_file_path, index=False)
     
     def show_map_worms_position(self):
+        """
+        Generates an image visualizing the positions of all worms on a map.
+        
+        The visualization includes:
+        - Worm IDs and their positions.
+        - Color-coded circles for user labels ('Mutant', 'Wild-Type').
+        - Gray circles for predicted labels.
+        - A red circle highlight for the 'seen' worm.
+        
+        Returns:
+            np.ndarray: An OpenCV-compatible image (numpy array).
+        """
         df = pd.read_csv(self.csv_file_path)
 
         # Create a black image
@@ -515,7 +612,6 @@ class WormPositionManager:
         red = (0, 0, 255)
         gray_green = (100, 140, 100)
         gray_red = (100, 100, 150)
-        gray = (100, 100, 100)
 
         # Define coordinates range
         min_x, max_x = df['x_microscope'].min(), df['x_microscope'].max()
@@ -560,7 +656,15 @@ class WormPositionManager:
         return img
     
     def show_table_worms_positions(self):
-
+        """
+        Generates an image of a table displaying key information for each worm.
+        
+        The table shows the `worm_id`, model `prediction`, and `user_label`.
+        The row for the currently 'seen' worm is highlighted in red.
+        
+        Returns:
+            np.ndarray: An OpenCV-compatible image (numpy array) of the table.
+        """
         df = pd.read_csv(self.csv_file_path)
 
         # Create blank image

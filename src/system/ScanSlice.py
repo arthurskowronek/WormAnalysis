@@ -11,18 +11,26 @@ from config import MODELS_DIR, RESSOURCES_DIR, DATA_DIR, save_corner_positions_i
 
 class ScanSlice:
     """
-    Class for scanning slides and detecting worms using YOLO
+    Class for controlling a microscope to scan a slide and detect worms using a YOLO model.
+
+    This class orchestrates the entire scanning process, from moving the microscope
+    stage and capturing images to processing those images with a YOLO model for
+    worm detection. It handles the stitching of individual image tiles into a
+    final, complete slice.
     """
     def __init__(self, mmc, grossissement, dual_view=False, scan_shape="square", overlap_percent=10):
         """
-        Initialize ScanSlice
+        Initializes the ScanSlice object.
         
         Args:
-            mmc: Micro-Manager core object
-            grossissement: Magnification level
-            dual_view: Whether using dual view mode
-            scan_shape: Shape of scan area ("square" or other)
-            overlap_percent: Percentage overlap between images
+            mmc: The Micro-Manager core object for microscope control.
+            grossissement (str): The magnification level (e.g., "10x").
+            dual_view (bool): True if using a dual-view camera setup, False otherwise.
+            scan_shape (str): The shape of the scanning area ("square" or "rectangle").
+                              Defaults to "square".
+            overlap_percent (int): The percentage of overlap between adjacent images
+                                   to ensure complete coverage and aid in stitching.
+                                   Defaults to 10.
         """
         self.mmc = mmc
         self.grossissement = int(grossissement.get().replace("x", ""))
@@ -45,6 +53,13 @@ class ScanSlice:
         self.scan_modified_dir = Path(DATA_DIR) / "Scan_modified"
     
     def initialize_scan(self):
+        """
+        Prepares the microscope and calculates the scanning grid.
+
+        This method calculates the actual step sizes with overlap, determines
+        the scanning area, and saves the corner positions to the configuration file.
+        It also moves the stage to the starting position for the scan.
+        """
         # Calculate actual steps considering overlap
         self.actual_step_x = self.step_size_x * (1 - self.overlap_percent / 100)
         self.actual_step_y = self.step_size_y * (1 - self.overlap_percent / 100)
@@ -53,7 +68,7 @@ class ScanSlice:
         self.start_x, self.start_y = self.mmc.getXYPosition()
         
         # Calculate scan area
-        end_x = self.start_x + (26000 if self.scan_shape == "square" else 45000) # TODO: récupérer ces valeurs depuis config machine
+        end_x = self.start_x + (26000 if self.scan_shape == "square" else 45000) # TODO
         end_y = self.start_y + 26000
         
         # Get the actual corner positions (it was the center before)
@@ -78,6 +93,17 @@ class ScanSlice:
         self.final_end_y = 0
     
     def scan(self):
+        """
+        Executes the main scanning loop.
+
+        The function performs a serpentine scan, moving the stage, snapping
+        an image, and processing the *previous* image while the stage is moving.
+        This parallelization optimizes the scanning speed.
+
+        Returns:
+            List[List[float]]: A list of final, non-overlapping worm positions
+                               detected across the entire slide.
+        """
         self.initialize_scan()
         
         # Scan grid
@@ -121,6 +147,14 @@ class ScanSlice:
         return self.get_worms_position()
 
     def process_image_to_detect_worms(self):
+        """
+        Processes a single image tile to detect worms.
+
+        This method takes the most recently captured image, performs a worm
+        detection using the YOLO model, and saves a modified version of the image
+        (e.g., with bounding boxes). It also handles the specific logic for
+        dual-view camera setups.
+        """
         # Process previous image for worm detection
         last_pos_x = self.positions_info[-1][1]
         last_pos_y = self.positions_info[-1][2]
@@ -146,16 +180,19 @@ class ScanSlice:
     
     def worm_detection(self, img, id, pos_x=0, pos_y=0, drawing = False):
         """
-        Detect worms in image using YOLO
+        Detects worms in a given image using the YOLO model.
         
         Args:
-            img: Input image
-            id: Image ID
-            pos_x: X position on stage
-            pos_y: Y position on stage
+            img (np.ndarray): The input image tile (e.g., a single scan image).
+            id (int): The unique ID of the image file.
+            pos_x (float): The x-coordinate of the stage when the image was captured.
+            pos_y (float): The y-coordinate of the stage when the image was captured.
+            drawing (bool): If True, bounding boxes are drawn on the output image.
+                            Defaults to False.
             
         Returns:
-            tuple: (processed_image, updated_bounding_boxes_list)
+            tuple: A tuple containing the processed image (with or without drawings)
+                   and the updated list of all detected bounding boxes.
         """
         # Get the image in the right format
         image = img.copy()
@@ -199,7 +236,18 @@ class ScanSlice:
         return image, self.list_bounding_boxes
 
     def get_worms_position(self):
-        """Get final worm positions by merging overlapping detections"""
+        """
+        Consolidates overlapping bounding boxes to determine unique worm positions.
+
+        This method handles cases where a single worm appears in multiple
+        overlapping images. It groups overlapping bounding boxes and calculates
+        the average center position for each group, effectively removing redundant
+        detections.
+
+        Returns:
+            List[List[float]]: A list of unique worm positions, each represented as a
+                               list of `[x_microscope, y_microscope]` coordinates.
+        """
         overlapping_pairs = []
         best_matches = defaultdict(dict)  # {idx1: {id2: (idx2, iou)}}
         
@@ -255,7 +303,16 @@ class ScanSlice:
     
     # Helpers methods for bounding box processing
     def _boxes_overlap(self, box1, box2):
-        """Check if two bounding boxes overlap"""
+        """
+        Checks if two bounding boxes overlap.
+
+        Args:
+            box1 (List): The first bounding box [id, x1, y1, x2, y2].
+            box2 (List): The second bounding box [id, x1, y1, x2, y2].
+
+        Returns:
+            bool: True if the boxes overlap, False otherwise.
+        """
         id_1, x1_1, y1_1, x2_1, y2_1 = box1
         id_2, x1_2, y1_2, x2_2, y2_2 = box2
         
@@ -269,7 +326,17 @@ class ScanSlice:
             return False
     
     def _merge_overlapping_sublists(self, sublists):
-        """Merge overlapping sublists"""
+        """
+        Merges sublists that share at least one common element.
+
+        Args:
+            sublists (List[Tuple]): A list of tuples, where each tuple represents
+                                    a pair of overlapping bounding box indices.
+
+        Returns:
+            List[List]: A list of lists, where each inner list contains the indices
+                        of a group of mutually overlapping bounding boxes.
+        """
         groups = []
         
         for sub in sublists:
@@ -308,7 +375,16 @@ class ScanSlice:
         return [sorted(list(g)) for g in groups]
     
     def _compute_iou(self, box1, box2):
-        """Compute Intersection over Union (IoU) for two boxes"""
+        """
+        Computes the Intersection over Union (IoU) of two bounding boxes.
+
+        Args:
+            box1 (List): The first bounding box [id, x1, y1, x2, y2].
+            box2 (List): The second bounding box [id, x1, y1, x2, y2].
+
+        Returns:
+            float: The IoU value, a float between 0.0 and 1.0.
+        """
         _, x1_1, y1_1, x2_1, y2_1 = box1
         _, x1_2, y1_2, x2_2, y2_2 = box2
         
@@ -333,7 +409,13 @@ class ScanSlice:
         
     # Others methods
     def reconstruct_slice(self):
-        """Reconstruct the full slice from individual tiles"""
+        """
+        Reconstructs a single, large image from the individual scanned tiles.
+
+        This function reads all the saved image tiles, crops them to remove
+        the overlap, and stitches them together into a final, seamless image.
+        The resulting image is then saved as a JPEG.
+        """
         output_path = Path(RESSOURCES_DIR) / "stitched_final.jpg"
         pattern = r"SlideScan_R(\d+)_C(\d+)_\d+\.tif"
         

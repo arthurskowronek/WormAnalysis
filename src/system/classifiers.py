@@ -831,7 +831,7 @@ def evaluate_models_with_scalers(
             
             plot_confusion_matrix_and_learning_curve(cm, train_sizes, train_mean, train_std, test_mean, test_std)
 
-            # Affichage des indices mal classés
+            # Show misclassified indices
             misclassified_indices = np.where(y != y_pred_cv)[0]
             print("Misclassified samples indices:", misclassified_indices)
 
