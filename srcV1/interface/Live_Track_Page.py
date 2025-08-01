@@ -132,14 +132,5 @@ class LiveTrackPage:
         if cv2.getWindowProperty(self.trackbar_window, 0) >= 0:
             cv2.destroyWindow(self.trackbar_window)
 
-    # ----- Action methods -----
-    def save_image(self):
-         # save image in the user directory
-        print("Saving image in the user directory")
-        filename = f"{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.tif"
-        user_directory = Path(USER_DIR) / self.user_directory
-        if not user_directory.exists():
-            user_directory.mkdir(parents=True, exist_ok=True)
-        image_path = user_directory / filename
-        cv2.imwrite(str(image_path), self.live_img)
+
 

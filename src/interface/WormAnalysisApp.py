@@ -3,6 +3,7 @@ import cv2
 import yaml
 import time
 import shutil
+import datetime
 import numpy as np
 import pandas as pd
 import tkinter as tk
@@ -12,15 +13,13 @@ from tifffile import imwrite
 from ultralytics import YOLO
 from PIL import Image, ImageTk, ImageColor
 
-from config import RESSOURCES_DIR, PARAMETERS_FILE, DATA_DIR, MODELS_DIR, DATE_FORMAT, EXPOSURE_TIME_LIVE, load_config_file
+from config import RESSOURCES_DIR, DATA_DIR, MODELS_DIR, USER_DIR, PARAMETERS_FILE, DATE_FORMAT, EXPOSURE_TIME_LIVE, load_config_file
 
 from src.system.dataset_manager import Dataset_Manager
 from src.interface.Tooltip import Tooltip
 from src.system.ScanSlice import ScanSlice
 from src.interface.colorTheme import ColorTheme
 from src.system.Worm_Position_Manager import WormPositionManager
-
-# TODO : let possibility to save the image in snap mode
 
 class WormAnalysisApp:
     def __init__(self, root, mmc = None, initial_dark_mode=False, first_page = "automatic_scan", initial_show_parameters = True):
@@ -117,8 +116,8 @@ class WormAnalysisApp:
         self.binning = tk.StringVar(value=self.loaded_params.get("binning", "2x2"))
         self.binning.trace_add("write", lambda *args: self.save_parameters())
         
-        self.shutter = tk.BooleanVar(value=self.loaded_params.get("shutter", False))
-        self.shutter.trace_add("write", lambda *args: self.save_parameters())
+        """self.shutter = tk.BooleanVar(value=self.loaded_params.get("shutter", False))
+        self.shutter.trace_add("write", lambda *args: self.save_parameters())"""
         
         self.dual_view = tk.BooleanVar(value=self.loaded_params.get("dual_view", False))
         self.dual_view.trace_add("write", lambda *args: self.save_parameters())
@@ -129,8 +128,8 @@ class WormAnalysisApp:
         self.scan_objective = tk.StringVar(value=self.loaded_params.get("scan_objective", '4x'))
         self.scan_objective.trace_add("write", lambda *args: self.save_parameters())
         
-        self.fluo_objective = tk.StringVar(value=self.loaded_params.get("fluo_objective", '10x'))
-        self.fluo_objective.trace_add("write", lambda *args: self.save_parameters())
+        """self.fluo_objective = tk.StringVar(value=self.loaded_params.get("fluo_objective", '10x'))
+        self.fluo_objective.trace_add("write", lambda *args: self.save_parameters())"""
         
         self.user_directory = tk.StringVar(value=self.loaded_params.get("user_directory", 'Arthur_2025_07_24'))
         self.user_directory.trace_add("write", lambda *args: self.save_parameters())
@@ -144,11 +143,11 @@ class WormAnalysisApp:
         params = {
             "exposure_time": self.exposure_time.get(),
             "binning": self.binning.get(),
-            "shutter": self.shutter.get(),
+            #"shutter": self.shutter.get(),
             "dual_view": self.dual_view.get(),
             "display_mode": self.display_mode.get(),
             "scan_objective": self.scan_objective.get(),
-            "fluo_objective": self.fluo_objective.get(),
+            #"fluo_objective": self.fluo_objective.get(),
             "shape": self.shape.get(),
             "user_directory": self.user_directory.get()
         }
@@ -713,7 +712,7 @@ class WormAnalysisApp:
         )
 
         # Shutter toggle
-        self.shutter_toggle = self.create_custom_toggle(self.params_content_frame, "Shutter", self.shutter)
+        #self.shutter_toggle = self.create_custom_toggle(self.params_content_frame, "Shutter", self.shutter)
 
         # Dual view
         self.dual_view_toggle = self.create_custom_toggle(self.params_content_frame, "Dual view", self.dual_view)
@@ -733,11 +732,11 @@ class WormAnalysisApp:
         )
 
         # Fluo objective
-        bg = "parameters_button_background" if "fluo_objective" in self.enable_parameters_buttons else "parameters_button_disabled_background"
+        """bg = "parameters_button_background" if "fluo_objective" in self.enable_parameters_buttons else "parameters_button_disabled_background"
         tk.Label(self.params_content_frame, text="Fluo objective", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
         _, self.fluo_objective_dropdown = self.create_rounded_dropdown(
             self.params_content_frame, ["10x", "20x", "40x"], self.fluo_objective, bg
-        )
+        )"""
 
         # Scan shape
         bg = "parameters_button_background" if "scan_shape" in self.enable_parameters_buttons else "parameters_button_disabled_background"
@@ -1159,11 +1158,11 @@ class WormAnalysisApp:
         all_widgets = {
             "exposure_time": self.exposure_time_entry,
             "binning": self.binning_dropdown,
-            "shutter": self.shutter_toggle,
+            #"shutter": self.shutter_toggle,
             "dual_view": self.dual_view_toggle,
             "display_mode": self.display_mode_dropdown,
             "scan_objective": self.scan_objective_dropdown,
-            "fluo_objective": self.fluo_objective_dropdown,
+            #"fluo_objective": self.fluo_objective_dropdown,
             "scan_shape": self.scan_shape_dropdown
         }
         
@@ -1665,41 +1664,42 @@ class WormAnalysisApp:
         return result
     
     def analyse_worm(self):
-        # Step 0: Tell the user the analysis is starting
-        self.prediction_label_2.configure(text=f"with a probability of : computing...")
-        
-        # Step 1: Segment the image and save it
-        img = self.find_worm_segmentation(self.captured_image) # TODO
-        id = self.worms_position.get_id_worm_seen()
-        unclassified_path = Path(DATA_DIR) / "Unclassified" / f"{id}.tif"
-        imwrite(str(unclassified_path), img)
-        
-        # Step 2: Try to predict with model, fallback to random
-        try:
-            dataset = Dataset_Manager()
-            dataset.load_images()
-            dataset.set_features()
-            model = dataset.get_model()
-            pred = model.predict(dataset.get_features_selected()[0])[0]
-            print(f"Model-derived prediction : {pred:.2f}")
+        if self.live_image == False: # we have to be in the snap mode to analyse the worm
+            # Step 0: Tell the user the analysis is starting
+            self.prediction_label_2.configure(text=f"with a probability of : computing...")
             
-            big_dataset = Dataset_Manager()
-            big_dataset.load_images(compute=False, name_dataset="big_dataset")
-            big_dataset.merge_with(dataset)
-        except Exception as e:
-            pred = 0.5
-            print(f"Error during the prediction (error : {e})")
-            time.sleep(2)
-        
-        # Step 3: Save image in the corresponding directory 
-        directory = Path(DATA_DIR) / ("Mutant_prediction" if pred > 0.5 else "WT_prediction")
-        classified_path = directory / f"{id}.tif" 
-        shutil.move(str(unclassified_path), str(classified_path))
-        
-        # Step 4: Update prediction in worm database
-        self.worms_position.update_worm_prediction(id, pred)
-        self.prediction = int(100*pred)
-        self.prediction_label_2.configure(text=f"with a probability of {self.prediction}%")
+            # Step 1: Segment the image and save it
+            img = self.find_worm_segmentation(self.snap_img) 
+            id = self.worms_position.get_id_worm_seen()
+            unclassified_path = Path(DATA_DIR) / "Unclassified" / f"{id}.tif"
+            imwrite(str(unclassified_path), img)
+            
+            # Step 2: Try to predict with model, fallback to random
+            try:
+                dataset = Dataset_Manager()
+                dataset.load_images()
+                dataset.set_features()
+                model = dataset.get_model()
+                pred = model.predict(dataset.get_features_selected()[0])[0]
+                print(f"Model-derived prediction : {pred:.2f}")
+                
+                big_dataset = Dataset_Manager()
+                big_dataset.load_images(compute=False, name_dataset="big_dataset")
+                big_dataset.merge_with(dataset)
+            except Exception as e:
+                pred = 0.5
+                print(f"Error during the prediction (error : {e})")
+                time.sleep(2)
+            
+            # Step 3: Save image in the corresponding directory 
+            directory = Path(DATA_DIR) / ("Mutant_prediction" if pred > 0.5 else "WT_prediction")
+            classified_path = directory / f"{id}.tif" 
+            shutil.move(str(unclassified_path), str(classified_path))
+            
+            # Step 4: Update prediction in worm database
+            self.worms_position.update_worm_prediction(id, pred)
+            self.prediction = int(100*pred)
+            self.prediction_label_2.configure(text=f"with a probability of {self.prediction}%")
     
     def start_live(self):
         self.live_image = True
@@ -1713,13 +1713,13 @@ class WormAnalysisApp:
         self.CORE.setExposure(self.exposure_time.get())
         # Snap the image
         self.CORE.snapImage()
-        img = self.CORE.getImage()
+        self.snap_img = self.CORE.getImage()
         # Reset the exposure time to the live value
         self.CORE.setExposure(EXPOSURE_TIME_LIVE)
         
         # Show the snapshot (once)
-        if isinstance(img, np.ndarray):
-            image = Image.fromarray(img)
+        if isinstance(self.snap_img, np.ndarray):
+            image = Image.fromarray(self.snap_img)
             label_width = self.live_image_label.winfo_width()
             label_height = self.live_image_label.winfo_height()
             if label_width > 0 and label_height > 0:
@@ -1731,6 +1731,19 @@ class WormAnalysisApp:
         
         self.show_load_position_page()
         
+    def save_snap_image(self):
+         if self.live_image == False: 
+            self.save_button_label_ref.configure(text="Saved")
+            CURRENT_DATE = datetime.datetime.now().strftime(DATE_FORMAT) 
+            filename = f"{CURRENT_DATE}.tif"
+            user_directory = Path(USER_DIR) / str(self.user_directory.get())
+            path = user_directory / filename
+            if not user_directory.exists():
+                user_directory.mkdir(parents=True, exist_ok=True)
+            imwrite(str(path), self.snap_img) 
+            time.sleep(2)
+            self.save_button_label_ref.configure(text="")
+              
     # --- Pages ---  
     def show_automatic_scan_page(self):
         # Clear previous widgets if needed
@@ -2229,6 +2242,36 @@ class WormAnalysisApp:
             fg=self.colors.theme["secondary_text"],
             font=(self.font, 10)
         ).pack()
+        
+        # --- Third button + label ---
+        button3_analysis_container = tk.Frame(button_label_row_analysis_container, bg=self.colors.theme["primary_background"])
+        button3_analysis_container.pack(side=tk.LEFT, padx=10)
+
+        self.save_snap_button_ref = self.create_rounded_button(
+            parent=button3_analysis_container,
+            text="Save image",
+            command=lambda: self.save_snap_image(), 
+            bg_color=self.colors.theme["primary_background"],
+            text_color=self.colors.theme["tertiary_text"],
+            hover_color=self.colors.theme["secondary_background"],
+            font=(self.font, 10),
+            width_pixels=100,
+            height_pixels=30,
+            corner_radius=20,
+            side=tk.TOP,
+            pady=(0,0),
+            padx_text=0,
+            border_width=2,
+            border_color=self.colors.theme["stroke_button"]
+        )
+        self.save_button_label_ref = tk.Label(
+            button3_analysis_container,
+            text="",
+            bg=self.colors.theme["primary_background"],
+            fg=self.colors.theme["tertiary_text"],
+            font=(self.font, 10)
+        ).pack()
+
 
 
         # ----- RIGHT CONTAINER -----
