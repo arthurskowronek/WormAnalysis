@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from PIL import Image, ImageTk, ImageColor
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-from config import RESSOURCES_DIR, DATA_DIR, MODELS_DIR, USER_DIR, PARAMETERS_FILE, DATE_FORMAT, EXPOSURE_TIME_LIVE, load_config_file, log_error, increment_user_statistics, update_user_statistics
+from config import RESSOURCES_DIR, DATA_DIR, MODELS_DIR, USER_DIR, LOG_DIR, PARAMETERS_FILE, DATE_FORMAT, EXPOSURE_TIME_LIVE, load_config_file, log_error, increment_user_statistics, update_user_statistics
 
 from src.interface.Tooltip import Tooltip
 from src.system.ScanSlice import ScanSlice
@@ -1444,6 +1444,8 @@ class WormAnalysisApp:
             worms_microscope_position = scanner.scan()
             self.init_pos_x = scanner.start_x
             self.init_pos_y = scanner.start_y
+            self.scan_width = scanner.scan_width
+            self.scan_height = scanner.scan_height
         except Exception as e:
             self.context_error = log_error(e, f"Launch scan failed")
 
@@ -1572,9 +1574,31 @@ class WormAnalysisApp:
         
         # Compute relative position
         x_mouse = float(x_display / display_width)
-        y_mouse = float(y_display / display_height)
+        y_mouse = float(y_display / display_height)    
         x_bounding_box_proportion = float(self.bounding_box_size / display_width)
         y_bounding_box_proportion = float(self.bounding_box_size / display_height)
+        
+        # Get scan image associated
+        if self.add_worm_scan_result:
+            try:
+                for i in range(self.scan_width + 1):
+                    if i/self.scan_width > x_mouse:
+                        scan_image_position_width = i-1
+                        break
+                for i in range(self.scan_height + 1):
+                    if i/self.scan_height > y_mouse:
+                        scan_image_position_height = i-1
+                        break
+                filename_scan_image_associate = f"SlideScan_X{scan_image_position_width}_Y{scan_image_position_height}"
+                source_dir = Path(DATA_DIR) / "Scan"
+                dest_dir = Path(LOG_DIR) / "Image_to_annotate"
+                # Find files that start with filename and end with .tif
+                matching_files = list(source_dir.glob(f"{filename_scan_image_associate}*.tif"))
+                source_file = matching_files[0]
+                dest_file = dest_dir / source_file.name
+                shutil.copy2(source_file, dest_file)
+            except Exception as e:
+                self.context_error = log_error(e, f"Saving image for annotation failed")
 
         # Check if click is inside any bounding box
         if not self.add_worm_scan_result:
@@ -1709,12 +1733,12 @@ class WormAnalysisApp:
             x,y = self.worms_position.get_worm_microscope_position(self.worms_position.get_id_worm_seen())
             time.sleep(0.01)
         except Exception as e:
-            self.context_error = log_error(e, f"Get go to next worm position failed")
+            self.context_error = log_error(e, "Get go to next worm position failed")
             
         try:
             self.CORE.setXYPosition(self.CORE.getXYStageDevice(), x, y)
         except Exception as e:
-            self.context_error = log_error(e, f"Microscope move to next worm failed")
+            self.context_error = log_error(e, "Microscope move to next worm failed")
         
     def go_to_last_worm(self):
         """

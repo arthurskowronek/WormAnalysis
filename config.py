@@ -18,6 +18,7 @@ MODELS_DIR = PROJECT_ROOT / "models"
 RESSOURCES_DIR = PROJECT_ROOT / "ressources"
 SRC_DIR = PROJECT_ROOT / "src"
 USER_DIR = PROJECT_ROOT / "user"
+LOG_DIR = PROJECT_ROOT / "logs"
 
 # Path to the parameters file
 PARAMETERS_FILE = Path(RESSOURCES_DIR) / "parameters.yaml"
