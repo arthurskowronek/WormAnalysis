@@ -116,6 +116,7 @@ class Dataset_Manager:
             
             for label_dir in label_dirs:
                 dir_path = self.data_dir / label_dir
+                print(dir_path)
                 if not dir_path.exists():
                     continue
                     

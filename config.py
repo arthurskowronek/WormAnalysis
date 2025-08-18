@@ -10,7 +10,7 @@ import traceback
 from pathlib import Path
 
 # Get the project root (assuming we run from the project root)
-PROJECT_ROOT = Path.cwd()
+PROJECT_ROOT = Path("/Users/skowronek/Documents/WormAnalysis") # Path.cwd()
 
 # Define all project directories
 DATA_DIR = PROJECT_ROOT / "data"
