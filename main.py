@@ -6,17 +6,26 @@ import tkinter as tk
 from src.interface.WormAnalysisApp import WormAnalysisApp
 from config import set_up_environment, loadCore
 
+from config import log_error
+
 def main():
     # Setup environment
     set_up_environment()
+    
     # Launch connection with the microscope
-    try: mmc = loadCore()
-    except: mmc = None
+    try: 
+        mmc = loadCore()
+    except: 
+        mmc = None
+        log_error(e, "Load core failed")
     
     # Launch application
-    root = tk.Tk()
-    app = WormAnalysisApp(root, mmc)
-    root.mainloop()
+    try:
+        root = tk.Tk()
+        app = WormAnalysisApp(root, mmc)
+        root.mainloop()
+    except Exception as e:
+        log_error(e, "Launch application failed")
 
 if __name__ == "__main__":
     main()

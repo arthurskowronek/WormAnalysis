@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from PIL import Image, ImageTk, ImageColor
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-from config import RESSOURCES_DIR, DATA_DIR, MODELS_DIR, USER_DIR, PARAMETERS_FILE, DATE_FORMAT, EXPOSURE_TIME_LIVE, load_config_file
+from config import RESSOURCES_DIR, DATA_DIR, MODELS_DIR, USER_DIR, PARAMETERS_FILE, DATE_FORMAT, EXPOSURE_TIME_LIVE, load_config_file, log_error
 
 from src.interface.Tooltip import Tooltip
 from src.system.ScanSlice import ScanSlice
@@ -51,6 +51,7 @@ class WormAnalysisApp:
         self.root.title("Worm Analysis")
         self.root.geometry("1440x960")
         self.PARAMS_FILE = PARAMETERS_FILE
+        self.context_error = ""
 
         # Initialize variables
         self.show_parameters = initial_show_parameters
@@ -1153,11 +1154,14 @@ class WormAnalysisApp:
         This method is typically called when a major state change occurs, such as
         switching pages or toggling dark mode. It ensures that the UI accurately
         reflects the current state of the application and its parameters.
-        """     
-        self.root.configure(bg=self.colors.theme["primary_background"])
-        for widget in self.root.winfo_children():
-            widget.destroy()
-        self.__init__(self.root, self.CORE, self.dark_mode, self.current_page, self.show_parameters, self.live_image)
+        """    
+        try: 
+            self.root.configure(bg=self.colors.theme["primary_background"])
+            for widget in self.root.winfo_children():
+                widget.destroy()
+            self.__init__(self.root, self.CORE, self.dark_mode, self.current_page, self.show_parameters, self.live_image)
+        except Exception as e:
+            self.context_error = log_error(e, "Refresh UI failed")
   
     def refresh_parameters_interface(self):
         """
@@ -1222,7 +1226,10 @@ class WormAnalysisApp:
         """
         self.dark_mode = not self.dark_mode
         self.update_colors()
-        self.refresh_ui()
+        try:
+            self.refresh_ui()
+        except Exception as e:
+            self.context_error = log_error(e, "Toggle dark mode failed")
 
     def toggle_parameters(self):
         """
@@ -1232,18 +1239,21 @@ class WormAnalysisApp:
         main content area if the current page is a scan-related page, ensuring
         the layout adapts correctly to the change in panel visibility.
         """
-        self.show_parameters = not self.show_parameters
-        if self.show_parameters:
-            self.params_frame.pack(side=tk.RIGHT, fill=tk.Y)
-        else:
-            self.params_frame.pack_forget()
-        
-        # Store the after_id and schedule resizing with error handling
-        if hasattr(self, 'main_content') and self.main_content.winfo_exists() and (self.current_page == "automatic_scan" or self.current_page == "scan_result"):
-            after_id = self.main_content.after(50, self.resize_scan_content_area)
-            if not hasattr(self, '_after_ids'):
-                self._after_ids = []
-            self._after_ids.append(after_id)
+        try:
+            self.show_parameters = not self.show_parameters
+            if self.show_parameters:
+                self.params_frame.pack(side=tk.RIGHT, fill=tk.Y)
+            else:
+                self.params_frame.pack_forget()
+            
+            # Store the after_id and schedule resizing with error handling
+            if hasattr(self, 'main_content') and self.main_content.winfo_exists() and (self.current_page == "automatic_scan" or self.current_page == "scan_result"):
+                after_id = self.main_content.after(50, self.resize_scan_content_area)
+                if not hasattr(self, '_after_ids'):
+                    self._after_ids = []
+                self._after_ids.append(after_id)
+        except Exception as e:
+            self.context_error = log_error(e, "Toggle parameters panel failed")
     
     def toggle_add_worm_scan_result(self):
         """
@@ -1254,8 +1264,11 @@ class WormAnalysisApp:
         to the result set. It triggers the `show_result_scan_page` method to
         update the UI.
         """
-        self.add_worm_scan_result = not self.add_worm_scan_result   
-        self.show_result_scan_page()
+        try:
+            self.add_worm_scan_result = not self.add_worm_scan_result   
+            self.show_result_scan_page()
+        except Exception as e:
+            self.context_error = log_error(e, f"Toggle add worm scan result failed")
     
     def switch_page(self, page_id):
         """
@@ -1267,8 +1280,11 @@ class WormAnalysisApp:
         Args:
             page_id (str): A string identifier for the new page.
         """
-        self.current_page = page_id
-        self.refresh_ui()
+        try:
+            self.current_page = page_id
+            self.refresh_ui()
+        except Exception as e:
+            self.context_error = log_error(e, f"Switch page {page_id} failed")
     
     def resize_scan_content_area(self):
         """
@@ -1280,39 +1296,42 @@ class WormAnalysisApp:
         and properly sized within the available space. It also resizes the
         displayed image accordingly.
         """
-        if self.current_page == "automatic_scan":
-            middle_container = self.middle_container_ref
-            content_area = self.content_area_ref
-        elif self.current_page == "scan_result":
-            middle_container = self.middle_result_container_ref
-            content_area = self.content_area_result_container_ref
+        try:
+            if self.current_page == "automatic_scan":
+                middle_container = self.middle_container_ref
+                content_area = self.content_area_ref
+            elif self.current_page == "scan_result":
+                middle_container = self.middle_result_container_ref
+                content_area = self.content_area_result_container_ref
 
-        container_width = middle_container.winfo_width()
-        container_height = middle_container.winfo_height()
+            container_width = middle_container.winfo_width()
+            container_height = middle_container.winfo_height()
 
-        if self.shape.get() == 'square':
-            side = min(container_width, container_height)
-            width = height = side
-        elif self.shape.get() == 'rectangle':
-            height = min(container_height, container_width / 2)
-            width = 2 * height
-        else:
-            height = min(container_height, container_width)
-            width = height
+            if self.shape.get() == 'square':
+                side = min(container_width, container_height)
+                width = height = side
+            elif self.shape.get() == 'rectangle':
+                height = min(container_height, container_width / 2)
+                width = 2 * height
+            else:
+                height = min(container_height, container_width)
+                width = height
 
-        x = (container_width - width) / 2
-        y = (container_height - height) / 2
+            x = (container_width - width) / 2
+            y = (container_height - height) / 2
 
-        content_area.place(x=x, y=y, width=width, height=height)
-        
-        self.last_scan_area_size = (int(width), int(height))
-        
-        # --- Resize image accordingly ---
-        if hasattr(self, 'original_image') and hasattr(self, 'img_label') and self.img_label.winfo_exists():
-            resized_img = self.original_image.resize(self.last_scan_area_size)
-            photo = ImageTk.PhotoImage(resized_img)
-            self.displayed_image = photo
-            self.img_label.configure(image=photo)
+            content_area.place(x=x, y=y, width=width, height=height)
+            
+            self.last_scan_area_size = (int(width), int(height))
+            
+            # --- Resize image accordingly ---
+            if hasattr(self, 'original_image') and hasattr(self, 'img_label') and self.img_label.winfo_exists():
+                resized_img = self.original_image.resize(self.last_scan_area_size)
+                photo = ImageTk.PhotoImage(resized_img)
+                self.displayed_image = photo
+                self.img_label.configure(image=photo)
+        except Exception as e:
+            self.context_error = log_error(e, f"Resize scan content area failed")
         
     def resize_live_image(self, event):
         """
@@ -1326,13 +1345,16 @@ class WormAnalysisApp:
             event (tk.Event): The event object from the `Configure` event,
                             containing the new width and height.
         """
-        w, h = event.width, event.height
-        size = min(w, h - 80)  # leave space for bottom button
-        x = (w - size) // 2
-        if self.current_page == "assist_acquisition":
-            self.live_assist_container_ref.place(x=x, y=0, width=size, height=size)
-        elif self.current_page == "load_position":
-            self.live_analysis_container_ref.place(x=x, y=0, width=size, height=size)
+        try:
+            w, h = event.width, event.height
+            size = min(w, h - 80)  # leave space for bottom button
+            x = (w - size) // 2
+            if self.current_page == "assist_acquisition":
+                self.live_assist_container_ref.place(x=x, y=0, width=size, height=size)
+            elif self.current_page == "load_position":
+                self.live_analysis_container_ref.place(x=x, y=0, width=size, height=size)
+        except Exception as e:
+            self.context_error = log_error(e, f"Resize live image failed")
     
     def resize_map_assist(self, event):
         """
@@ -1361,36 +1383,39 @@ class WormAnalysisApp:
         Args:
             event (tk.Event): The event object from the `Configure` event.
         """
-        canvas_width = event.width
-        canvas_height = event.height
-        self.top_label_canvas.coords(self.top_label_frame_window, canvas_width / 2, canvas_height / 2)   
-        
-        # Draw the rectangle
-        canvas_width = event.width
-        canvas_height = event.height
+        try:
+            canvas_width = event.width
+            canvas_height = event.height
+            self.top_label_canvas.coords(self.top_label_frame_window, canvas_width / 2, canvas_height / 2)   
+            
+            # Draw the rectangle
+            canvas_width = event.width
+            canvas_height = event.height
 
-        rect_width = 299
-        rect_height = 98
+            rect_width = 299
+            rect_height = 98
 
-        x1 = (canvas_width - rect_width) / 2
-        y1 = (canvas_height - rect_height) / 2
-        x2 = x1 + rect_width
-        y2 = y1 + rect_height
+            x1 = (canvas_width - rect_width) / 2
+            y1 = (canvas_height - rect_height) / 2
+            x2 = x1 + rect_width
+            y2 = y1 + rect_height
 
-        # Remove previous rectangle if any
-        self.top_label_canvas.delete("rounded_bg")
+            # Remove previous rectangle if any
+            self.top_label_canvas.delete("rounded_bg")
 
-        self.draw_rounded_rect(
-            self.top_label_canvas,
-            x1=x1,
-            y1=y1,
-            x2=x2,
-            y2=y2,
-            radius=20,
-            fill=self.colors.theme["primary_background"],
-            outline=self.colors.theme["secondary_text"],
-            tag="rounded_bg"
-        )
+            self.draw_rounded_rect(
+                self.top_label_canvas,
+                x1=x1,
+                y1=y1,
+                x2=x2,
+                y2=y2,
+                radius=20,
+                fill=self.colors.theme["primary_background"],
+                outline=self.colors.theme["secondary_text"],
+                tag="rounded_bg"
+            )
+        except Exception as e:
+            self.context_error = log_error(e, f"Resize size prediction box failed")
                
     def launch_scan(self):
         """
@@ -1414,7 +1439,10 @@ class WormAnalysisApp:
         # Update: scanning
         self.scan_status_label.config(text="Scanning in progress...")
         self.scan_status_label.update_idletasks()
-        worms_microscope_position = scanner.scan()
+        try:
+            worms_microscope_position = scanner.scan()
+        except Exception as e:
+            self.context_error = log_error(e, f"Launc scan failed")
 
         # Update: saving worm positions
         self.scan_status_label.config(text="Saving worm positions...")
@@ -1424,7 +1452,10 @@ class WormAnalysisApp:
         # Update: reconstructing image
         self.scan_status_label.config(text="Reconstructing scan result...")
         self.scan_status_label.update_idletasks()
-        scanner.reconstruct_slice()
+        try:
+            scanner.reconstruct_slice()
+        except Exception as e:
+            self.context_error = log_error(e, f"Reconstruct slice failed")
 
         # Update: switching page
         self.scan_status_label.config(text="Scan complete. Displaying results...")
@@ -1644,7 +1675,8 @@ class WormAnalysisApp:
             self.live_image_label.config(image=tk_image)
 
         except Exception as e:
-            pass
+            if self.context_error != "Update live image failed":
+                self.context_error = log_error(e, "Update live image failed")
         
         # Only continue the loop if in live mode
         if self.live_image:
@@ -1660,16 +1692,20 @@ class WormAnalysisApp:
         updates the UI label showing the current worm ID, and then commands
         the microscope stage to move to the new worm's coordinates.
         """
-        self.worms_position.go_to_newt_worm() # set "seen" to True to the next worm
-        self.id_worm_seen = self.worms_position.get_id_path_worm_seen() # get the id of the newt worm
-        self.id_worm_seen_label.config(text=f"{self.id_worm_seen+1}/{self.worms_position.get_number_of_worms()}")
+        try:
+            self.worms_position.go_to_newt_worm() # set "seen" to True to the next worm
+            self.id_worm_seen = self.worms_position.get_id_path_worm_seen() # get the id of the newt worm
+            self.id_worm_seen_label.config(text=f"{self.id_worm_seen+1}/{self.worms_position.get_number_of_worms()}")
 
-        x,y = self.worms_position.get_worm_microscope_position(self.worms_position.get_id_worm_seen())
-        time.sleep(0.01)
+            x,y = self.worms_position.get_worm_microscope_position(self.worms_position.get_id_worm_seen())
+            time.sleep(0.01)
+        except Exception as e:
+            self.context_error = log_error(e, f"Get go to next worm position failed")
+            
         try:
             self.CORE.setXYPosition(self.CORE.getXYStageDevice(), x, y)
-        except:
-            pass
+        except Exception as e:
+            self.context_error = log_error(e, f"Microscope move to next worm failed")
         
     def go_to_last_worm(self):
         """
@@ -1681,16 +1717,20 @@ class WormAnalysisApp:
         the microscope stage to move to the new worm's coordinates. This is
         useful for reviewing or re-analyzing a previously seen worm.
         """
-        self.worms_position.go_to_last_worm() # set "seen" to True to the last worm
-        self.id_worm_seen = self.worms_position.get_id_path_worm_seen() # get the id of the newt worm
-        self.id_worm_seen_label.config(text=f"{self.id_worm_seen+1}/{self.worms_position.get_number_of_worms()}")
+        try:
+            self.worms_position.go_to_last_worm() # set "seen" to True to the last worm
+            self.id_worm_seen = self.worms_position.get_id_path_worm_seen() # get the id of the newt worm
+            self.id_worm_seen_label.config(text=f"{self.id_worm_seen+1}/{self.worms_position.get_number_of_worms()}")
 
-        x,y = self.worms_position.get_worm_microscope_position(self.worms_position.get_id_worm_seen())
-        time.sleep(0.01)
+            x,y = self.worms_position.get_worm_microscope_position(self.worms_position.get_id_worm_seen())
+            time.sleep(0.01)
+        except Exception as e:
+            self.context_error = log_error(e, f"Get go to last worm position failed")
+            
         try:
             self.CORE.setXYPosition(self.CORE.getXYStageDevice(), x, y)
-        except:
-            pass
+        except Exception as e:
+            self.context_error = log_error(e, f"Microscope move to last worm failed")
     
     def classify_as_wt(self):
         """
@@ -1704,51 +1744,54 @@ class WormAnalysisApp:
         4. Updates a master dataset and a model performance tracking file
         with the new classification.
         """
-        id = self.worms_position.get_id_worm_seen()
-        self.worms_position.update_worm_label(id, 'Wild-Type')
-        self.proportion_wt_label_ref.config(text=f"{int(100*(1-self.worms_position.get_mutant_proportion()))}%")
-        self.proportion_mutant_label_ref.config(text=f"{int(100*(self.worms_position.get_mutant_proportion()))}%")
-        
-        # save image in the corresponding directory
-        filename = f"{id}.tif"
-        WT_path = Path(DATA_DIR) / "WT_prediction" / filename
-        Mutant_path = Path(DATA_DIR) / "Mutant_prediction" / filename
-        final_directory = Path(DATA_DIR) / "WT"
-        file_count = len(list(final_directory.glob("*")))
-        new_filename = f"WT_{file_count}.tif"
-        classified_path = final_directory / new_filename
-        if WT_path.exists() or Mutant_path.exists():
-            unclassified_path = WT_path if WT_path.exists() else Mutant_path
-            shutil.move(str(unclassified_path), str(classified_path))
+        try:
+            id = self.worms_position.get_id_worm_seen()
+            self.worms_position.update_worm_label(id, 'Wild-Type')
+            self.proportion_wt_label_ref.config(text=f"{int(100*(1-self.worms_position.get_mutant_proportion()))}%")
+            self.proportion_mutant_label_ref.config(text=f"{int(100*(self.worms_position.get_mutant_proportion()))}%")
             
-            # update label in the big dataset
-            big_dataset = Dataset_Manager()
-            big_dataset.load_images(compute=False, name_dataset="big_dataset")
-            big_dataset.update_label_by_filename(filename, "WT", new_filename)
-            
-            # update model_performance file
-            # Get variables
-            csv_path_best_model = Path(MODELS_DIR) / "best_model_tracking.csv"
-            df_best_model = pd.read_csv(csv_path_best_model)
-            best_row = df_best_model.loc[df_best_model['best_score'].idxmax()]
-            best_scaler = best_row['best_scaler_name']
-            best_model = best_row['best_model_name']
-            new_line = {
-                'date': [pd.Timestamp.now().strftime(DATE_FORMAT)],
-                'best_scaler_name': [best_scaler], 
-                'best_model_name': [best_model],
-                'label_predicted': [self.worms_position.get_worm_prediction(id)],
-                'label_true': ["WT"]
-            }
-            df_new_results = pd.DataFrame(new_line)
-            csv_path = Path(MODELS_DIR) / "model_performance.csv"
-            df_existing_results = pd.read_csv(csv_path)
-            df_combined_results = pd.concat([df_existing_results, df_new_results], ignore_index=True)
-            df_combined_results.to_csv(csv_path, index=False, mode='w')
-            
-        else:
-            img = self.find_worm_segmentation(self.live_img)
-            cv2.imwrite(str(classified_path), img)
+            # save image in the corresponding directory
+            filename = f"{id}.tif"
+            WT_path = Path(DATA_DIR) / "WT_prediction" / filename
+            Mutant_path = Path(DATA_DIR) / "Mutant_prediction" / filename
+            final_directory = Path(DATA_DIR) / "WT"
+            file_count = len(list(final_directory.glob("*")))
+            new_filename = f"WT_{file_count}.tif"
+            classified_path = final_directory / new_filename
+            if WT_path.exists() or Mutant_path.exists():
+                unclassified_path = WT_path if WT_path.exists() else Mutant_path
+                shutil.move(str(unclassified_path), str(classified_path))
+                
+                # update label in the big dataset
+                big_dataset = Dataset_Manager()
+                big_dataset.load_images(compute=False, name_dataset="big_dataset")
+                big_dataset.update_label_by_filename(filename, "WT", new_filename)
+                
+                # update model_performance file
+                # Get variables
+                csv_path_best_model = Path(MODELS_DIR) / "best_model_tracking.csv"
+                df_best_model = pd.read_csv(csv_path_best_model)
+                best_row = df_best_model.loc[df_best_model['best_score'].idxmax()]
+                best_scaler = best_row['best_scaler_name']
+                best_model = best_row['best_model_name']
+                new_line = {
+                    'date': [pd.Timestamp.now().strftime(DATE_FORMAT)],
+                    'best_scaler_name': [best_scaler], 
+                    'best_model_name': [best_model],
+                    'label_predicted': [self.worms_position.get_worm_prediction(id)],
+                    'label_true': ["WT"]
+                }
+                df_new_results = pd.DataFrame(new_line)
+                csv_path = Path(MODELS_DIR) / "model_performance.csv"
+                df_existing_results = pd.read_csv(csv_path)
+                df_combined_results = pd.concat([df_existing_results, df_new_results], ignore_index=True)
+                df_combined_results.to_csv(csv_path, index=False, mode='w')
+                
+            else:
+                img = self.find_worm_segmentation(self.live_img)
+                cv2.imwrite(str(classified_path), img)
+        except Exception as e:
+            self.context_error = log_error(e, f"Classify as WT failed")
     
     def classify_as_mutant(self):
         """
@@ -1759,51 +1802,54 @@ class WormAnalysisApp:
         image to the "Mutant" directory, and updates the master dataset and
         model performance tracking file.
         """
-        id = self.worms_position.get_id_worm_seen()
-        self.worms_position.update_worm_label(id, 'Mutant')
-        self.proportion_wt_label_ref.config(text=f"{int(100*(1-self.worms_position.get_mutant_proportion()))}%")
-        self.proportion_mutant_label_ref.config(text=f"{int(100*(self.worms_position.get_mutant_proportion()))}%")
-        
-        # save image in the corresponding directory
-        filename = f"{id}.tif"
-        WT_path = Path(DATA_DIR) / "WT_prediction" / filename
-        Mutant_path = Path(DATA_DIR) / "Mutant_prediction" / filename
-        final_directory = Path(DATA_DIR) / "Mutant"
-        file_count = len(list(final_directory.glob("*")))
-        new_filename = f"Mut_{file_count}.tif"
-        classified_path = final_directory / new_filename
-        if WT_path.exists() or Mutant_path.exists():
-            unclassified_path = WT_path if WT_path.exists() else Mutant_path
-            shutil.move(str(unclassified_path), str(classified_path))
+        try:
+            id = self.worms_position.get_id_worm_seen()
+            self.worms_position.update_worm_label(id, 'Mutant')
+            self.proportion_wt_label_ref.config(text=f"{int(100*(1-self.worms_position.get_mutant_proportion()))}%")
+            self.proportion_mutant_label_ref.config(text=f"{int(100*(self.worms_position.get_mutant_proportion()))}%")
             
-            # update label in the big dataset
-            big_dataset = Dataset_Manager()
-            big_dataset.load_images(compute=False, name_dataset="big_dataset")
-            big_dataset.update_label_by_filename(filename, "Mutant", new_filename)
-            
-            # update model_performance file
-            # Get variables
-            csv_path_best_model = Path(MODELS_DIR) / "best_model_tracking.csv"
-            df_best_model = pd.read_csv(csv_path_best_model)
-            best_row = df_best_model.loc[df_best_model['best_score'].idxmax()]
-            best_scaler = best_row['best_scaler_name']
-            best_model = best_row['best_model_name']
-            new_line = {
-                'date': [pd.Timestamp.now().strftime(DATE_FORMAT)],
-                'best_scaler_name': [best_scaler],
-                'best_model_name': [best_model],
-                'label_predicted': [self.worms_position.get_worm_prediction(id)],
-                'label_true': ["Mutant"]
-            }
-            df_new_results = pd.DataFrame(new_line)
-            csv_path = Path(MODELS_DIR) / "model_performance.csv"
-            df_existing_results = pd.read_csv(csv_path)
-            df_combined_results = pd.concat([df_existing_results, df_new_results], ignore_index=True)
-            df_combined_results.to_csv(csv_path, index=False, mode='w')
-            
-        else:
-            img = self.find_worm_segmentation(self.live_img)
-            cv2.imwrite(str(classified_path), img)
+            # save image in the corresponding directory
+            filename = f"{id}.tif"
+            WT_path = Path(DATA_DIR) / "WT_prediction" / filename
+            Mutant_path = Path(DATA_DIR) / "Mutant_prediction" / filename
+            final_directory = Path(DATA_DIR) / "Mutant"
+            file_count = len(list(final_directory.glob("*")))
+            new_filename = f"Mut_{file_count}.tif"
+            classified_path = final_directory / new_filename
+            if WT_path.exists() or Mutant_path.exists():
+                unclassified_path = WT_path if WT_path.exists() else Mutant_path
+                shutil.move(str(unclassified_path), str(classified_path))
+                
+                # update label in the big dataset
+                big_dataset = Dataset_Manager()
+                big_dataset.load_images(compute=False, name_dataset="big_dataset")
+                big_dataset.update_label_by_filename(filename, "Mutant", new_filename)
+                
+                # update model_performance file
+                # Get variables
+                csv_path_best_model = Path(MODELS_DIR) / "best_model_tracking.csv"
+                df_best_model = pd.read_csv(csv_path_best_model)
+                best_row = df_best_model.loc[df_best_model['best_score'].idxmax()]
+                best_scaler = best_row['best_scaler_name']
+                best_model = best_row['best_model_name']
+                new_line = {
+                    'date': [pd.Timestamp.now().strftime(DATE_FORMAT)],
+                    'best_scaler_name': [best_scaler],
+                    'best_model_name': [best_model],
+                    'label_predicted': [self.worms_position.get_worm_prediction(id)],
+                    'label_true': ["Mutant"]
+                }
+                df_new_results = pd.DataFrame(new_line)
+                csv_path = Path(MODELS_DIR) / "model_performance.csv"
+                df_existing_results = pd.read_csv(csv_path)
+                df_combined_results = pd.concat([df_existing_results, df_new_results], ignore_index=True)
+                df_combined_results.to_csv(csv_path, index=False, mode='w')
+                
+            else:
+                img = self.find_worm_segmentation(self.live_img)
+                cv2.imwrite(str(classified_path), img)
+        except Exception as e:
+            self.context_error = log_error(e, f"Classify as mutant failed")
      
     def find_worm_segmentation(self, img):
         """
@@ -1822,66 +1868,70 @@ class WormAnalysisApp:
             np.ndarray: The input image with the background masked out, resulting
                         in only the worm being visible.
         """
-        model = self.segmentation_model
-        image = img.copy()
-        
-        # Normalize image for YOLO
-        """threshold = 3000
-        image = np.clip(image, 0, threshold).astype(np.uint16)"""
-        
-        # Normalize image for YOLO
-        image = cv2.normalize(image, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
-        
-        # Save temporary image
-        temp_path = Path(MODELS_DIR) / "temp_converted_image.png"
-        cv2.imwrite(str(temp_path), image)
-        
-        # Predict
-        prediction = model.predict(source=str(temp_path), save=False, verbose=False)
-        os.remove(temp_path)
-        
-        masks = prediction[0].masks
-        
-        if masks is None or masks.data.shape[0] == 0:
-            # No mask detected
-            return np.zeros_like(image)
+        try:
+            model = self.segmentation_model
+            image = img.copy()
+            
+            # Normalize image for YOLO
+            """threshold = 3000
+            image = np.clip(image, 0, threshold).astype(np.uint16)"""
+            
+            # Normalize image for YOLO
+            image = cv2.normalize(image, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
+            
+            # Save temporary image
+            temp_path = Path(MODELS_DIR) / "temp_converted_image.png"
+            cv2.imwrite(str(temp_path), image)
+            
+            # Predict
+            prediction = model.predict(source=str(temp_path), save=False, verbose=False)
+            os.remove(temp_path)
+            
+            masks = prediction[0].masks
+            
+            if masks is None or masks.data.shape[0] == 0:
+                # No mask detected
+                return np.zeros_like(image)
 
-        # Get image center
-        h, w = image.shape[:2]
-        center = np.array([w // 2, h // 2])
+            # Get image center
+            h, w = image.shape[:2]
+            center = np.array([w // 2, h // 2])
 
-        # Find the mask closest to the center
-        min_dist = float('inf')
-        closest_mask = None
+            # Find the mask closest to the center
+            min_dist = float('inf')
+            closest_mask = None
 
-        for i, mask in enumerate(masks.data):
-            mask = mask.cpu().numpy()
-            yx = np.column_stack(np.nonzero(mask))
-            if yx.size == 0:
-                continue
-            xy = yx[:, ::-1]  # (x, y)
+            for i, mask in enumerate(masks.data):
+                mask = mask.cpu().numpy()
+                yx = np.column_stack(np.nonzero(mask))
+                if yx.size == 0:
+                    continue
+                xy = yx[:, ::-1]  # (x, y)
 
-            distances = np.linalg.norm(xy - center, axis=1)
-            min_distance = distances.min()
+                distances = np.linalg.norm(xy - center, axis=1)
+                min_distance = distances.min()
 
-            if min_distance < min_dist:
-                min_dist = min_distance
-                closest_mask = mask
-        
-        resized_mask = cv2.resize(closest_mask.astype(np.uint8), (w,h), interpolation=cv2.INTER_NEAREST)
-        mask_bool = resized_mask.astype(bool)
+                if min_distance < min_dist:
+                    min_dist = min_distance
+                    closest_mask = mask
+            
+            resized_mask = cv2.resize(closest_mask.astype(np.uint8), (w,h), interpolation=cv2.INTER_NEAREST)
+            mask_bool = resized_mask.astype(bool)
 
-        result = np.zeros_like(image)
+            result = np.zeros_like(image)
 
-        if image.ndim == 2:
-            # Image grayscale 2D
-            result[mask_bool] = image[mask_bool]
-        else:
-            # Image couleur 3D (rare dans ton cas)
-            for c in range(image.shape[2]):
-                result[..., c][mask_bool] = image[..., c][mask_bool]
-
-        return result
+            if image.ndim == 2:
+                # Image grayscale 2D
+                result[mask_bool] = image[mask_bool]
+            else:
+                # Image couleur 3D (rare dans ton cas)
+                for c in range(image.shape[2]):
+                    result[..., c][mask_bool] = image[..., c][mask_bool]
+            
+            return result
+        except Exception as e:
+            self.context_error = log_error(e, f"Find worm segmentation failed")
+            return None
     
     def analyse_worm(self):
         """
@@ -1918,8 +1968,8 @@ class WormAnalysisApp:
                 big_dataset.load_images(compute=False, name_dataset="big_dataset")
                 big_dataset.merge_with(dataset)
             except Exception as e:
+                self.context_error = log_error(e, f"Prediction failed")
                 pred = 0.5
-                print(f"Error during the prediction (error : {e})")
                 time.sleep(2)
             
             # Step 3: Save image in the corresponding directory 
@@ -1958,7 +2008,8 @@ class WormAnalysisApp:
             self.CORE.snapImage()
             self.snap_img = self.CORE.getImage()
             self.CORE.setExposure(EXPOSURE_TIME_LIVE)
-        except:
+        except Exception as e:
+            self.context_error = log_error(e, f"Snap image failed")
             file_path = Path(DATA_DIR) / "default_img.jpg" 
             self.snap_img = cv2.imread(str(file_path), cv2.IMREAD_GRAYSCALE)
 
@@ -1980,56 +2031,59 @@ class WormAnalysisApp:
         in the main UI and the histogram in the new window are updated in
         real-time as the sliders are moved.
         """
-        if not isinstance(self.snap_img, np.ndarray):
-            return
+        try:
+            if not isinstance(self.snap_img, np.ndarray):
+                return
 
-        img_array = self.snap_img.copy()
-        self.original_snap_array = img_array  # Keep for processing
+            img_array = self.snap_img.copy()
+            self.original_snap_array = img_array  # Keep for processing
 
-        # Default vmin/vmax
-        vmin = float(np.min(img_array))
-        vmax = float(np.max(img_array))
+            # Default vmin/vmax
+            vmin = float(np.min(img_array))
+            vmax = float(np.max(img_array))
 
-        self.vmin_var = tk.DoubleVar(value=vmin)
-        self.vmax_var = tk.DoubleVar(value=vmax)
+            self.vmin_var = tk.DoubleVar(value=vmin)
+            self.vmax_var = tk.DoubleVar(value=vmax)
 
-        # Create window
-        win = tk.Toplevel()
-        win.title("Adjust Brightness / Contrast")
+            # Create window
+            win = tk.Toplevel()
+            win.title("Adjust Brightness / Contrast")
 
-        # --- Histogram with matplotlib ---
-        self.hist_fig, self.hist_ax = plt.subplots(figsize=(5, 3))
-        self.hist_canvas = FigureCanvasTkAgg(self.hist_fig, master=win)
-        self.hist_canvas.get_tk_widget().pack(pady=5)
+            # --- Histogram with matplotlib ---
+            self.hist_fig, self.hist_ax = plt.subplots(figsize=(5, 3))
+            self.hist_canvas = FigureCanvasTkAgg(self.hist_fig, master=win)
+            self.hist_canvas.get_tk_widget().pack(pady=5)
 
-        # --- Sliders frame below histogram ---
-        slider_frame = tk.Frame(win)
-        slider_frame.pack(pady=10)
+            # --- Sliders frame below histogram ---
+            slider_frame = tk.Frame(win)
+            slider_frame.pack(pady=10)
 
-        # vmin slider
-        vmin_label = tk.Label(slider_frame, text="vmin")
-        vmin_label.grid(row=0, column=0, padx=5)
-        vmin_slider = tk.Scale(
-            slider_frame, from_=vmin, to=vmax, variable=self.vmin_var,
-            orient=tk.HORIZONTAL, length=400, resolution=1
-        )
-        vmin_slider.grid(row=0, column=1, padx=5)
+            # vmin slider
+            vmin_label = tk.Label(slider_frame, text="vmin")
+            vmin_label.grid(row=0, column=0, padx=5)
+            vmin_slider = tk.Scale(
+                slider_frame, from_=vmin, to=vmax, variable=self.vmin_var,
+                orient=tk.HORIZONTAL, length=400, resolution=1
+            )
+            vmin_slider.grid(row=0, column=1, padx=5)
 
-        # vmax slider
-        vmax_label = tk.Label(slider_frame, text="vmax")
-        vmax_label.grid(row=1, column=0, padx=5, pady=(10, 0))
-        vmax_slider = tk.Scale(
-            slider_frame, from_=vmin, to=vmax, variable=self.vmax_var,
-            orient=tk.HORIZONTAL, length=400, resolution=1
-        )
-        vmax_slider.grid(row=1, column=1, padx=5, pady=(10, 0))
+            # vmax slider
+            vmax_label = tk.Label(slider_frame, text="vmax")
+            vmax_label.grid(row=1, column=0, padx=5, pady=(10, 0))
+            vmax_slider = tk.Scale(
+                slider_frame, from_=vmin, to=vmax, variable=self.vmax_var,
+                orient=tk.HORIZONTAL, length=400, resolution=1
+            )
+            vmax_slider.grid(row=1, column=1, padx=5, pady=(10, 0))
 
-        # Update only on mouse release (avoids lag)
-        vmin_slider.bind("<ButtonRelease-1>", lambda e: self.update_image_and_histogram())
-        vmax_slider.bind("<ButtonRelease-1>", lambda e: self.update_image_and_histogram())
+            # Update only on mouse release (avoids lag)
+            vmin_slider.bind("<ButtonRelease-1>", lambda e: self.update_image_and_histogram())
+            vmax_slider.bind("<ButtonRelease-1>", lambda e: self.update_image_and_histogram())
 
-        # Initial draw
-        self.update_image_and_histogram()
+            # Initial draw
+            self.update_image_and_histogram()
+        except Exception as e:
+            self.context_error = log_error(e, f"Open contrast histogram window failed")
     
     def update_image_and_histogram(self):
         """
@@ -2040,37 +2094,40 @@ class WormAnalysisApp:
         the image in the main UI, and redraws the histogram with vertical lines
         indicating the current `vmin` and `vmax`.
         """
-        if not hasattr(self, "original_snap_array"):
-            return
+        try:
+            if not hasattr(self, "original_snap_array"):
+                return
 
-        img_array = self.original_snap_array
-        vmin_val = self.vmin_var.get()
-        vmax_val = self.vmax_var.get()
+            img_array = self.original_snap_array
+            vmin_val = self.vmin_var.get()
+            vmax_val = self.vmax_var.get()
 
-        # Clip and scale
-        clipped = np.clip(img_array, vmin_val, vmax_val)
-        scaled = ((clipped - vmin_val) / (vmax_val - vmin_val + 1e-8) * 255).astype(np.uint8)
-        image = Image.fromarray(scaled)
+            # Clip and scale
+            clipped = np.clip(img_array, vmin_val, vmax_val)
+            scaled = ((clipped - vmin_val) / (vmax_val - vmin_val + 1e-8) * 255).astype(np.uint8)
+            image = Image.fromarray(scaled)
 
-        # Resize only once per size
-        label_width = self.live_image_label.winfo_width()
-        label_height = self.live_image_label.winfo_height()
-        if label_width > 0 and label_height > 0:
-            image = image.resize((label_width, label_height), Image.Resampling.LANCZOS)
+            # Resize only once per size
+            label_width = self.live_image_label.winfo_width()
+            label_height = self.live_image_label.winfo_height()
+            if label_width > 0 and label_height > 0:
+                image = image.resize((label_width, label_height), Image.Resampling.LANCZOS)
 
-        tk_image = ImageTk.PhotoImage(image)
-        self.live_image_label.configure(image=tk_image)
-        self.live_image_label.image = tk_image
+            tk_image = ImageTk.PhotoImage(image)
+            self.live_image_label.configure(image=tk_image)
+            self.live_image_label.image = tk_image
 
-        # Update histogram with vertical lines
-        self.hist_ax.clear()
-        self.hist_ax.hist(img_array.ravel(), bins=256, color="gray", alpha=0.8)
-        self.hist_ax.axvline(vmin_val, color='red', linestyle='--', linewidth=1.5, label='vmin')
-        self.hist_ax.axvline(vmax_val, color='blue', linestyle='--', linewidth=1.5, label='vmax')
-        self.hist_ax.set_title("Pixel Intensity Histogram")
-        self.hist_ax.set_xlim(np.min(img_array), np.max(img_array))
-        self.hist_ax.legend()
-        self.hist_canvas.draw()
+            # Update histogram with vertical lines
+            self.hist_ax.clear()
+            self.hist_ax.hist(img_array.ravel(), bins=256, color="gray", alpha=0.8)
+            self.hist_ax.axvline(vmin_val, color='red', linestyle='--', linewidth=1.5, label='vmin')
+            self.hist_ax.axvline(vmax_val, color='blue', linestyle='--', linewidth=1.5, label='vmax')
+            self.hist_ax.set_title("Pixel Intensity Histogram")
+            self.hist_ax.set_xlim(np.min(img_array), np.max(img_array))
+            self.hist_ax.legend()
+            self.hist_canvas.draw()
+        except Exception as e:
+            self.context_error = log_error(e, f"Update image histogram failed")
  
     def display_snap_image(self):
         """
@@ -2080,20 +2137,23 @@ class WormAnalysisApp:
         takes the snapped image, normalizes its pixel intensity range, converts
         it to a Tkinter-compatible format, and displays it in the `live_image_label`.
         """
-        if isinstance(self.snap_img, np.ndarray): 
-            img = self.snap_img.copy().astype(np.float32)
-            img = (img - img.min()) / (img.max() - img.min()) * 255
-            img = img.astype(np.uint8)
+        try:
+            if isinstance(self.snap_img, np.ndarray): 
+                img = self.snap_img.copy().astype(np.float32)
+                img = (img - img.min()) / (img.max() - img.min()) * 255
+                img = img.astype(np.uint8)
 
-            image = Image.fromarray(img)
-            label_width = self.live_image_label.winfo_width()
-            label_height = self.live_image_label.winfo_height()
-            if label_width > 0 and label_height > 0:
-                image = image.resize((label_width, label_height), Image.Resampling.LANCZOS)
+                image = Image.fromarray(img)
+                label_width = self.live_image_label.winfo_width()
+                label_height = self.live_image_label.winfo_height()
+                if label_width > 0 and label_height > 0:
+                    image = image.resize((label_width, label_height), Image.Resampling.LANCZOS)
 
-            tk_image = ImageTk.PhotoImage(image)
-            self.live_image_label.image = tk_image
-            self.live_image_label.config(image=tk_image)
+                tk_image = ImageTk.PhotoImage(image)
+                self.live_image_label.image = tk_image
+                self.live_image_label.config(image=tk_image)
+        except Exception as e:
+            self.context_error = log_error(e, f"Display snap image failed")
      
     def save_snap_image(self):
         """
@@ -2104,19 +2164,22 @@ class WormAnalysisApp:
         inside the user's chosen directory, and then removes the "Saved" message
         after a short delay.
         """
-        if self.live_image == False: 
-            self.save_button_label_ref.configure(text="Saved")
-            self.root.update_idletasks()
-            
-            CURRENT_DATE = datetime.datetime.now().strftime(DATE_FORMAT) 
-            filename = f"{CURRENT_DATE}.tif"
-            user_directory = Path(USER_DIR) / str(self.user_directory.get())
-            path = user_directory / filename
-            if not user_directory.exists():
-                user_directory.mkdir(parents=True, exist_ok=True)
-            imwrite(str(path), self.snap_img) 
-            
-            self.root.after(2000, lambda: self.save_button_label_ref.configure(text=""))
+        try:
+            if self.live_image == False: 
+                self.save_button_label_ref.configure(text="Saved")
+                self.root.update_idletasks()
+                
+                CURRENT_DATE = datetime.datetime.now().strftime(DATE_FORMAT) 
+                filename = f"{CURRENT_DATE}.tif"
+                user_directory = Path(USER_DIR) / str(self.user_directory.get())
+                path = user_directory / filename
+                if not user_directory.exists():
+                    user_directory.mkdir(parents=True, exist_ok=True)
+                imwrite(str(path), self.snap_img) 
+                
+                self.root.after(2000, lambda: self.save_button_label_ref.configure(text=""))
+        except Exception as e:
+            self.context_error = log_error(e, f"Save snap image failed")
               
     # --- Pages ---  
     def show_automatic_scan_page(self):

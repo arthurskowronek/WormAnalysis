@@ -2,9 +2,11 @@
 Global configuration file for the project.
 """
 import os
+import csv
 import yaml
 import datetime
 import pymmcore 
+import traceback
 from pathlib import Path
 
 # Get the project root (assuming we run from the project root)
@@ -48,7 +50,7 @@ def set_up_environment():
     It also clears the contents of predefined subdirectories inside the data directory 
     (e.g., 'Unclassified', 'Mutant_prediction', etc.) by deleting all files within them.
     
-    Directories are created with parents=True and exist_ok=True to handle nested 
+    Directories are created with `parents=True` and `exist_ok=True` to handle nested 
     paths and avoid errors if they already exist.
     """
     # Create root-level directories
@@ -79,7 +81,7 @@ def set_up_environment():
         for file in directory.iterdir():
             if file.is_file():
                 file.unlink()
-                  
+    
 def loadCore():
     """
     Initialize and configure the Micro-Manager core interface.
@@ -160,3 +162,50 @@ def save_corner_positions_into_yaml_config_file(start_x, start_y, end_x, end_y):
     # Write everything back
     with open(PARAMETERS_FILE, "w") as f:
         f.writelines(lines)
+
+def log_error(error, context=""):
+    """
+    Log an error to log.txt with timestamp and full traceback
+    Also update CSV file with error count by context
+    
+    Args:
+        error: The exception object
+        context: Optional context description
+    """
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Log to text file
+    with open("log.txt", "a", encoding="utf-8") as log_file:
+        log_file.write(f"\n{'='*50}\n")
+        log_file.write(f"ERROR LOGGED: {timestamp}\n")
+        if context:
+            log_file.write(f"CONTEXT: {context}\n")
+        log_file.write(f"ERROR TYPE: {type(error).__name__}\n")
+        log_file.write(f"ERROR MESSAGE: {str(error)}\n")
+        log_file.write(f"FULL TRACEBACK:\n{traceback.format_exc()}\n")
+    
+    # Update CSV file with error counts
+    csv_file = "error_counts.csv"
+    error_counts = {}
+    
+    # Read existing CSV if it exists
+    if os.path.exists(csv_file):
+        with open(csv_file, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                error_counts[row["context"]] = int(row["count"])
+    
+    # Update count for this context
+    if context in error_counts:
+        error_counts[context] += 1
+    else:
+        error_counts[context] = 1
+    
+    # Write updated counts back to CSV
+    with open(csv_file, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["context", "count"])  # Header
+        for ctx, count in error_counts.items():
+            writer.writerow([ctx, count])
+            
+    return context

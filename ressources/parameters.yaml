@@ -2,12 +2,6 @@ binning: 2x2
 display_mode: Grayscale
 dual_view: false
 exposure_time: '100'
-fluo_objective: 10x
 scan_objective: 4x
 shape: square
-shutter: false
 user_directory: Arthur_2025_07_24
-start_corner_x: -1647.0
-start_corner_y: -1647.0
-end_corner_x: 22405.5
-end_corner_y: 22405.5
