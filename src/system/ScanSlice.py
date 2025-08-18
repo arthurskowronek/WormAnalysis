@@ -37,7 +37,6 @@ class ScanSlice:
         self.dual_view = dual_view.get()
         self.scan_shape = scan_shape.get()
         self.overlap_percent = overlap_percent
-        print(f"ScanSlice initialized with grossissement={self.grossissement}, dual_view={self.dual_view}, scan_shape={self.scan_shape}, overlap_percent={self.overlap_percent}")
         
         # Calculate step sizes
         self.step_size_x = 13180 / self.grossissement

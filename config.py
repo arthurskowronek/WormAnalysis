@@ -172,10 +172,10 @@ def log_error(error, context=""):
         error: The exception object
         context: Optional context description
     """
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.datetime.now().strftime(DATE_FORMAT)
     
     # Log to text file
-    with open("log.txt", "a", encoding="utf-8") as log_file:
+    with open("logs/log.txt", "a", encoding="utf-8") as log_file:
         log_file.write(f"\n{'='*50}\n")
         log_file.write(f"ERROR LOGGED: {timestamp}\n")
         if context:
@@ -185,7 +185,7 @@ def log_error(error, context=""):
         log_file.write(f"FULL TRACEBACK:\n{traceback.format_exc()}\n")
     
     # Update CSV file with error counts
-    csv_file = "error_counts.csv"
+    csv_file = "logs/error_counts.csv"
     error_counts = {}
     
     # Read existing CSV if it exists
@@ -209,3 +209,115 @@ def log_error(error, context=""):
             writer.writerow([ctx, count])
             
     return context
+
+def start_new_session_get_statistics():
+    timestamp = datetime.datetime.now().strftime(DATE_FORMAT)
+    
+    # Update CSV file 
+    csv_file = "logs/user_statistics.csv"
+    
+    # Créer le dossier logs s'il n'existe pas
+    os.makedirs("logs", exist_ok=True)
+    
+    # Lire les données existantes
+    existing_data = []
+    fieldnames = ['id_session', 'date_session', 'nb_scans', 'nb_vers_detected', 
+                 'nb_false_positives', 'nb_vers_missed', 'nb_vers_final']
+    
+    if os.path.exists(csv_file):
+        with open(csv_file, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            existing_data = list(reader)
+    
+    # Calculer le numéro de session
+    id_session = len(existing_data) + 1
+    
+    # Préparer les nouvelles données
+    new_row = {
+        'id_session': id_session,
+        'date_session': timestamp,
+        'nb_scans': 0,
+        'nb_vers_detected': 0,
+        'nb_false_positives': 0,
+        'nb_vers_missed': 0,
+        'nb_vers_final': 0
+    }
+    
+    # Ajouter la nouvelle ligne
+    existing_data.append(new_row)
+    
+    # Écrire toutes les données dans le CSV
+    with open(csv_file, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(existing_data)
+
+def update_user_statistics(field_name, value):
+    """
+    Helper function to update a specific field in the last line of the CSV
+    
+    Args:
+        field_name: Name of the field to update
+        value: Value to set
+    """
+    csv_file = "logs/user_statistics.csv"
+    fieldnames = ['id_session', 'date_session', 'nb_scans', 'nb_vers_detected',
+                 'nb_false_positives', 'nb_vers_missed', 'nb_vers_final']
+    
+    if not os.path.exists(csv_file):
+        print("CSV file does not exist. Please start a new session first.")
+        return
+    
+    # Read existing data
+    existing_data = []
+    with open(csv_file, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        existing_data = list(reader)
+    
+    if not existing_data:
+        print("No data in CSV file. Please start a new session first.")
+        return
+    
+    # Update the last row
+    last_row = existing_data[-1]
+    last_row[field_name] = int(value)
+    
+    # Write back to CSV
+    with open(csv_file, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(existing_data)
+        
+def increment_user_statistics(field_name):
+    """
+    Add 1 to 'field_name' in the last line of the CSV file
+    """
+    csv_file = "logs/user_statistics.csv"
+    fieldnames = ['id_session', 'date_session', 'nb_scans', 'nb_vers_detected',
+                 'nb_false_positives', 'nb_vers_missed', 'nb_vers_final']
+    
+    if not os.path.exists(csv_file):
+        print("CSV file does not exist. Please start a new session first.")
+        return
+    
+    # Read existing data
+    existing_data = []
+    with open(csv_file, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        existing_data = list(reader)
+    
+    if not existing_data:
+        print("No data in CSV file. Please start a new session first.")
+        return
+    
+    # Increment nb_scans in the last row
+    last_row = existing_data[-1]
+    current_scans = int(last_row[field_name]) if last_row[field_name].isdigit() else 0
+    last_row[field_name] = int(current_scans + 1) 
+    
+    # Write back to CSV
+    with open(csv_file, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(existing_data)
+        

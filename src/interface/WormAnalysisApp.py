@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from PIL import Image, ImageTk, ImageColor
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-from config import RESSOURCES_DIR, DATA_DIR, MODELS_DIR, USER_DIR, PARAMETERS_FILE, DATE_FORMAT, EXPOSURE_TIME_LIVE, load_config_file, log_error
+from config import RESSOURCES_DIR, DATA_DIR, MODELS_DIR, USER_DIR, PARAMETERS_FILE, DATE_FORMAT, EXPOSURE_TIME_LIVE, load_config_file, log_error, increment_user_statistics, update_user_statistics
 
 from src.interface.Tooltip import Tooltip
 from src.system.ScanSlice import ScanSlice
@@ -1429,25 +1429,32 @@ class WormAnalysisApp:
         5. Switches the page to display the scan results.
         """
         # Show "Starting scan" message
-        self.scan_status_label.config(text="Launching scan... please wait.")
-        self.scan_status_label.update_idletasks()
-        scanner = ScanSlice(self.CORE, self.scan_objective, self.dual_view, self.shape)
-        
-        self.init_pos_x = scanner.start_x
-        self.init_pos_y = scanner.start_y
+        try:
+            self.scan_status_label.config(text="Launching scan... please wait.")
+            self.scan_status_label.update_idletasks()
+            scanner = ScanSlice(self.CORE, self.scan_objective, self.dual_view, self.shape)
+        except Exception as e:
+            self.context_error = log_error(e, f"Initialize scan failed")
 
         # Update: scanning
         self.scan_status_label.config(text="Scanning in progress...")
         self.scan_status_label.update_idletasks()
         try:
+            increment_user_statistics('nb_scans')
             worms_microscope_position = scanner.scan()
+            self.init_pos_x = scanner.start_x
+            self.init_pos_y = scanner.start_y
         except Exception as e:
-            self.context_error = log_error(e, f"Launc scan failed")
+            self.context_error = log_error(e, f"Launch scan failed")
 
         # Update: saving worm positions
         self.scan_status_label.config(text="Saving worm positions...")
         self.scan_status_label.update_idletasks()
-        self.worms_position = WormPositionManager(table_worm_position=worms_microscope_position)
+        try:
+            self.worms_position = WormPositionManager(table_worm_position=worms_microscope_position)
+            update_user_statistics('nb_vers_detected', len(self.worms_position))
+        except Exception as e:
+            self.context_error = log_error(e, f"Saving worm position failed")
 
         # Update: reconstructing image
         self.scan_status_label.config(text="Reconstructing scan result...")
@@ -1575,11 +1582,13 @@ class WormAnalysisApp:
                 if x-x_bounding_box_proportion <= x_mouse <= x+x_bounding_box_proportion and y-y_bounding_box_proportion <= y_mouse <= y+y_bounding_box_proportion:
                     # Remove the worm
                     self.worms_position.delete_worm(id)
+                    increment_user_statistics('nb_false_positives')
                     break
         else:
             # Add a new worm
             x_microscope, y_microscope = self.worms_position.transform_proportion_into_microscope_positions(x_mouse, y_mouse)
             self.worms_position.add_worm_microscope_position(x_microscope, y_microscope)
+            increment_user_statistics('nb_vers_missed')
             
         # Redraw image with updated worm positions
         updated_img = self.draw_prediction_result_box()
@@ -2893,6 +2902,9 @@ class WormAnalysisApp:
             font=(self.font, 10)
         )
         self.id_worm_seen_label.pack(pady=0)
+        
+        # Add number of worm to the statistic file
+        update_user_statistics('nb_vers_final', self.worms_position.get_number_of_worms())
 
 
         # 4. Two Buttons Side by Side - Use same row to eliminate gap

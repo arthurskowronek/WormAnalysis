@@ -4,18 +4,19 @@ Created on Thursday June 12 10:41:44 2025
 """
 import tkinter as tk
 from src.interface.WormAnalysisApp import WormAnalysisApp
-from config import set_up_environment, loadCore
+from config import set_up_environment, loadCore, start_new_session_get_statistics
 
 from config import log_error
 
 def main():
     # Setup environment
     set_up_environment()
+    start_new_session_get_statistics()
     
     # Launch connection with the microscope
     try: 
         mmc = loadCore()
-    except: 
+    except Exception as e:
         mmc = None
         log_error(e, "Load core failed")
     
