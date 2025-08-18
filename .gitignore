@@ -9,3 +9,9 @@ logs
 build
 dist
 Worm_detection.spec
+notebooks/YOLO_data/test/images
+notebooks/YOLO_data/test/labels
+notebooks/YOLO_data/train/images
+notebooks/YOLO_data/train/labels
+notebooks/YOLO_data/val/images
+notebooks/YOLO_data/val/labels
