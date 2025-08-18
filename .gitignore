@@ -7,6 +7,5 @@ models
 .venv
 logs
 build
-icon_worm_detection_analysis.ico
 dist
 Worm_detection.spec
