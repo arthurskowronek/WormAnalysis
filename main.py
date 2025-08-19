@@ -8,7 +8,7 @@ from config import set_up_environment, loadCore, start_new_session_get_statistic
 
 from config import log_error
 
-# Comment pour créer l'executable: pyinstaller --onefile --icon=icon_worm_detection_analysis.ico --name=Worm_detection main.py
+# Commande pour créer l'executable: pyinstaller --onefile --icon=icon_worm_detection_analysis.ico --name=Worm_detection main.py
 
 def main():
     # Setup environment

@@ -1731,35 +1731,36 @@ class WormAnalysisApp:
         controlled by `self.root.after()` as long as `self.live_image` is True.
         """
         try:
-            self.CORE.snapImage()
-            image_data = self.CORE.getImage()  # This should return a numpy array or raw buffer
+            if hasattr(self, "live_image_label") and self.live_image_label.winfo_exists():
+                self.CORE.snapImage()
+                image_data = self.CORE.getImage()  # This should return a numpy array or raw buffer
 
-            image = Image.fromarray(image_data)
-            arr = np.array(image, dtype=np.uint16)   
-            arr_8bit = (arr / 256).astype(np.uint8) 
-            image = Image.fromarray(arr_8bit, mode="L")
+                image = Image.fromarray(image_data)
+                arr = np.array(image, dtype=np.uint16)   
+                arr_8bit = (arr / 256).astype(np.uint8) 
+                image = Image.fromarray(arr_8bit, mode="L")
 
-            # Resize image to fit the label (optional)
-            label_width = self.live_image_label.winfo_width()
-            label_height = self.live_image_label.winfo_height()
-            if label_width > 0 and label_height > 0:
-                image = image.resize((label_width, label_height), Image.Resampling.LANCZOS)
+                # Resize image to fit the label (optional)
+                label_width = self.live_image_label.winfo_width()
+                label_height = self.live_image_label.winfo_height()
+                if label_width > 0 and label_height > 0:
+                    image = image.resize((label_width, label_height), Image.Resampling.LANCZOS)
 
-            # Convert image for tkinter
-            tk_image = ImageTk.PhotoImage(image)
+                # Convert image for tkinter
+                tk_image = ImageTk.PhotoImage(image)
 
-            # Keep reference
-            self.live_image_label.image = tk_image
-            self.live_image_label.config(image=tk_image)
+                # Keep reference
+                self.live_image_label.image = tk_image
+                self.live_image_label.config(image=tk_image)
 
         except Exception as e:
             if self.context_error != "Update live image failed":
                 self.context_error = log_error(e, "Update live image failed")
         
         # Only continue the loop if in live mode
-        if self.live_image:
+        if self.live_image and self.root.winfo_exists():
             # Repeat after X ms
-            self.root.after(100, self.update_live_image)
+            self._live_after_id = self.root.after(100, self.update_live_image)
 
     def go_to_next_worm(self):
         """
@@ -2069,6 +2070,10 @@ class WormAnalysisApp:
         """
         self.live_image = True
         self.show_load_position_page()
+        
+        if hasattr(self, "_live_after_id") and self._live_after_id:
+            self.root.after_cancel(self._live_after_id)
+        
         self.update_live_image()  # Restart the live loop
         
     def snap_image(self):
@@ -2081,8 +2086,12 @@ class WormAnalysisApp:
         """
         self.live_image = False
 
+        if hasattr(self, "_live_after_id") and self._live_after_id:
+            self.root.after_cancel(self._live_after_id)
+            self._live_after_id = None
+        
         try:
-            self.CORE.setExposure(self.exposure_time.get())
+            self.CORE.setExposure(int(self.exposure_time.get()))
             self.CORE.snapImage()
             self.snap_img = self.CORE.getImage()
             self.CORE.setExposure(EXPOSURE_TIME_LIVE)
@@ -2716,8 +2725,9 @@ class WormAnalysisApp:
         self.left_live_analysis_container_ref.bind("<Configure>", self.resize_live_image)
         
         # Placeholder for live image
-        self.live_image_label = tk.Label(live_analysis_container, bg="black")
-        self.live_image_label.pack(expand=True, fill=tk.BOTH)
+        if not hasattr(self, "live_image_label") or not self.live_image_label.winfo_exists():
+            self.live_image_label = tk.Label(live_analysis_container, bg="black")
+            self.live_image_label.pack(expand=True, fill=tk.BOTH)
 
         # Bottom: Buttons + labels
         bottom_analysis_container = tk.Frame(left_live_analysis_container, bg=self.colors.theme["primary_background"])
