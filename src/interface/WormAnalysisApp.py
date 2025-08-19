@@ -2135,6 +2135,7 @@ class WormAnalysisApp:
             # Create window
             win = tk.Toplevel()
             win.title("Adjust Brightness / Contrast")
+            win.geometry("+1100+450")
 
             # --- Histogram with matplotlib ---
             self.hist_fig, self.hist_ax = plt.subplots(figsize=(5, 3))
@@ -2195,6 +2196,7 @@ class WormAnalysisApp:
             image = Image.fromarray(scaled)
 
             # Resize only once per size
+            self.live_image_label.update_idletasks()
             label_width = self.live_image_label.winfo_width()
             label_height = self.live_image_label.winfo_height()
             if label_width > 0 and label_height > 0:
