@@ -11,6 +11,7 @@ from pathlib import Path
 
 # Get the project root (assuming we run from the project root)
 PROJECT_ROOT = Path("/Users/skowronek/Documents/WormAnalysis") # Path.cwd()
+# PROJET_ROOT = Path("/Users/imagerie/Desktop/CriblrGenetic")
 
 # Define all project directories
 DATA_DIR = PROJECT_ROOT / "data"
@@ -76,7 +77,15 @@ def set_up_environment():
         subdir_path.mkdir(parents=True, exist_ok=True)
 
     # Clear specific subdirectories
-    dirs_to_clear = ["Unclassified", "Mutant_prediction", "WT_prediction", "Scan", "Scan_modified"]
+    dirs_to_clear = ["Unclassified", "Mutant_prediction", "WT_prediction"]
+    for subdir in dirs_to_clear:
+        directory = Path(DATA_DIR) / subdir
+        for file in directory.iterdir():
+            if file.is_file():
+                file.unlink()
+                
+def clear_scan_directory():
+    dirs_to_clear = ["Scan", "Scan_modified"]
     for subdir in dirs_to_clear:
         directory = Path(DATA_DIR) / subdir
         for file in directory.iterdir():

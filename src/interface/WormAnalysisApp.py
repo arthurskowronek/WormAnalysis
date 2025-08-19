@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from PIL import Image, ImageTk, ImageColor
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-from config import RESSOURCES_DIR, DATA_DIR, MODELS_DIR, USER_DIR, LOG_DIR, PARAMETERS_FILE, DATE_FORMAT, EXPOSURE_TIME_LIVE, load_config_file, log_error, increment_user_statistics, update_user_statistics
+from config import RESSOURCES_DIR, DATA_DIR, MODELS_DIR, USER_DIR, LOG_DIR, PARAMETERS_FILE, DATE_FORMAT, EXPOSURE_TIME_LIVE, load_config_file, log_error, increment_user_statistics, update_user_statistics, clear_scan_directory
 
 from src.interface.Tooltip import Tooltip
 from src.system.ScanSlice import ScanSlice
@@ -24,7 +24,7 @@ from src.system.dataset_manager import Dataset_Manager
 from src.system.Worm_Position_Manager import WormPositionManager
 
 class WormAnalysisApp:
-    def __init__(self, root, mmc = None, initial_dark_mode=False, first_page = "automatic_scan", initial_show_parameters = True, initial_live_image = True):
+    def __init__(self, root, mmc = None, initial_dark_mode=True, first_page = "automatic_scan", initial_show_parameters = True, initial_live_image = True):
         """
         Initializes the Worm Analysis Application interface.
 
@@ -141,6 +141,12 @@ class WormAnalysisApp:
         self.machine_has_dual_view = tk.BooleanVar(value=self.loaded_params.get("machine_has_dual_view", True))
         self.machine_has_dual_view.trace_add("write", lambda *args: self.save_parameters())
                 
+        self.scan_width = tk.StringVar(value=self.loaded_params.get("scan_width", '8'))
+        self.scan_width.trace_add("write", lambda *args: self.save_parameters()) 
+        
+        self.scan_height = tk.StringVar(value=self.loaded_params.get("scan_height", '8'))
+        self.scan_height.trace_add("write", lambda *args: self.save_parameters())         
+                
     def save_parameters(self):
         """
         Updates the parameters in the YAML file
@@ -155,7 +161,9 @@ class WormAnalysisApp:
             "scan_objective": self.scan_objective.get(),
             "shape": self.shape.get(),
             "user_directory": self.user_directory.get(),
-            "machine_has_dual_view": self.machine_has_dual_view.get()
+            "machine_has_dual_view": self.machine_has_dual_view.get(),
+            "scan_width": self.scan_width.get(),
+            "scan_height": self.scan_height.get()
         }
         
         # Read and parse the existing YAML file
@@ -1457,20 +1465,21 @@ class WormAnalysisApp:
         try:
             self.scan_status_label.config(text="Launching scan... please wait.")
             self.scan_status_label.update_idletasks()
+            clear_scan_directory()
             scanner = ScanSlice(self.CORE, self.scan_objective, self.dual_view, self.shape)
         except Exception as e:
             self.context_error = log_error(e, f"Initialize scan failed")
 
         # Update: scanning
-        self.scan_status_label.config(text="Scanning in progress...")
+        self.scan_status_label.config(text="      Scanning in progress...      ")
         self.scan_status_label.update_idletasks()
         try:
             increment_user_statistics('nb_scans')
             worms_microscope_position = scanner.scan()
             self.init_pos_x = scanner.start_x
             self.init_pos_y = scanner.start_y
-            self.scan_width = scanner.scan_width
-            self.scan_height = scanner.scan_height
+            self.scan_width.set(scanner.scan_width)
+            self.scan_height.set(scanner.scan_height)
         except Exception as e:
             self.context_error = log_error(e, f"Launch scan failed")
 
@@ -1479,7 +1488,7 @@ class WormAnalysisApp:
         self.scan_status_label.update_idletasks()
         try:
             self.worms_position = WormPositionManager(table_worm_position=worms_microscope_position)
-            update_user_statistics('nb_vers_detected', len(self.worms_position))
+            update_user_statistics('nb_vers_detected', self.worms_position.get_number_of_worms())
         except Exception as e:
             self.context_error = log_error(e, f"Saving worm position failed")
 
@@ -1547,7 +1556,9 @@ class WormAnalysisApp:
         img_with_bounding_box_np = np.array(image)
         
         # Convert to color
-        img_with_bounding_box_np = cv2.cvtColor(img_with_bounding_box_np, cv2.COLOR_GRAY2BGR)
+        if len(img_with_bounding_box_np.shape) == 2:  # image grayscale
+            img_with_bounding_box_np = cv2.cvtColor(img_with_bounding_box_np, cv2.COLOR_GRAY2BGR)
+
         
         # Get worms positions
         if self.worms_position is None:
@@ -1606,16 +1617,19 @@ class WormAnalysisApp:
         # Get scan image associated
         if self.add_worm_scan_result:
             try:
-                for i in range(self.scan_width + 1):
-                    if i/self.scan_width > x_mouse:
+                for i in range(int(self.scan_width.get()) + 1):
+                    if i/int(self.scan_width.get()) > x_mouse:
                         scan_image_position_width = i-1
                         break
-                for i in range(self.scan_height + 1):
-                    if i/self.scan_height > y_mouse:
+                for i in range(int(self.scan_height.get()) + 1):
+                    if i/int(self.scan_height.get()) > y_mouse:
                         scan_image_position_height = i-1
                         break
-                    
-                filename_scan_image_associate = f"SlideScan_X{scan_image_position_width}_Y{scan_image_position_height}"
+                
+                if self.shape.get() == "square":
+                    filename_scan_image_associate = f"SlideScan_R{int(self.scan_width.get()) - scan_image_position_width - 1}_C{scan_image_position_height}_" # origin is in the top right corner
+                else:
+                    filename_scan_image_associate = f"SlideScan_R{int(self.scan_height.get()) - scan_image_position_height - 1}_C{int(self.scan_width.get()) - scan_image_position_width - 1}_"
                 source_dir = Path(DATA_DIR) / "Scan"
                 dest_dir = Path(LOG_DIR) / "Image_to_annotate"
                 
@@ -1720,12 +1734,10 @@ class WormAnalysisApp:
             self.CORE.snapImage()
             image_data = self.CORE.getImage()  # This should return a numpy array or raw buffer
 
-            if isinstance(image_data, np.ndarray):
-                # Convert grayscale numpy array to Image
-                image = Image.fromarray(image_data)
-            else:
-                # Handle other formats if necessary
-                return
+            image = Image.fromarray(image_data)
+            arr = np.array(image, dtype=np.uint16)   
+            arr_8bit = (arr / 256).astype(np.uint8) 
+            image = Image.fromarray(arr_8bit, mode="L")
 
             # Resize image to fit the label (optional)
             label_width = self.live_image_label.winfo_width()

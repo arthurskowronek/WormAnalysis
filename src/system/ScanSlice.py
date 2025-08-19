@@ -91,7 +91,7 @@ class ScanSlice:
         self.final_end_x = 0
         self.final_end_y = 0
     
-    def scan(self):
+    def scan(self, verbose=False):
         """
         Executes the main scanning loop.
 
@@ -117,8 +117,8 @@ class ScanSlice:
                 self.mmc.setXYPosition(self.mmc.getXYStageDevice(), pos_x, pos_y) # Move to next position
                 
                 # Update final positions (we don't want to get the last position if it is on the same x or y position as the start)
-                if pos_x > final_end_x: final_end_x = pos_x
-                if pos_y > final_end_y: final_end_y = pos_y
+                if pos_x > self.final_end_x: self.final_end_x = pos_x
+                if pos_y > self.final_end_y: self.final_end_y = pos_y
                 
                 if self.image is not None: # We process the previous image in order to do the compute during the microscope movement
                     self.process_image_to_detect_worms()
@@ -134,7 +134,7 @@ class ScanSlice:
                 # Record position info
                 self.positions_info.append([self.file_count, pos_x, pos_y, x_idx, y_idx])
                 self.file_count += 1
-                print(f"Image {self.file_count-1}/{self.scan_width*self.scan_height} captured at X={pos_x:.2f}, Y={pos_y:.2f}")
+                if verbose: print(f"Image {self.file_count-1}/{self.scan_width*self.scan_height} captured at X={pos_x:.2f}, Y={pos_y:.2f}")
         
         # Process final image
         if self.image is not None:
@@ -407,7 +407,7 @@ class ScanSlice:
         return inter_area / union_area
         
     # Others methods
-    def reconstruct_slice(self):
+    def reconstruct_slice(self, verbose=False):
         """
         Reconstructs a single, large image from the individual scanned tiles.
 
@@ -456,7 +456,7 @@ class ScanSlice:
         i = 0
         for fname, x_idx, y_idx in positions:
             i += 1
-            print(f"Processing tile {i}")
+            if verbose: print(f"Processing tile {i}")
             img_full = imread(self.scan_dir / fname)
             
             # 1. Crop to right half if dual view
@@ -494,4 +494,4 @@ class ScanSlice:
         pil_image = pil_image.convert('RGB')
         
         pil_image.save(output_path, 'JPEG', quality=95)
-        print(f"✅ Final stitched image saved to: {output_path}")
+        if verbose: print(f"✅ Final stitched image saved to: {output_path}")
