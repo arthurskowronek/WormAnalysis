@@ -5,3 +5,8 @@ exposure_time: '100'
 scan_objective: 4x
 shape: square
 user_directory: Arthur_2025_07_24
+start_x: 0
+start_y: 0
+end_x: 0
+end_y: 0
+machine_has_dual_view: false

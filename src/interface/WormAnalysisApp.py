@@ -92,7 +92,7 @@ class WormAnalysisApp:
         elif self.current_page == "tutorial":
             self.show_placeholder_page(self.current_page.replace('_', ' ').title())
         elif self.current_page == "configuration":
-            self.show_placeholder_page(self.current_page.replace('_', ' ').title())
+            self.show_machine_configuration_page()
     
     # --- Initalization helper function ---
     def set_parameters(self):
@@ -136,42 +136,42 @@ class WormAnalysisApp:
         
         self.user_directory = tk.StringVar(value=self.loaded_params.get("user_directory", 'Arthur_2025_07_24'))
         self.user_directory.trace_add("write", lambda *args: self.save_parameters())
+        
+        # machine parameters
+        self.machine_has_dual_view = tk.BooleanVar(value=self.loaded_params.get("machine_has_dual_view", True))
+        self.machine_has_dual_view.trace_add("write", lambda *args: self.save_parameters())
                 
     def save_parameters(self):
         """
-        Updates only the first 9 lines of the parameters YAML file
+        Updates the parameters in the YAML file
         with current application parameters.
         """
         # New parameters to update
         params = {
             "exposure_time": self.exposure_time.get(),
             "binning": self.binning.get(),
-            #"shutter": self.shutter.get(),
             "dual_view": self.dual_view.get(),
             "display_mode": self.display_mode.get(),
             "scan_objective": self.scan_objective.get(),
-            #"fluo_objective": self.fluo_objective.get(),
             "shape": self.shape.get(),
-            "user_directory": self.user_directory.get()
+            "user_directory": self.user_directory.get(),
+            "machine_has_dual_view": self.machine_has_dual_view.get()
         }
-
-        # Convert new parameters to YAML lines
-        new_lines = yaml.dump(params, default_flow_style=False).splitlines(keepends=True)
-
-        # Read existing file lines
+        
+        # Read and parse the existing YAML file
         try:
             with open(self.PARAMS_FILE, "r") as f:
-                old_lines = f.readlines()
+                config = yaml.safe_load(f) or {}
         except FileNotFoundError:
-            old_lines = []
+            config = {}
 
-        # Replace first 9 lines with new ones, preserving the rest
-        updated_lines = new_lines[:9] + old_lines[9:]
+        # Update only the corner position parameters
+        config.update(params)
 
-        # Write updated lines back
+        # Write the updated configuration back to file
         with open(self.PARAMS_FILE, "w") as f:
-            f.writelines(updated_lines)
- 
+            yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+        
     def update_colors(self):
         """
         Updates the application's color theme based on the current dark mode setting.
@@ -400,7 +400,16 @@ class WormAnalysisApp:
         remove_worm_path = Path(RESSOURCES_DIR) / "icon" / "remove_worm.png" 
         self.remove_worm_icon = self.flatten_and_resize_icon(remove_worm_path, 20, 20, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
         self.remove_worm_icon_hover = self.flatten_and_resize_icon(remove_worm_path, 20, 20, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
-                                                  
+               
+        # Machine config icon
+        # Process toggle_open.png - big size
+        big_open_toggle_path = Path(RESSOURCES_DIR) / "icon" / "toggle_open.png"
+        self.big_toggle_open_icon = self.flatten_and_resize_icon(big_open_toggle_path, 68, 24, self.colors.theme["primary_background"], self.colors.theme["toggle_button"])
+
+        # Process toggle_close.png - big size
+        big_close_toggle_path = Path(RESSOURCES_DIR) / "icon" / "toggle_close.png"
+        self.big_toggle_close_icon = self.flatten_and_resize_icon(big_close_toggle_path, 68, 24, self.colors.theme["primary_background"], self.colors.theme["toggle_button"])
+                                                          
     def flatten_and_resize_icon(self, img_path, width, height, bg_color, fg_color):
         """
         Loads, recolors, and resizes an image icon.
@@ -718,7 +727,10 @@ class WormAnalysisApp:
         #self.shutter_toggle = self.create_custom_toggle(self.params_content_frame, "Shutter", self.shutter)
 
         # Dual view
-        self.dual_view_toggle = self.create_custom_toggle(self.params_content_frame, "Dual view", self.dual_view)
+        if self.machine_has_dual_view.get():
+            self.dual_view_toggle = self.create_custom_toggle(self.params_content_frame, "Dual view", self.dual_view)
+        else:
+            self.dual_view_toggle = None
 
         # Display mode
         bg = "parameters_button_background" if "display_mode" in self.enable_parameters_buttons else "parameters_button_disabled_background"
@@ -920,7 +932,7 @@ class WormAnalysisApp:
 
         return variable, combo
     
-    def create_custom_toggle(self, parent, label, boolean_var):
+    def create_custom_toggle(self, parent, label, boolean_var, size="small", bg="secondary_background"):
         """
         Creates a custom toggle switch with an icon that reflects its state.
 
@@ -937,22 +949,29 @@ class WormAnalysisApp:
             tk.Canvas: The canvas containing the toggle, which includes the image.
         """
         # Create the frame where the toggle will be set
-        frame = tk.Frame(parent, bg=self.colors.theme["secondary_background"])
+        frame = tk.Frame(parent, bg=self.colors.theme[bg])
         frame.pack(fill=tk.X, pady=(5, 5))
 
         # Add the label of the toggle
-        tk.Label(frame, text=label, bg=self.colors.theme["secondary_background"],
+        tk.Label(frame, text=label, bg=self.colors.theme[bg],
                 fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(side=tk.LEFT)
 
         # Create the toggle
-        toggle_canvas = tk.Canvas(frame, width=self.toggle_open_icon.width(),
-                                height=self.toggle_open_icon.height(),
+        if size == "small":
+            open_toggle_icon = self.toggle_open_icon
+            close_toggle_icon = self.toggle_close_icon
+        elif size == "big":
+            open_toggle_icon = self.big_toggle_open_icon
+            close_toggle_icon = self.big_toggle_close_icon
+            
+        toggle_canvas = tk.Canvas(frame, width=open_toggle_icon.width(),
+                                height=open_toggle_icon.height(),
                                 bg=self.colors.theme["primary_background"], highlightthickness=0)
         toggle_canvas.pack(side=tk.RIGHT, padx=3)
 
         def draw_toggle():
             toggle_canvas.delete("all")
-            image = self.toggle_open_icon if not boolean_var.get() else self.toggle_close_icon
+            image = open_toggle_icon if not boolean_var.get() else close_toggle_icon
             toggle_canvas.create_image(0, 0, image=image, anchor=tk.NW)
 
         def toggle_command(event=None):
@@ -1201,17 +1220,23 @@ class WormAnalysisApp:
         
         for key, widget in all_widgets.items():
             if key in disabled_widgets:
-                if isinstance(widget, tk.Canvas):  # Handle custom toggle
-                    widget.unbind("<Button-1>")
-                else:
-                    widget.configure(state="disabled")
+                try:
+                    if isinstance(widget, tk.Canvas):  # Handle custom toggle
+                        widget.unbind("<Button-1>")
+                    else:
+                        widget.configure(state="disabled")
+                except:
+                    pass # Can happen when there is no dual view
             else:
-                if isinstance(widget, ttk.Combobox):
-                    widget.configure(state="readonly")
-                elif isinstance(widget, tk.Canvas):
-                    widget.bind("<Button-1>", widget.toggle_command)
-                else:
-                    widget.configure(state="normal")
+                try:
+                    if isinstance(widget, ttk.Combobox):
+                        widget.configure(state="readonly")
+                    elif isinstance(widget, tk.Canvas):
+                        widget.bind("<Button-1>", widget.toggle_command)
+                    else:
+                        widget.configure(state="normal")
+                except:
+                    pass # Can happen when there is no dual view
         
         # Store only enabled widget keys
         self.enable_parameters_buttons = [key for key in all_widgets if key not in disabled_widgets]
@@ -1589,14 +1614,22 @@ class WormAnalysisApp:
                     if i/self.scan_height > y_mouse:
                         scan_image_position_height = i-1
                         break
+                    
                 filename_scan_image_associate = f"SlideScan_X{scan_image_position_width}_Y{scan_image_position_height}"
                 source_dir = Path(DATA_DIR) / "Scan"
                 dest_dir = Path(LOG_DIR) / "Image_to_annotate"
+                
                 # Find files that start with filename and end with .tif
                 matching_files = list(source_dir.glob(f"{filename_scan_image_associate}*.tif"))
                 source_file = matching_files[0]
-                dest_file = dest_dir / source_file.name
+                
+                # Count existing files in destination directory and create new filename
+                existing_files = list(dest_dir.glob("*.tif"))  # Count .tif files
+                file_number = len(existing_files) + 1  # Next number in sequence
+                
+                dest_file = dest_dir / f"{file_number}.tif"
                 shutil.copy2(source_file, dest_file)
+                
             except Exception as e:
                 self.context_error = log_error(e, f"Saving image for annotation failed")
 
@@ -3039,3 +3072,57 @@ class WormAnalysisApp:
         self.refresh_parameters_interface()
         self.update_parameter_widgets_state(disabled_widgets=["exposure_time","binning","shutter","dual_view","display_mode","scan_objective","fluo_objective","scan_shape"])
         
+    def show_machine_configuration_page(self):
+        """
+        Displays the machine configuration page in the main content area.
+
+        This method clears any existing widgets, sets up the UI for configuring machine parameters,
+        and adds a toggle for dual view mode with an info tooltip. It also triggers resizing of the
+        scan content area after layout completion.
+        """
+        # Clear previous widgets if needed
+        for widget in self.main_content.winfo_children():
+            widget.destroy()
+            
+        # Disable some paramaters buttons
+        self.update_parameter_widgets_state(disabled_widgets=[])  # Everything enabled
+
+        # section with buttons
+        buttons_frame = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
+        buttons_frame.pack(fill=tk.BOTH, expand=True, pady=(40,40))
+
+        # Machine_has_dual_view button
+        self.Machine_has_dual_view_toggle = self.create_custom_toggle(buttons_frame, "", self.machine_has_dual_view, size="big", bg="primary_background")
+        self.Machine_has_dual_view_toggle.pack(expand=True)
+        
+        # Container to hold label + info icon
+        launch_label_frame = tk.Frame(buttons_frame, bg=self.colors.theme["primary_background"])
+        launch_label_frame.pack()
+
+        # Text label
+        title_launch_scan = tk.Label(
+            launch_label_frame, text="Has a dual view mode ?",
+            bg=self.colors.theme["primary_background"], fg=self.colors.theme["tertiary_text"],
+            font=(self.font, 10)
+        )
+        title_launch_scan.pack(side=tk.LEFT)
+
+        # Info icon
+        info_label = tk.Label(
+            launch_label_frame, image=self.info_icon,
+            bg=self.colors.theme["primary_background"]
+        )
+        info_label.pack(side=tk.LEFT, padx=(5, 0))  # small gap between text and icon
+
+        # Tooltip on hover
+        Tooltip(info_label, "If your microscope has a dual view mode, you can active this button to have the possibility to use the scan with it. (will appear in the parameters panel)", title="Info", theme="info", posx=70, posy=-70)
+
+        # Trigger resizing after layout completes with error handling
+        if hasattr(self, 'main_content') and self.main_content.winfo_exists():
+            after_id = self.main_content.after(100, self.resize_scan_content_area)
+            if not hasattr(self, '_after_ids'):
+                self._after_ids = []
+            self._after_ids.append(after_id)
+        
+    
+    

@@ -126,43 +126,36 @@ def load_config_file():
 def save_corner_positions_into_yaml_config_file(start_x, start_y, end_x, end_y):
     """
     Updates the corner position parameters (start_x, start_y, end_x, end_y)
-    in the YAML file, preserving the first 9 lines.
+    in the YAML file by parsing and updating the existing configuration.
     
     Parameters:
-        start_x (float/int)
-        start_y (float/int)
-        end_x (float/int)
-        end_y (float/int)
+    start_x (float/int): Starting X coordinate
+    start_y (float/int): Starting Y coordinate  
+    end_x (float/int): Ending X coordinate
+    end_y (float/int): Ending Y coordinate
     """
-    # New values to insert
+    
+    # New corner parameters to update
     corner_params = {
         "start_x": start_x,
         "start_y": start_y,
         "end_x": end_x,
         "end_y": end_y
     }
-
-    # Read the existing file
+    
+    # Read and parse the existing YAML file
     try:
         with open(PARAMETERS_FILE, "r") as f:
-            lines = f.readlines()
+            config = yaml.safe_load(f) or {}
     except FileNotFoundError:
-        lines = []
-
-    # Dump the corner parameters to YAML-formatted lines
-    corner_yaml_lines = yaml.dump(corner_params, default_flow_style=False).splitlines(keepends=True)
-
-    # Replace or append corner positions starting at line 10
-    # Pad the list if it's shorter than 9 lines
-    while len(lines) < 9:
-        lines.append("\n")
+        config = {}
     
-    # Replace lines 9–12 or add them if not present
-    lines = lines[:9] + corner_yaml_lines + lines[9 + len(corner_yaml_lines):]
-
-    # Write everything back
+    # Update only the corner position parameters
+    config.update(corner_params)
+    
+    # Write the updated configuration back to file
     with open(PARAMETERS_FILE, "w") as f:
-        f.writelines(lines)
+        yaml.dump(config, f, default_flow_style=False, sort_keys=False)
 
 def log_error(error, context=""):
     """
