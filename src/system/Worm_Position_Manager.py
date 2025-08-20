@@ -408,10 +408,10 @@ class WormPositionManager:
             Tuple[float, float]: The transformed (x_prop, y_prop) coordinates.
         """
         parameters = load_config_file()
-        start_corner_x = parameters.get('start_corner_x', 0)
-        start_corner_y = parameters.get('start_corner_y', 0)
-        end_corner_x = parameters.get('end_corner_x', 1)
-        end_corner_y = parameters.get('end_corner_y', 1)
+        start_corner_x = parameters.get('start_x')
+        start_corner_y = parameters.get('start_y')
+        end_corner_x = parameters.get('end_x')
+        end_corner_y = parameters.get('end_y')
         
         x = (x - start_corner_x) / (end_corner_x - start_corner_x)
         y = (y - start_corner_y) / (end_corner_y - start_corner_y)
@@ -433,10 +433,10 @@ class WormPositionManager:
             Tuple[float, float]: The transformed (x_microscope, y_microscope) coordinates.
         """
         parameters = load_config_file()
-        start_corner_x = parameters.get('start_corner_x', 0)
-        start_corner_y = parameters.get('start_corner_y', 0)
-        end_corner_x = parameters.get('end_corner_x', 1)
-        end_corner_y = parameters.get('end_corner_y', 1)
+        start_corner_x = parameters.get('start_x')
+        start_corner_y = parameters.get('start_y')
+        end_corner_x = parameters.get('end_x')
+        end_corner_y = parameters.get('end_y')
 
         x = y_prop
         y = 1 - x_prop

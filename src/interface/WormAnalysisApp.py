@@ -140,12 +140,12 @@ class WormAnalysisApp:
         # machine parameters
         self.machine_has_dual_view = tk.BooleanVar(value=self.loaded_params.get("machine_has_dual_view", True))
         self.machine_has_dual_view.trace_add("write", lambda *args: self.save_parameters())
-                
+
         self.scan_width = tk.StringVar(value=self.loaded_params.get("scan_width", '8'))
-        self.scan_width.trace_add("write", lambda *args: self.save_parameters()) 
-        
+        self.scan_width.trace_add("write", lambda *args: self.save_parameters())
+
         self.scan_height = tk.StringVar(value=self.loaded_params.get("scan_height", '8'))
-        self.scan_height.trace_add("write", lambda *args: self.save_parameters())         
+        self.scan_height.trace_add("write", lambda *args: self.save_parameters())
                 
     def save_parameters(self):
         """
@@ -592,7 +592,7 @@ class WormAnalysisApp:
         ])
         
         self.create_menu_section("Analysis", [
-            ("Load last position", "load_position", self.loading_icon, self.loading_icon_hover)
+            ("Analyse worms", "load_position", self.loading_icon, self.loading_icon_hover)
         ])
         
         self.create_menu_section("Help", [
@@ -1551,15 +1551,14 @@ class WormAnalysisApp:
         """
         # Load original image
         image = Image.open(Path(RESSOURCES_DIR) / "stitched_final.jpg")
-        
+
         # Convert to numpy array
         img_with_bounding_box_np = np.array(image)
         
         # Convert to color
-        if len(img_with_bounding_box_np.shape) == 2:  # image grayscale
+        if len(img_with_bounding_box_np.shape) == 2:
             img_with_bounding_box_np = cv2.cvtColor(img_with_bounding_box_np, cv2.COLOR_GRAY2BGR)
 
-        
         # Get worms positions
         if self.worms_position is None:
             self.worms_position = WormPositionManager(new_acquisition=False)
@@ -1576,15 +1575,15 @@ class WormAnalysisApp:
             y = int(worm[1] * img_height)
             box = (x - self.bounding_box_size, y - self.bounding_box_size, x + self.bounding_box_size, y + self.bounding_box_size)  # (x1, y1, x2, y2)
             cv2.rectangle(img_with_bounding_box_np, (box[0], box[1]), (box[2], box[3]), (0, 0, 255), 1)
-            
+    
         # Convert back to PIL Image
         img_with_bounding_box_np = cv2.cvtColor(img_with_bounding_box_np, cv2.COLOR_BGR2RGB)
         self.original_image = Image.fromarray(img_with_bounding_box_np)
-        
+
         # Create placeholder image for display
         placeholder_img = self.original_image.resize((10, 10))
         img_with_bounding_box = ImageTk.PhotoImage(placeholder_img)
-        
+
         return img_with_bounding_box
         
     def on_stitching_image_click(self, event):
@@ -1610,7 +1609,8 @@ class WormAnalysisApp:
         
         # Compute relative position
         x_mouse = float(x_display / display_width)
-        y_mouse = float(y_display / display_height)    
+        y_mouse = float(y_display / display_height)  
+        print(f"{x_mouse},{y_mouse}") # TODO  
         x_bounding_box_proportion = float(self.bounding_box_size / display_width)
         y_bounding_box_proportion = float(self.bounding_box_size / display_height)
         
@@ -1625,11 +1625,12 @@ class WormAnalysisApp:
                     if i/int(self.scan_height.get()) > y_mouse:
                         scan_image_position_height = i-1
                         break
-                
+                    
                 if self.shape.get() == "square":
-                    filename_scan_image_associate = f"SlideScan_R{int(self.scan_width.get()) - scan_image_position_width - 1}_C{scan_image_position_height}_" # origin is in the top right corner
+                    filename_scan_image_associate = f"SlideScan_R{int(self.scan_width.get())-scan_image_position_width-1}_C{scan_image_position_height}_"
                 else:
-                    filename_scan_image_associate = f"SlideScan_R{int(self.scan_height.get()) - scan_image_position_height - 1}_C{int(self.scan_width.get()) - scan_image_position_width - 1}_"
+                    filename_scan_image_associate = f"SlideScan_R{int(self.scan_height.get()) - scan_image_position_height - 1}_C{int(self.scan_width.get())-scan_image_position_width-1}_"
+
                 source_dir = Path(DATA_DIR) / "Scan"
                 dest_dir = Path(LOG_DIR) / "Image_to_annotate"
                 
@@ -1736,8 +1737,8 @@ class WormAnalysisApp:
                 image_data = self.CORE.getImage()  # This should return a numpy array or raw buffer
 
                 image = Image.fromarray(image_data)
-                arr = np.array(image, dtype=np.uint16)   
-                arr_8bit = (arr / 256).astype(np.uint8) 
+                arr = np.array(image, dtype=np.uint16)
+                arr_8bit = (arr/256).astype(np.uint8)
                 image = Image.fromarray(arr_8bit, mode="L")
 
                 # Resize image to fit the label (optional)
@@ -1759,8 +1760,11 @@ class WormAnalysisApp:
         
         # Only continue the loop if in live mode
         if self.live_image and self.root.winfo_exists():
-            # Repeat after X ms
-            self._live_after_id = self.root.after(100, self.update_live_image)
+            try:
+                # Repeat after X ms
+                self._live_after_id = self.root.after(100, self.update_live_image)
+            except:
+                pass
 
     def go_to_next_worm(self):
         """
@@ -2070,10 +2074,10 @@ class WormAnalysisApp:
         """
         self.live_image = True
         self.show_load_position_page()
-        
+
         if hasattr(self, "_live_after_id") and self._live_after_id:
             self.root.after_cancel(self._live_after_id)
-        
+
         self.update_live_image()  # Restart the live loop
         
     def snap_image(self):
@@ -2089,7 +2093,7 @@ class WormAnalysisApp:
         if hasattr(self, "_live_after_id") and self._live_after_id:
             self.root.after_cancel(self._live_after_id)
             self._live_after_id = None
-        
+
         try:
             self.CORE.setExposure(int(self.exposure_time.get()))
             self.CORE.snapImage()
@@ -2104,8 +2108,10 @@ class WormAnalysisApp:
         self.show_load_position_page()
 
         # Then delay the display of the image so widgets have time to exist
-        self.root.after(100, self.display_snap_image)
-
+        try:
+            self.root.after(100, self.display_snap_image)
+        except:
+            pass
         self.open_contrast_histogram_window()
         
     def open_contrast_histogram_window(self):
@@ -2197,7 +2203,7 @@ class WormAnalysisApp:
 
             # Resize only once per size
             self.live_image_label.update_idletasks()
-            label_width = self.live_image_label.winfo_width()
+            label_width = self.live_image_label.winfo_width() 
             label_height = self.live_image_label.winfo_height()
             if label_width > 0 and label_height > 0:
                 image = image.resize((label_width, label_height), Image.Resampling.LANCZOS)
@@ -2361,11 +2367,14 @@ class WormAnalysisApp:
         Tooltip(info_label, "Be sure to have the objective in the lower right corner and to use the L camera.", posx=70, posy=-70)
 
         # Trigger resizing after layout completes with error handling
-        if hasattr(self, 'main_content') and self.main_content.winfo_exists():
-            after_id = self.main_content.after(100, self.resize_scan_content_area)
-            if not hasattr(self, '_after_ids'):
-                self._after_ids = []
-            self._after_ids.append(after_id)
+        try:
+            if hasattr(self, 'main_content') and self.main_content.winfo_exists():
+                after_id = self.main_content.after(100, self.resize_scan_content_area)
+                if not hasattr(self, '_after_ids'):
+                    self._after_ids = []
+                self._after_ids.append(after_id)
+        except:
+            pass
     
     def show_result_scan_page(self):
         """
@@ -2516,18 +2525,20 @@ class WormAnalysisApp:
         
 
         # Trigger resizing after layout completes with error handling
-        if hasattr(self, 'main_content') and self.main_content.winfo_exists():
-            after_id = self.main_content.after(100, self.resize_scan_content_area)
-            if not hasattr(self, '_after_ids'):
-                self._after_ids = []
-            self._after_ids.append(after_id)
+        try:
+            if hasattr(self, 'main_content') and self.main_content.winfo_exists():
+                after_id = self.main_content.after(100, self.resize_scan_content_area)
+                if not hasattr(self, '_after_ids'):
+                    self._after_ids = []
+                self._after_ids.append(after_id)
+        except:
+            pass
             
         # ----- IMAGE DISPLAY -----        
-        img_with_bounding_box = self.draw_prediction_result_box()
-        self.displayed_image = img_with_bounding_box
+        self.displayed_image = self.draw_prediction_result_box()
         
         # Create image label and store reference
-        self.img_label = tk.Label(content_area_result_container, image=img_with_bounding_box, bg=self.colors.theme["secondary_background"])
+        self.img_label = tk.Label(content_area_result_container, image=self.displayed_image, bg=self.colors.theme["secondary_background"])
         self.img_label.pack(expand=True)
         
         # Bind click event to the image label
@@ -2577,8 +2588,9 @@ class WormAnalysisApp:
         self.left_live_assist_container_ref.bind("<Configure>", self.resize_live_image)
         
         # Placeholder for live image
-        self.live_image_label = tk.Label(live_assist_container, bg="black")
-        self.live_image_label.pack(expand=True, fill=tk.BOTH)
+        if not self.live_image_label.winfo_exists():
+            self.live_image_label = tk.Label(live_assist_container, bg="black")
+            self.live_image_label.pack(expand=True, fill=tk.BOTH)
 
         # Bottom: Buttons + label
         bottom_assist_container = tk.Frame(left_live_assist_container, bg=self.colors.theme["primary_background"])
@@ -3142,11 +3154,14 @@ class WormAnalysisApp:
         Tooltip(info_label, "If your microscope has a dual view mode, you can active this button to have the possibility to use the scan with it. (will appear in the parameters panel)", title="Info", theme="info", posx=70, posy=-70)
 
         # Trigger resizing after layout completes with error handling
-        if hasattr(self, 'main_content') and self.main_content.winfo_exists():
-            after_id = self.main_content.after(100, self.resize_scan_content_area)
-            if not hasattr(self, '_after_ids'):
-                self._after_ids = []
-            self._after_ids.append(after_id)
+        try:
+            if hasattr(self, 'main_content') and self.main_content.winfo_exists():
+                after_id = self.main_content.after(100, self.resize_scan_content_area)
+                if not hasattr(self, '_after_ids'):
+                    self._after_ids = []
+                self._after_ids.append(after_id)
+        except:
+            pass
         
     
     

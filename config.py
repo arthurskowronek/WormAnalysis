@@ -10,8 +10,8 @@ import traceback
 from pathlib import Path
 
 # Get the project root (assuming we run from the project root)
-PROJECT_ROOT = Path("/Users/skowronek/Documents/WormAnalysis") # Path.cwd()
-# PROJET_ROOT = Path("/Users/imagerie/Desktop/CriblrGenetic")
+# PROJECT_ROOT = Path("/Users/imagerie/Desktop/CribleGenetic") # Path.cwd()
+PROJECT_ROOT = Path.cwd()
 
 # Define all project directories
 DATA_DIR = PROJECT_ROOT / "data"
@@ -83,7 +83,7 @@ def set_up_environment():
         for file in directory.iterdir():
             if file.is_file():
                 file.unlink()
-                
+
 def clear_scan_directory():
     dirs_to_clear = ["Scan", "Scan_modified"]
     for subdir in dirs_to_clear:
@@ -113,6 +113,7 @@ def loadCore():
     mmc.setDeviceAdapterSearchPaths([DIRECTORY])
     mmc.loadSystemConfiguration(os.path.join(DIRECTORY, CONFIG))
     mmc.setExposure(EXPOSURE_TIME_LIVE)
+    mmc.setAutoShutter(False)
     return mmc
 
 def load_config_file():

@@ -65,6 +65,9 @@ class ScanSlice:
         
         # Get starting position
         self.start_x, self.start_y = self.mmc.getXYPosition()
+
+        # Close shutter
+        self.mmc.setAutoShutter(False)
         
         # Calculate scan area
         end_x = self.start_x + (26000 if self.scan_shape == "square" else 45000) # TODO
@@ -91,7 +94,7 @@ class ScanSlice:
         self.final_end_x = 0
         self.final_end_y = 0
     
-    def scan(self, verbose=False):
+    def scan(self):
         """
         Executes the main scanning loop.
 
@@ -134,7 +137,7 @@ class ScanSlice:
                 # Record position info
                 self.positions_info.append([self.file_count, pos_x, pos_y, x_idx, y_idx])
                 self.file_count += 1
-                if verbose: print(f"Image {self.file_count-1}/{self.scan_width*self.scan_height} captured at X={pos_x:.2f}, Y={pos_y:.2f}")
+                #print(f"Image {self.file_count-1}/{self.scan_width*self.scan_height} captured at X={pos_x:.2f}, Y={pos_y:.2f}")
         
         # Process final image
         if self.image is not None:
@@ -177,7 +180,7 @@ class ScanSlice:
             self.image, _ = self.worm_detection(self.image, self.file_count - 1, last_pos_x, last_pos_y)
             imwrite(self.scan_modified_dir / self.file_name, self.image)
     
-    def worm_detection(self, img, id, pos_x=0, pos_y=0, drawing = False):
+    def worm_detection(self, img, id, pos_x=0, pos_y=0, drawing = True):
         """
         Detects worms in a given image using the YOLO model.
         
@@ -407,7 +410,7 @@ class ScanSlice:
         return inter_area / union_area
         
     # Others methods
-    def reconstruct_slice(self, verbose=False):
+    def reconstruct_slice(self):
         """
         Reconstructs a single, large image from the individual scanned tiles.
 
@@ -439,9 +442,9 @@ class ScanSlice:
         tile_h_full, tile_w_full = sample_image.shape
         tile_w_half = tile_w_full // 2 if self.dual_view else tile_w_full
         
-        # Margins to crop: 5% on each side
-        margin_x = int(tile_w_half * 0.05)
-        margin_y = int(tile_h_full * 0.05)
+        # Margins to crop
+        margin_x = int(tile_w_half * self.overlap_percent/200)
+        margin_y = int(tile_h_full * self.overlap_percent/200)
         
         # Final tile size after all crops
         crop_w = tile_w_half - 2 * margin_x
@@ -456,7 +459,7 @@ class ScanSlice:
         i = 0
         for fname, x_idx, y_idx in positions:
             i += 1
-            if verbose: print(f"Processing tile {i}")
+            #print(f"Processing tile {i}")
             img_full = imread(self.scan_dir / fname)
             
             # 1. Crop to right half if dual view
@@ -494,4 +497,4 @@ class ScanSlice:
         pil_image = pil_image.convert('RGB')
         
         pil_image.save(output_path, 'JPEG', quality=95)
-        if verbose: print(f"✅ Final stitched image saved to: {output_path}")
+        #print(f"✅ Final stitched image saved to: {output_path}")
