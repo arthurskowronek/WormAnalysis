@@ -52,6 +52,19 @@ class WormAnalysisApp:
         self.root.geometry("1440x960")
         self.PARAMS_FILE = PARAMETERS_FILE
         self.context_error = ""
+        
+        # keep track of scheduled after callbacks
+        if not hasattr(self, "_after_ids"):
+            self._after_ids = []
+
+        # flag used to stop live loops safely
+        if not hasattr(self, "_live_running"):
+            self._live_running = False
+
+        # load the heavy model only once (guard)
+        if not hasattr(self, "segmentation_model") or self.segmentation_model is None:
+            self.segmentation_model = YOLO(Path(MODELS_DIR) / "YOLO_segmentation.pt")
+
 
         # Initialize variables
         self.show_parameters = initial_show_parameters
@@ -73,8 +86,6 @@ class WormAnalysisApp:
         self.set_color_theme()
         self.load_icon()
         
-        self.segmentation_model = YOLO(Path(MODELS_DIR) / "YOLO_segmentation.pt")
-        
         # Main container
         self.main_frame = tk.Frame(root, bg=self.colors.theme["primary_background"])
         self.main_frame.pack(fill=tk.BOTH, expand=True)
@@ -95,6 +106,69 @@ class WormAnalysisApp:
             self.show_machine_configuration_page()
     
     # --- Initalization helper function ---
+    def _cleanup_for_reinit(self):
+        """
+        Minimal cleanup before re-initializing the UI.
+        Cancels scheduled after callbacks, stops live loops and unbinds/destroys
+        widgets that background callbacks might touch.
+        This is intentionally minimal to avoid large refactors.
+        """
+        # Stop live loop (if you use such a loop, it should check this flag)
+        try:
+            self._live_running = False
+        except Exception:
+            pass
+
+        # Cancel all stored after callbacks
+        try:
+            if hasattr(self, "_after_ids"):
+                for aid in list(self._after_ids):
+                    try:
+                        self.root.after_cancel(aid)
+                    except Exception:
+                        pass
+                self._after_ids.clear()
+        except Exception:
+            pass
+
+        # Unbind/destroy widgets that background callbacks might update
+        try:
+            if hasattr(self, "img_label") and getattr(self, "img_label") is not None:
+                try:
+                    self.img_label.unbind("<Button-1>")
+                    self.img_label.unbind("<B1-Motion>")
+                except Exception:
+                    pass
+                # don't force-destroy here if you prefer pack_forget(); we try safe destroy
+                try:
+                    if self.img_label.winfo_exists():
+                        self.img_label.destroy()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        try:
+            if hasattr(self, "live_image_label") and getattr(self, "live_image_label") is not None:
+                try:
+                    if self.live_image_label.winfo_exists():
+                        self.live_image_label.destroy()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # Try to close/cleanup worms_position if it has a close/stop method
+        try:
+            if hasattr(self, "worms_position") and self.worms_position is not None:
+                if hasattr(self.worms_position, "close"):
+                    try:
+                        self.worms_position.close()
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
     def set_parameters(self):
         """
         Initializes and binds UI parameters using Tkinter variables.
@@ -1232,24 +1306,37 @@ class WormAnalysisApp:
         ]
         canvas.create_polygon(points, fill=fill, outline=outline, smooth=True, splinesteps=36, tags=tag)
 
-    # --- Command ---
+    # --- Command ---            
     def refresh_ui(self):   
         """
-        Refreshes the entire user interface by destroying all current widgets
-        and rebuilding them from scratch.
+        Refreshes the UI in a minimal, safer way by performing a cleanup
+        before re-initializing. This avoids common crashes caused by
+        pending after callbacks or live-update loops referencing destroyed widgets.
+        """
+        try:
+            # 1) Minimal cleanup to cancel pending callbacks and stop live loops
+            try:
+                self._cleanup_for_reinit()
+            except Exception:
+                pass
 
-        This method is typically called when a major state change occurs, such as
-        switching pages or toggling dark mode. It ensures that the UI accurately
-        reflects the current state of the application and its parameters.
-        """    
-        try: 
-            self.root.configure(bg=self.colors.theme["primary_background"])
-            for widget in self.root.winfo_children():
-                widget.destroy()
-            self.__init__(self.root, self.CORE, self.dark_mode, self.current_page, self.show_parameters, self.live_image)
+            # 2) Attempt to remove main widgets (so __init__ can rebuild cleanly)
+            try:
+                if hasattr(self, "main_frame"):
+                    self.main_frame.destroy()
+            except Exception:
+                pass
+
+            # 3) Re-initialize UI state by calling __init__ (kept for minimal change)
+            #    We pass existing CORE and state flags so the app restarts in the same mode.
+            try:
+                self.__init__(self.root, self.CORE, self.dark_mode, self.current_page, self.show_parameters, self.live_image)
+            except Exception as e:
+                # fallback: try a safer recreate of main_frame if __init__ fails
+                self.context_error = log_error(e, "Refresh UI reinit failed")
         except Exception as e:
             self.context_error = log_error(e, "Refresh UI failed")
-  
+
     def refresh_parameters_interface(self):
         """
         Destroys and recreates the parameters panel.
@@ -1782,48 +1869,120 @@ class WormAnalysisApp:
         self.worms_position.add_worm_microscope_position(x_microscope, y_microscope)
     
     # load position page
+    def start_live(self):
+        """Start live loop (safe): set flag and launch update loop."""
+        self.live_image = True
+        self._live_running = True
+        # cancel any previously scheduled loop to avoid duplicates
+        try:
+            if hasattr(self, "_live_after_id"):
+                try:
+                    self.root.after_cancel(self._live_after_id)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        # call updater
+        self.update_live_image()
+
+    def stop_live(self):
+        """Stop live loop and cancel pending after callback."""
+        try:
+            self.live_image = False
+            self._live_running = False
+            if hasattr(self, "_live_after_id"):
+                try:
+                    self.root.after_cancel(self._live_after_id)
+                except Exception:
+                    pass
+            # also clear tracked after ids if you want immediate cancellation
+            if hasattr(self, "_after_ids"):
+                for aid in list(self._after_ids):
+                    try:
+                        self.root.after_cancel(aid)
+                    except Exception:
+                        pass
+                self._after_ids.clear()
+        except Exception:
+            pass
+
     def update_live_image(self):
         """
-        Snaps a new image from the microscope and updates the live image display.
-
-        This function continuously captures images from the microscope core,
-        converts them to a format suitable for Tkinter, and displays them in
-        the `live_image_label` widget. The process is repeated in a loop
-        controlled by `self.root.after()` as long as `self.live_image` is True.
+        Safe live update loop:
+        - returns immediately if _live_running is False
+        - protects CORE calls and image conversion
+        - cancels previously scheduled _live_after_id before scheduling a new one
+        - appends after ids to self._after_ids for centralized cleanup
         """
         try:
-            if hasattr(self, "live_image_label") and self.live_image_label.winfo_exists():
+            # stop quickly if requested or if root was destroyed
+            if not getattr(self, "_live_running", False) or not self.root.winfo_exists():
+                return
+
+            # only try to update if label exists
+            if not (hasattr(self, "live_image_label") and self.live_image_label.winfo_exists()):
+                # label gone — stop the loop to avoid repeated errors
+                self._live_running = False
+                return
+
+            # Safe camera acquisition (guard for CORE missing/failing)
+            image_data = None
+            try:
+                if self.CORE is None:
+                    raise RuntimeError("CORE is None")
+                # These calls may raise; catch below
                 self.CORE.snapImage()
-                image_data = self.CORE.getImage()  # This should return a numpy array or raw buffer
+                image_data = self.CORE.getImage()
+            except Exception as e:
+                # log, but keep running (don't crash the app)
+                if self.context_error != "Update live image failed":
+                    self.context_error = log_error(e, "Update live image failed (camera)")
+                image_data = None
 
-                image = Image.fromarray(image_data)
-                arr = np.array(image, dtype=np.uint16)
-                arr_8bit = (arr/256).astype(np.uint8)
-                image = Image.fromarray(arr_8bit, mode="L")
+            # If we got image data, convert and display
+            if image_data is not None:
+                try:
+                    image = Image.fromarray(image_data)
+                    arr = np.array(image, dtype=np.uint16)
+                    arr_8bit = (arr / 256).astype(np.uint8)
+                    image = Image.fromarray(arr_8bit, mode="L")
 
-                # Resize image to fit the label (optional)
-                label_width = self.live_image_label.winfo_width()
-                label_height = self.live_image_label.winfo_height()
-                if label_width > 0 and label_height > 0:
-                    image = image.resize((label_width, label_height), Image.Resampling.LANCZOS)
+                    # resize to label size if available
+                    label_width = self.live_image_label.winfo_width()
+                    label_height = self.live_image_label.winfo_height()
+                    if label_width > 0 and label_height > 0:
+                        image = image.resize((label_width, label_height), Image.Resampling.LANCZOS)
 
-                # Convert image for tkinter
-                tk_image = ImageTk.PhotoImage(image)
-
-                # Keep reference
-                self.live_image_label.image = tk_image
-                self.live_image_label.config(image=tk_image)
-
+                    tk_image = ImageTk.PhotoImage(image)
+                    # keep reference to avoid GC
+                    self.live_image_label.image = tk_image
+                    self.live_image_label.config(image=tk_image)
+                except Exception as e:
+                    # conversion/display error should not break the loop
+                    if self.context_error != "Update live image failed":
+                        self.context_error = log_error(e, "Update live image failed (display)")
         except Exception as e:
+            # top-level safety net
             if self.context_error != "Update live image failed":
                 self.context_error = log_error(e, "Update live image failed")
-        
-        # Only continue the loop if in live mode
-        if self.live_image and self.root.winfo_exists():
+        finally:
+            # schedule next iteration only if still running and root alive
             try:
-                # Repeat after X ms
-                self._live_after_id = self.root.after(100, self.update_live_image)
-            except:
+                if getattr(self, "_live_running", False) and self.root.winfo_exists():
+                    # cancel previous scheduled id to avoid stacking
+                    try:
+                        if hasattr(self, "_live_after_id"):
+                            self.root.after_cancel(self._live_after_id)
+                    except Exception:
+                        pass
+
+                    self._live_after_id = self.root.after(100, self.update_live_image)
+
+                    # track it for global cleanup
+                    if not hasattr(self, "_after_ids"):
+                        self._after_ids = []
+                    self._after_ids.append(self._live_after_id)
+            except Exception:
                 pass
 
     def go_to_next_worm(self):
@@ -2138,7 +2297,8 @@ class WormAnalysisApp:
         if hasattr(self, "_live_after_id") and self._live_after_id:
             self.root.after_cancel(self._live_after_id)
 
-        self.update_live_image()  # Restart the live loop
+        self._live_running = True
+        self.update_live_image()
         
     def snap_image(self):
         """
@@ -2750,7 +2910,9 @@ class WormAnalysisApp:
         self.right_map_assist_container_ref.bind("<Configure>", self.resize_map_assist)
         
         # Update the live image
-        self.update_live_image()
+        if self.live_image:
+            self._live_running = True
+            self.update_live_image()
     
     def show_load_position_page(self):
         """
@@ -3150,6 +3312,7 @@ class WormAnalysisApp:
 
         # Update the live image
         if self.live_image:
+            self._live_running = True
             self.update_live_image()
 
     def show_placeholder_page(self, page_name):
