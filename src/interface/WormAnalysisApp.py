@@ -146,7 +146,43 @@ class WormAnalysisApp:
 
         self.scan_height = tk.StringVar(value=self.loaded_params.get("scan_height", '8'))
         self.scan_height.trace_add("write", lambda *args: self.save_parameters())
-                
+        
+        self.scan_height_length = tk.StringVar(value=self.loaded_params.get("scan_height_length"))
+        self.scan_height_length.trace_add("write", lambda *args: self.save_parameters())
+        
+        self.scan_width_length = tk.StringVar(value=self.loaded_params.get("scan_width_length"))
+        self.scan_width_length.trace_add("write", lambda *args: self.save_parameters())
+        
+        self.microscope_step_size = tk.StringVar(value=self.loaded_params.get("microscope_step_size"))
+        self.microscope_step_size.trace_add("write", lambda *args: self.save_parameters())
+        
+        self.microscope_objective_size_1 = tk.StringVar(value=self.loaded_params.get("microscope_objective_size_1"))
+        self.microscope_objective_size_1.trace_add("write", lambda *args: self.save_parameters())
+        
+        self.microscope_objective_size_2 = tk.StringVar(value=self.loaded_params.get("microscope_objective_size_2"))
+        self.microscope_objective_size_2.trace_add("write", lambda *args: self.save_parameters())
+        
+        self.microscope_objective_size_3 = tk.StringVar(value=self.loaded_params.get("microscope_objective_size_3"))
+        self.microscope_objective_size_3.trace_add("write", lambda *args: self.save_parameters())
+        
+        self.microscope_objective_size_4 = tk.StringVar(value=self.loaded_params.get("microscope_objective_size_4"))
+        self.microscope_objective_size_4.trace_add("write", lambda *args: self.save_parameters())
+        
+        self.microscope_objective_size_5 = tk.StringVar(value=self.loaded_params.get("microscope_objective_size_5"))
+        self.microscope_objective_size_5.trace_add("write", lambda *args: self.save_parameters())
+        
+        self.microscope_objective_size_6 = tk.StringVar(value=self.loaded_params.get("microscope_objective_size_6"))
+        self.microscope_objective_size_6.trace_add("write", lambda *args: self.save_parameters())
+        
+        self.microscope_binning_size_1 = tk.StringVar(value=self.loaded_params.get("microscope_binning_size_1"))
+        self.microscope_binning_size_1.trace_add("write", lambda *args: self.save_parameters())
+        
+        self.microscope_binning_size_2 = tk.StringVar(value=self.loaded_params.get("microscope_binning_size_2"))
+        self.microscope_binning_size_2.trace_add("write", lambda *args: self.save_parameters())
+        
+        self.microscope_binning_size_3 = tk.StringVar(value=self.loaded_params.get("microscope_binning_size_3"))
+        self.microscope_binning_size_3.trace_add("write", lambda *args: self.save_parameters())
+                  
     def save_parameters(self):
         """
         Updates the parameters in the YAML file
@@ -163,7 +199,19 @@ class WormAnalysisApp:
             "user_directory": self.user_directory.get(),
             "machine_has_dual_view": self.machine_has_dual_view.get(),
             "scan_width": self.scan_width.get(),
-            "scan_height": self.scan_height.get()
+            "scan_height": self.scan_height.get(),
+            "scan_height_length": self.scan_height_length.get(),
+            "scan_width_length": self.scan_width_length.get(),
+            "microscope_step_size": self.microscope_step_size.get(),
+            "microscope_objective_size_1": self.microscope_objective_size_1.get(),
+            "microscope_objective_size_2": self.microscope_objective_size_2.get(),
+            "microscope_objective_size_3": self.microscope_objective_size_3.get(),
+            "microscope_objective_size_4": self.microscope_objective_size_4.get(),
+            "microscope_objective_size_5": self.microscope_objective_size_5.get(),
+            "microscope_objective_size_6": self.microscope_objective_size_6.get(),
+            "microscope_binning_size_1": self.microscope_binning_size_1.get(),
+            "microscope_binning_size_2": self.microscope_binning_size_2.get(),
+            "microscope_binning_size_3": self.microscope_binning_size_3.get()
         }
         
         # Read and parse the existing YAML file
@@ -725,10 +773,15 @@ class WormAnalysisApp:
         )
         
         # Binning
+        list_binning = [
+            str(self.loaded_params.get(f"microscope_binning_size_{i}"))
+            for i in range(1, 4)
+            if str(self.loaded_params.get(f"microscope_binning_size_{i}")) != ""
+        ]
         bg = "parameters_button_background" if "binning" in self.enable_parameters_buttons else "parameters_button_disabled_background"
         tk.Label(self.params_content_frame, text="Binning", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
         _, self.binning_dropdown = self.create_rounded_dropdown(
-            self.params_content_frame, ["2x2", "3x3"], self.binning, bg
+            self.params_content_frame, list_binning, self.binning, bg
         )
 
         # Shutter toggle
@@ -748,10 +801,15 @@ class WormAnalysisApp:
         )
         
         # Scan Objective
+        list_scan_objective = [
+            str(self.loaded_params.get(f"microscope_objective_size_{i}")) + "x"
+            for i in range(1, 7)
+            if str(self.loaded_params.get(f"microscope_objective_size_{i}")) != ""
+        ]
         bg = "parameters_button_background" if "scan_objective" in self.enable_parameters_buttons else "parameters_button_disabled_background"
         tk.Label(self.params_content_frame, text="Scan Objective", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
         _, self.scan_objective_dropdown = self.create_rounded_dropdown(
-            self.params_content_frame, ["4x", "5x", "10x"], self.scan_objective, bg
+            self.params_content_frame, list_scan_objective, self.scan_objective, bg
         )
 
         # Fluo objective
@@ -769,7 +827,7 @@ class WormAnalysisApp:
         )
     
     # --- Button ---
-    def create_rounded_input(self, parent, variable, bg = "parameters_button_background"): 
+    def create_rounded_input(self, parent, variable, bg = "parameters_button_background", width = 190, height = 35): 
         """
         Creates a rounded entry input widget inside a canvas.
 
@@ -793,8 +851,8 @@ class WormAnalysisApp:
             variable = tk.StringVar() 
             
         # Dimensions of the canvas
-        canvas_width = 190 
-        canvas_height = 35
+        canvas_width = width 
+        canvas_height = height
         radius = 20 
 
         # Create the canvas
@@ -817,7 +875,9 @@ class WormAnalysisApp:
         entry_height = canvas_height - 10 # Approximate height of the entry part
         canvas.create_window(radius, canvas_height / 2, window=entry, anchor="w",
                              width=entry_width, height=entry_height)
-        return variable
+        canvas.variable = variable
+
+        return canvas
     
     def create_rounded_input_with_icon(self, parent, variable, icon, bg = "parameters_button_background"):
         """
@@ -3122,17 +3182,47 @@ class WormAnalysisApp:
             
         # Disable some paramaters buttons
         self.update_parameter_widgets_state(disabled_widgets=[])  # Everything enabled
+        
+        # -------------------------------------------------------------------------------------------------- #
+        
+        # section with buttons dual view
+        title_frame = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
+        title_frame.pack(fill=tk.BOTH, expand=True, pady=(40,10))
 
-        # section with buttons
-        buttons_frame = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
-        buttons_frame.pack(fill=tk.BOTH, expand=True, pady=(40,40))
+        # Text label
+        title_label = tk.Label(
+            title_frame, text="Be careful when you change these values.",
+            bg=self.colors.theme["primary_background"], fg=self.colors.theme["danger_stroke"],
+            font=(self.font, 12)
+        )
+        title_label.pack()
+        
+        title_label_2 = tk.Label(
+            title_frame, text="Once you have configured them for your system's operation, do not change them again.",
+            bg=self.colors.theme["primary_background"], fg=self.colors.theme["danger_stroke"],
+            font=(self.font, 12)
+        )
+        title_label_2.pack()
+        
+        title_label_3 = tk.Label(
+            title_frame, text="Incorrectly configured values will prevent the program from working properly.",
+            bg=self.colors.theme["primary_background"], fg=self.colors.theme["danger_stroke"],
+            font=(self.font, 12)
+        )
+        title_label_3.pack()
+
+        # -------------------------------------------------------------------------------------------------- #
+
+        # section with buttons dual view
+        buttons_dual_view_frame = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
+        buttons_dual_view_frame.pack(fill=tk.BOTH, expand=True, pady=(10,10))
 
         # Machine_has_dual_view button
-        self.Machine_has_dual_view_toggle = self.create_custom_toggle(buttons_frame, "", self.machine_has_dual_view, size="big", bg="primary_background")
+        self.Machine_has_dual_view_toggle = self.create_custom_toggle(buttons_dual_view_frame, "", self.machine_has_dual_view, size="big", bg="primary_background")
         self.Machine_has_dual_view_toggle.pack(expand=True)
         
         # Container to hold label + info icon
-        launch_label_frame = tk.Frame(buttons_frame, bg=self.colors.theme["primary_background"])
+        launch_label_frame = tk.Frame(buttons_dual_view_frame, bg=self.colors.theme["primary_background"])
         launch_label_frame.pack()
 
         # Text label
@@ -3152,6 +3242,216 @@ class WormAnalysisApp:
 
         # Tooltip on hover
         Tooltip(info_label, "If your microscope has a dual view mode, you can active this button to have the possibility to use the scan with it. (will appear in the parameters panel)", title="Info", theme="info", posx=70, posy=-70)
+
+        # -------------------------------------------------------------------------------------------------- #
+        # section with button scan length
+        buttons_scan_length_frame = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
+        buttons_scan_length_frame.pack(fill=tk.BOTH, expand=True, pady=(10,10))
+
+        # Create an inner frame to hold the two canvases side-by-side
+        input_container_frame = tk.Frame(buttons_scan_length_frame, bg=self.colors.theme["primary_background"])
+        # Center this inner frame horizontally
+        input_container_frame.pack(pady=0)
+
+        # Create the first canvas (size_scan_height) and pack it to the left
+        self.size_scan_height_canvas = self.create_rounded_input(
+            input_container_frame, self.scan_height_length, bg="machine_config_button", width=100
+        )
+        self.size_scan_height_canvas.pack(side=tk.LEFT, padx=10) # Use side=tk.LEFT and padx for spacing
+
+        # Create the second canvas (size_scan_width) and pack it to the left
+        self.size_scan_width_canvas = self.create_rounded_input(
+            input_container_frame, self.scan_width_length, bg="machine_config_button", width=100
+        )
+        self.size_scan_width_canvas.pack(side=tk.LEFT, padx=10) # It will appear to the right of the first
+
+
+        # Container to hold label + info icon
+        scan_length_label_frame = tk.Frame(buttons_scan_length_frame, bg=self.colors.theme["primary_background"])
+        scan_length_label_frame.pack()
+
+        # Text label
+        title_scan = tk.Label(
+            scan_length_label_frame, text="Manage the size of the scan",
+            bg=self.colors.theme["primary_background"], fg=self.colors.theme["tertiary_text"],
+            font=(self.font, 10)
+        )
+        title_scan.pack(side=tk.LEFT)
+
+        # Info icon
+        info_scan_label = tk.Label(
+            scan_length_label_frame, image=self.info_icon,
+            bg=self.colors.theme["primary_background"]
+        )
+        info_scan_label.pack(side=tk.LEFT, padx=(5, 0))  # small gap between text and icon
+
+        # Tooltip on hover
+        Tooltip(info_scan_label, "When you let the microscope scan the entire lame, it will use the above value to decide the width and height of the scan (in the microscope unit system).", title="Info", theme="info", posx=70, posy=-70)
+
+
+        # -------------------------------------------------------------------------------------------------- #
+        # section with button step size microscope
+        buttons_scan_step_size = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
+        buttons_scan_step_size.pack(fill=tk.BOTH, expand=True, pady=(10,10))
+
+        # Create an inner frame to hold the canvas
+        input_container_step_size_frame = tk.Frame(buttons_scan_step_size, bg=self.colors.theme["primary_background"])
+        # Center this inner frame horizontally
+        input_container_step_size_frame.pack(pady=0)
+
+        # Create the first canvas (size_scan_height) and pack it to the left
+        self.size_step_microscope_canva = self.create_rounded_input(
+            input_container_step_size_frame, self.microscope_step_size, bg="machine_config_button", width=100
+        )
+        self.size_step_microscope_canva.pack(side=tk.LEFT, padx=0) 
+
+
+        # Container to hold label + info icon
+        microscope_step_size_label_frame = tk.Frame(buttons_scan_step_size, bg=self.colors.theme["primary_background"])
+        microscope_step_size_label_frame.pack()
+
+        # Text label
+        title_step_size = tk.Label(
+            microscope_step_size_label_frame, text="Manage the size of the microscope step",
+            bg=self.colors.theme["primary_background"], fg=self.colors.theme["tertiary_text"],
+            font=(self.font, 10)
+        )
+        title_step_size.pack(side=tk.LEFT)
+
+        # Info icon
+        info_step_size_label = tk.Label(
+            microscope_step_size_label_frame, image=self.info_icon,
+            bg=self.colors.theme["primary_background"]
+        )
+        info_step_size_label.pack(side=tk.LEFT, padx=(5, 0))  # small gap between text and icon
+
+        # Tooltip on hover
+        Tooltip(info_step_size_label, "This value represent the size (in the microscope unit system) of a window when the objective magnitude is 1.", title="Info", theme="info", posx=70, posy=-70)
+
+
+        # -------------------------------------------------------------------------------------------------- #
+        # section with button size of the objective on the microscope
+        buttons_objective_size = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
+        buttons_objective_size.pack(fill=tk.BOTH, expand=True, pady=(10,10))
+
+        # Create an inner frame to hold the canvas
+        input_container_size_objective_frame = tk.Frame(buttons_objective_size, bg=self.colors.theme["primary_background"])
+        # Center this inner frame horizontally
+        input_container_size_objective_frame.pack(pady=0)
+
+        # Create the first canvas (size_scan_height) and pack it to the left
+        self.size_objective_microscope_canva = self.create_rounded_input(
+            input_container_size_objective_frame, self.microscope_objective_size_1, bg="machine_config_button", width=80
+        )
+        self.size_objective_microscope_canva.pack(side=tk.LEFT, padx=5) 
+        
+        # Create the 2nd canvas (size_scan_height) and pack it to the left
+        self.size_objective_microscope_canva = self.create_rounded_input(
+            input_container_size_objective_frame, self.microscope_objective_size_2, bg="machine_config_button", width=80
+        )
+        self.size_objective_microscope_canva.pack(side=tk.LEFT, padx=5) 
+        
+        # Create the 3th canvas (size_scan_height) and pack it to the left
+        self.size_objective_microscope_canva = self.create_rounded_input(
+            input_container_size_objective_frame, self.microscope_objective_size_3, bg="machine_config_button", width=80
+        )
+        self.size_objective_microscope_canva.pack(side=tk.LEFT, padx=5) 
+        
+        # Create the 4th canvas (size_scan_height) and pack it to the left
+        self.size_objective_microscope_canva = self.create_rounded_input(
+            input_container_size_objective_frame, self.microscope_objective_size_4, bg="machine_config_button", width=80
+        )
+        self.size_objective_microscope_canva.pack(side=tk.LEFT, padx=5) 
+        
+        # Create the 5th canvas (size_scan_height) and pack it to the left
+        self.size_objective_microscope_canva = self.create_rounded_input(
+            input_container_size_objective_frame, self.microscope_objective_size_5, bg="machine_config_button", width=80
+        )
+        self.size_objective_microscope_canva.pack(side=tk.LEFT, padx=5) 
+        
+        # Create the 6th canvas (size_scan_height) and pack it to the left
+        self.size_objective_microscope_canva = self.create_rounded_input(
+            input_container_size_objective_frame, self.microscope_objective_size_6, bg="machine_config_button", width=80
+        )
+        self.size_objective_microscope_canva.pack(side=tk.LEFT, padx=5)
+
+
+        # Container to hold label + info icon
+        microscope_objective_size_label_frame = tk.Frame(buttons_objective_size, bg=self.colors.theme["primary_background"])
+        microscope_objective_size_label_frame.pack()
+
+        # Text label
+        title_objective_size = tk.Label(
+            microscope_objective_size_label_frame, text="Manage the size of the objectives of your microscope",
+            bg=self.colors.theme["primary_background"], fg=self.colors.theme["tertiary_text"],
+            font=(self.font, 10)
+        )
+        title_objective_size.pack(side=tk.LEFT)
+
+        # Info icon
+        info_objective_size_label = tk.Label(
+            microscope_objective_size_label_frame, image=self.info_icon,
+            bg=self.colors.theme["primary_background"]
+        )
+        info_objective_size_label.pack(side=tk.LEFT, padx=(5, 0))  # small gap between text and icon
+
+        # Tooltip on hover
+        Tooltip(info_objective_size_label, "Enter the size of the magnification of each objective you have on your microscope.", title="Info", theme="info", posx=70, posy=-70)
+
+
+        # -------------------------------------------------------------------------------------------------- #
+        # section with button size of the binning on the microscope
+        buttons_binning_size = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
+        buttons_binning_size.pack(fill=tk.BOTH, expand=True, pady=(10,10))
+
+        # Create an inner frame to hold the canvas
+        input_container_size_binning_frame = tk.Frame(buttons_binning_size, bg=self.colors.theme["primary_background"])
+        # Center this inner frame horizontally
+        input_container_size_binning_frame.pack(pady=0)
+
+        # Create the first canvas (size_scan_height) and pack it to the left
+        self.size_binning_microscope_canva = self.create_rounded_input(
+            input_container_size_binning_frame, self.microscope_binning_size_1, bg="machine_config_button", width=80
+        )
+        self.size_binning_microscope_canva.pack(side=tk.LEFT, padx=5) 
+        
+        # Create the 2nd canvas (size_scan_height) and pack it to the left
+        self.size_binning_microscope_canva = self.create_rounded_input(
+            input_container_size_binning_frame, self.microscope_binning_size_2, bg="machine_config_button", width=80
+        )
+        self.size_binning_microscope_canva.pack(side=tk.LEFT, padx=5) 
+        
+        # Create the 3th canvas (size_scan_height) and pack it to the left
+        self.size_binning_microscope_canva = self.create_rounded_input(
+            input_container_size_binning_frame, self.microscope_binning_size_3, bg="machine_config_button", width=80
+        )
+        self.size_binning_microscope_canva.pack(side=tk.LEFT, padx=5) 
+
+
+        # Container to hold label + info icon
+        microscope_binning_size_label_frame = tk.Frame(buttons_binning_size, bg=self.colors.theme["primary_background"])
+        microscope_binning_size_label_frame.pack()
+
+        # Text label
+        title_binning_size = tk.Label(
+            microscope_binning_size_label_frame, text="Manage the size of the binnings of your microscope",
+            bg=self.colors.theme["primary_background"], fg=self.colors.theme["tertiary_text"],
+            font=(self.font, 10)
+        )
+        title_binning_size.pack(side=tk.LEFT)
+
+        # Info icon
+        info_binning_size_label = tk.Label(
+            microscope_binning_size_label_frame, image=self.info_icon,
+            bg=self.colors.theme["primary_background"]
+        )
+        info_binning_size_label.pack(side=tk.LEFT, padx=(5, 0))  # small gap between text and icon
+
+        # Tooltip on hover
+        Tooltip(info_binning_size_label, "Enter the size of each binning you have on your microscope.", title="Info", theme="info", posx=70, posy=-70)
+
+
+        
 
         # Trigger resizing after layout completes with error handling
         try:

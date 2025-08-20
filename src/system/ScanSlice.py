@@ -7,7 +7,7 @@ from ultralytics import YOLO
 from tifffile import imwrite, imread
 from collections import defaultdict
 
-from config import MODELS_DIR, RESSOURCES_DIR, DATA_DIR, save_corner_positions_into_yaml_config_file
+from config import MODELS_DIR, RESSOURCES_DIR, DATA_DIR, save_corner_positions_into_yaml_config_file, load_config_file
 
 class ScanSlice:
     """
@@ -39,7 +39,8 @@ class ScanSlice:
         self.overlap_percent = overlap_percent
         
         # Calculate step sizes
-        self.step_size_x = 13180 / self.grossissement
+        config = load_config_file()
+        self.step_size_x = int(config.get("microscope_step_size")) / self.grossissement
         self.step_size_y = self.step_size_x / 2 if self.dual_view else self.step_size_x
         
         # Load YOLO model
@@ -70,8 +71,9 @@ class ScanSlice:
         self.mmc.setAutoShutter(False)
         
         # Calculate scan area
-        end_x = self.start_x + (26000 if self.scan_shape == "square" else 45000) # TODO
-        end_y = self.start_y + 26000
+        config = load_config_file()
+        end_x = self.start_x + (int(config.get("scan_height_length")) if self.scan_shape == "square" else int(config.get("scan_width_length")))
+        end_y = self.start_y + int(config.get("scan_height_length"))
         
         # Get the actual corner positions (it was the center before)
         start_corner_x = self.start_x - self.step_size_x // 2

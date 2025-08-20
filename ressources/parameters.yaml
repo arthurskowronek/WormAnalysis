@@ -12,3 +12,15 @@ end_y: 26118.900024414062
 scan_width: '8'
 scan_height: '8'
 machine_has_dual_view: false
+scan_height_length: '26000'
+scan_width_length: '45000'
+microscope_step_size: '13180'
+microscope_objective_size_1: '4'
+microscope_objective_size_2: '5'
+microscope_objective_size_3: '10'
+microscope_objective_size_4: '20'
+microscope_objective_size_5: ''
+microscope_objective_size_6: ''
+microscope_binning_size_1: 2x2
+microscope_binning_size_2: 3x3
+microscope_binning_size_3: ''

@@ -10,7 +10,6 @@ import traceback
 from pathlib import Path
 
 # Get the project root (assuming we run from the project root)
-# PROJECT_ROOT = Path("/Users/imagerie/Desktop/CribleGenetic") # Path.cwd()
 PROJECT_ROOT = Path.cwd()
 
 # Define all project directories

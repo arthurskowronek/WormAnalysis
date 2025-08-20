@@ -33,6 +33,7 @@ class ColorTheme:
             "parameters_button_disabled_background": "#353535" if dark_mode else "#f1f1f1",
             "main_button_background": "#262626" if dark_mode else "#ffffff",
             "stroke_button": "#e0e0e0",
+            "machine_config_button": "#f7f7f7" if dark_mode else "#f1f1f1",
             
             # tooltip
             "danger_zone": "#FEE9E7",
