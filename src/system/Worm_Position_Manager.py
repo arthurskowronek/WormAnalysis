@@ -20,7 +20,7 @@ class WormPositionManager:
     calculating the shortest path using the Traveling Salesman Problem (TSP) algorithm.
     """
     
-    def __init__(self, output_folder = Path(RESSOURCES_DIR), new_acquisition = True, table_worm_position = [], filename: str = 'worm_positions.csv'):
+    def __init__(self, output_folder = Path(RESSOURCES_DIR), new_acquisition = True, table_worm_position = [], filename: str = 'worm_positions.csv', id = 0):
         """
         Initializes the WormPositionManager.
         
@@ -52,7 +52,7 @@ class WormPositionManager:
                 self._initialize_csv(table_worm_position)
             else:
                 self.find_shortest_path()
-                self.go_to_first_worm()
+                self.go_to_first_worm(id)
          
     def _initialize_csv(self, table_worm_position = []) -> None:
         """
@@ -183,7 +183,7 @@ class WormPositionManager:
         """
         df = pd.read_csv(self.csv_file_path)
         if df is not None and not df.empty:
-            positions = df[['x_microscope', 'y_microscope']].values.tolist()
+            positions = df[['x_microscope', 'y_microscope']].astype(int).values.tolist()
             return positions
         else:
             #print("CSV file is empty or not found")
@@ -415,9 +415,16 @@ class WormPositionManager:
         
         x = (x - start_corner_x) / (end_corner_x - start_corner_x)
         y = (y - start_corner_y) / (end_corner_y - start_corner_y)
-        # 0,0 is in the top right corner, so we need to change the origin
-        x_prop = 1 - y
-        y_prop = x
+
+        config = load_config_file()
+        shape = config.get("shape")
+        if shape == "square":
+            # 0,0 is in the top right corner, so we need to change the origin
+            x_prop = 1 - y
+            y_prop = x
+        else:
+            x_prop = 1 - x
+            y_prop = 1 - y
             
         return x_prop, y_prop
         
@@ -438,8 +445,14 @@ class WormPositionManager:
         end_corner_x = parameters.get('end_x')
         end_corner_y = parameters.get('end_y')
 
-        x = y_prop
-        y = 1 - x_prop
+        config = load_config_file()
+        shape = config.get("shape")
+        if shape == "square":
+            x = y_prop
+            y = 1 - x_prop
+        else:
+            x = 1 - x_prop
+            y = 1 - y_prop
 
         x_microscope = x * (end_corner_x - start_corner_x) + start_corner_x
         y_microscope = y * (end_corner_y - start_corner_y) + start_corner_y
@@ -447,7 +460,7 @@ class WormPositionManager:
         return x_microscope, y_microscope
     
     # Change worm being seen methods   
-    def go_to_first_worm(self):
+    def go_to_first_worm(self, id = 0):
         """
         Sets the first worm in the TSP-calculated path as the currently 'seen' worm.
         All other worms are marked as 'not seen'.
@@ -462,7 +475,7 @@ class WormPositionManager:
         df['seen'] = False
         
         # Set the first worm in the path (id_path = 0) to seen
-        mask_first = df['id_path'] == 0
+        mask_first = df['id_path'] == id
         df.loc[mask_first, 'seen'] = True
         
         # Save the updated DataFrame

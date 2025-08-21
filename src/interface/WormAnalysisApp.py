@@ -24,7 +24,7 @@ from src.system.dataset_manager import Dataset_Manager
 from src.system.Worm_Position_Manager import WormPositionManager
 
 class WormAnalysisApp:
-    def __init__(self, root, mmc = None, initial_dark_mode=True, first_page = "automatic_scan", initial_show_parameters = True, initial_live_image = True):
+    def __init__(self, root, mmc = None, initial_dark_mode=True, first_page = "automatic_scan", initial_show_parameters = True, initial_live_image = True, initial_id_worm_seen = 0):
         """
         Initializes the Worm Analysis Application interface.
 
@@ -72,7 +72,7 @@ class WormAnalysisApp:
         self.dark_mode = initial_dark_mode
         self.worms_position = None
         self.prediction = 85
-        self.id_worm_seen = 0
+        self.id_worm_seen = initial_id_worm_seen
         self.add_worm_scan_result = True
         self.live_image = initial_live_image
         self.bounding_box_size = 15 # Size of the bounding box around worms in pixels
@@ -1330,7 +1330,7 @@ class WormAnalysisApp:
             # 3) Re-initialize UI state by calling __init__ (kept for minimal change)
             #    We pass existing CORE and state flags so the app restarts in the same mode.
             try:
-                self.__init__(self.root, self.CORE, self.dark_mode, self.current_page, self.show_parameters, self.live_image)
+                self.__init__(self.root, self.CORE, self.dark_mode, self.current_page, self.show_parameters, self.live_image, self.id_worm_seen)
             except Exception as e:
                 # fallback: try a safer recreate of main_frame if __init__ fails
                 self.context_error = log_error(e, "Refresh UI reinit failed")
@@ -1463,6 +1463,7 @@ class WormAnalysisApp:
         try:
             self.current_page = page_id
             self.refresh_ui()
+            self.root.update_idletasks()
         except Exception as e:
             self.context_error = log_error(e, f"Switch page {page_id} failed")
     
@@ -1483,6 +1484,8 @@ class WormAnalysisApp:
             elif self.current_page == "scan_result":
                 middle_container = self.middle_result_container_ref
                 content_area = self.content_area_result_container_ref
+            else:
+                return
 
             container_width = middle_container.winfo_width()
             container_height = middle_container.winfo_height()
@@ -1503,6 +1506,8 @@ class WormAnalysisApp:
             content_area.place(x=x, y=y, width=width, height=height)
             
             self.last_scan_area_size = (int(width), int(height))
+            if width <= 0 or height <= 0:
+                return
             
             # --- Resize image accordingly ---
             if hasattr(self, 'original_image') and hasattr(self, 'img_label') and self.img_label.winfo_exists():
@@ -1608,6 +1613,14 @@ class WormAnalysisApp:
         4. Reconstructs the final image from the scan.
         5. Switches the page to display the scan results.
         """
+        try:
+            x, y = self.CORE.getXYPosition()
+            if hasattr(self, "init_pos_x"):
+                if x != self.init_pos_x or y != self.init_pos_y:
+                    self.CORE.setXYPosition(self.CORE.getXYStageDevice(), self.init_pos_x, self.init_pos_y)
+        except Exception as e:
+            self.context_error = log_error(e, "Go to start position failed")
+
         # Show "Starting scan" message
         try:
             self.scan_status_label.config(text="Launching scan... please wait.")
@@ -1756,8 +1769,7 @@ class WormAnalysisApp:
         
         # Compute relative position
         x_mouse = float(x_display / display_width)
-        y_mouse = float(y_display / display_height)  
-        print(f"{x_mouse},{y_mouse}") # TODO  
+        y_mouse = float(y_display / display_height)   
         x_bounding_box_proportion = float(self.bounding_box_size / display_width)
         y_bounding_box_proportion = float(self.bounding_box_size / display_height)
         
@@ -2924,11 +2936,18 @@ class WormAnalysisApp:
         navigation buttons, and a panel for showing prediction results and
         manual classification buttons.
         """
+
         # Clear previous widgets
         for widget in self.main_content.winfo_children():
             widget.destroy()
             
-        self.worms_position = WormPositionManager(new_acquisition=False)
+        self.worms_position = WormPositionManager(new_acquisition=False, id = self.id_worm_seen)
+        # move to the 1st worm
+        x_microscope, y_microscope = self.CORE.getXYPosition()
+        if [int(x_microscope), int(y_microscope)] not in self.worms_position.get_all_worm_microscope_position():
+            x_microscope_1st_worm, y_microscope_1st_worm = self.worms_position.get_worm_microscope_position(self.worms_position.get_id_worm_seen())
+            time.sleep(0.01)
+            self.CORE.setXYPosition(self.CORE.getXYStageDevice(), x_microscope_1st_worm, y_microscope_1st_worm)
             
         # Disable some paramaters buttons   
         self.update_parameter_widgets_state(disabled_widgets=["scan_shape", "scan_objective"]) 
@@ -3208,7 +3227,7 @@ class WormAnalysisApp:
 
         # 3. Text Container
         text_3_analysis_container = tk.Frame(right_map_analysis_container, bg=self.colors.theme["primary_background"])
-        text_3_analysis_container.grid(row=2, column=1, sticky="ew", pady=0, ipady=0)  # Remove all padding
+        text_3_analysis_container.grid(row=2, column=1, sticky="ew", pady=0, ipady=0) 
         self.id_worm_seen_label = tk.Label(
             text_3_analysis_container,
             text=f"{self.id_worm_seen+1}/{self.worms_position.get_number_of_worms()}",
@@ -3224,7 +3243,7 @@ class WormAnalysisApp:
 
         # 4. Two Buttons Side by Side - Use same row to eliminate gap
         bottom_buttons_4_analysis_container = tk.Frame(text_3_analysis_container, bg=self.colors.theme["primary_background"])
-        bottom_buttons_4_analysis_container.pack(side=tk.BOTTOM, pady=(5, 0))  # Remove fill=tk.X to center content
+        bottom_buttons_4_analysis_container.pack(side=tk.BOTTOM, pady=(5, 0))  
 
         # Create a single container for both buttons without expansion
         buttons_wrapper = tk.Frame(bottom_buttons_4_analysis_container, bg=self.colors.theme["primary_background"])
@@ -3232,7 +3251,7 @@ class WormAnalysisApp:
 
         # 1st - next worm
         sub1_4_analysis_container = tk.Frame(buttons_wrapper, bg=self.colors.theme["primary_background"])
-        sub1_4_analysis_container.pack(side=tk.LEFT, padx=(0, 1))  # Remove expand=True and fill=tk.X
+        sub1_4_analysis_container.pack(side=tk.LEFT, padx=(0, 1))  
         self.create_rounded_button(
             parent=sub1_4_analysis_container,
             text="",
@@ -3613,18 +3632,6 @@ class WormAnalysisApp:
         # Tooltip on hover
         Tooltip(info_binning_size_label, "Enter the size of each binning you have on your microscope.", title="Info", theme="info", posx=70, posy=-70)
 
-
-        
-
-        # Trigger resizing after layout completes with error handling
-        try:
-            if hasattr(self, 'main_content') and self.main_content.winfo_exists():
-                after_id = self.main_content.after(100, self.resize_scan_content_area)
-                if not hasattr(self, '_after_ids'):
-                    self._after_ids = []
-                self._after_ids.append(after_id)
-        except:
-            pass
         
     
     
