@@ -40,6 +40,7 @@ DEFAULT_CV_FOLDS = 5  # Number of cross-validation folds
 
 # Microscope parameters
 EXPOSURE_TIME_LIVE = 50  # Default exposure time for live mode in milliseconds
+NAME_CAMERA = "Camera-1" # TODO : name of the camera
 
 
 def set_up_environment():
@@ -91,7 +92,7 @@ def clear_scan_directory():
             if file.is_file():
                 file.unlink()
     
-def loadCore():
+def loadCore(verbose = False):
     """
     Initialize and configure the Micro-Manager core interface.
 
@@ -108,11 +109,19 @@ def loadCore():
     DIRECTORY = "C:/Program Files/Micro-Manager-2.0gamma" # Select the folder which contains Micro-Manager. # TODO
     CONFIG = "BESSEREAU_Lab.cfg" # Name of the config file (has to be in the Micro-Manager root folder) # TODO
     os.chdir(os.path.dirname(os.path.abspath(__file__))) # Set the current working directory
+    config = load_config_file()
+    
     mmc = pymmcore.CMMCore()
     mmc.setDeviceAdapterSearchPaths([DIRECTORY])
     mmc.loadSystemConfiguration(os.path.join(DIRECTORY, CONFIG))
     mmc.setExposure(EXPOSURE_TIME_LIVE)
     mmc.setAutoShutter(False)
+    mmc.setProperty(NAME_CAMERA, "Binning",str(config.get("binning")))
+    mmc.setProperty("Camera-1","PixelType","32bit")
+
+    if verbose: 
+        print(mmc.getDevicePropertyNames("Camera-1"))
+
     return mmc
 
 def load_config_file():

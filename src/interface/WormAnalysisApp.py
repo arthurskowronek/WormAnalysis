@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from PIL import Image, ImageTk, ImageColor
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-from config import RESSOURCES_DIR, DATA_DIR, MODELS_DIR, USER_DIR, LOG_DIR, PARAMETERS_FILE, DATE_FORMAT, EXPOSURE_TIME_LIVE, load_config_file, log_error, increment_user_statistics, update_user_statistics, clear_scan_directory
+from config import RESSOURCES_DIR, DATA_DIR, MODELS_DIR, USER_DIR, LOG_DIR, PARAMETERS_FILE, DATE_FORMAT, EXPOSURE_TIME_LIVE, NAME_CAMERA, load_config_file, log_error, increment_user_statistics, update_user_statistics, clear_scan_directory
 
 from src.interface.Tooltip import Tooltip
 from src.system.ScanSlice import ScanSlice
@@ -183,7 +183,7 @@ class WormAnalysisApp:
             - shape, exposure_time, binning, shutter, dual_view,
             display_mode, scan_objective, fluo_objective, user_directory.
         """
-        self.shape = tk.StringVar(value=self.loaded_params.get("shape", "square"))
+        self.shape = tk.StringVar(value=self.loaded_params.get("shape", "Square"))
         self.shape.trace_add("write", lambda *args: self.resize_scan_content_area())
         self.shape.trace_add("write", lambda *args: self.save_parameters())
 
@@ -247,15 +247,6 @@ class WormAnalysisApp:
         
         self.microscope_objective_size_6 = tk.StringVar(value=self.loaded_params.get("microscope_objective_size_6"))
         self.microscope_objective_size_6.trace_add("write", lambda *args: self.save_parameters())
-        
-        self.microscope_binning_size_1 = tk.StringVar(value=self.loaded_params.get("microscope_binning_size_1"))
-        self.microscope_binning_size_1.trace_add("write", lambda *args: self.save_parameters())
-        
-        self.microscope_binning_size_2 = tk.StringVar(value=self.loaded_params.get("microscope_binning_size_2"))
-        self.microscope_binning_size_2.trace_add("write", lambda *args: self.save_parameters())
-        
-        self.microscope_binning_size_3 = tk.StringVar(value=self.loaded_params.get("microscope_binning_size_3"))
-        self.microscope_binning_size_3.trace_add("write", lambda *args: self.save_parameters())
                   
     def save_parameters(self):
         """
@@ -282,10 +273,7 @@ class WormAnalysisApp:
             "microscope_objective_size_3": self.microscope_objective_size_3.get(),
             "microscope_objective_size_4": self.microscope_objective_size_4.get(),
             "microscope_objective_size_5": self.microscope_objective_size_5.get(),
-            "microscope_objective_size_6": self.microscope_objective_size_6.get(),
-            "microscope_binning_size_1": self.microscope_binning_size_1.get(),
-            "microscope_binning_size_2": self.microscope_binning_size_2.get(),
-            "microscope_binning_size_3": self.microscope_binning_size_3.get()
+            "microscope_objective_size_6": self.microscope_objective_size_6.get()
         }
         
         # Read and parse the existing YAML file
@@ -302,6 +290,12 @@ class WormAnalysisApp:
         with open(self.PARAMS_FILE, "w") as f:
             yaml.dump(config, f, default_flow_style=False, sort_keys=False)
         
+    def set_binning(self):
+        """
+        Set the binning parameter
+        """
+        self.CORE.setProperty(NAME_CAMERA, "Binning", str(self.loaded_params.get("binning"))) 
+
     def update_colors(self):
         """
         Updates the application's color theme based on the current dark mode setting.
@@ -847,11 +841,7 @@ class WormAnalysisApp:
         )
         
         # Binning
-        list_binning = [
-            str(self.loaded_params.get(f"microscope_binning_size_{i}"))
-            for i in range(1, 4)
-            if str(self.loaded_params.get(f"microscope_binning_size_{i}")) != ""
-        ]
+        list_binning = list(self.CORE.getAllowedPropertyValues("Camera-1","Binning"))
         bg = "parameters_button_background" if "binning" in self.enable_parameters_buttons else "parameters_button_disabled_background"
         tk.Label(self.params_content_frame, text="Binning", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
         _, self.binning_dropdown = self.create_rounded_dropdown(
@@ -868,11 +858,11 @@ class WormAnalysisApp:
             self.dual_view_toggle = None
 
         # Display mode
-        bg = "parameters_button_background" if "display_mode" in self.enable_parameters_buttons else "parameters_button_disabled_background"
+        """bg = "parameters_button_background" if "display_mode" in self.enable_parameters_buttons else "parameters_button_disabled_background"
         tk.Label(self.params_content_frame, text="Display mode", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
         _, self.display_mode_dropdown = self.create_rounded_dropdown(
             self.params_content_frame, ["Grayscale"], self.display_mode, bg
-        )
+        )"""
         
         # Scan Objective
         list_scan_objective = [
@@ -897,7 +887,7 @@ class WormAnalysisApp:
         bg = "parameters_button_background" if "scan_shape" in self.enable_parameters_buttons else "parameters_button_disabled_background"
         tk.Label(self.params_content_frame, text="Scan shape", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
         _, self.scan_shape_dropdown = self.create_rounded_dropdown(
-            self.params_content_frame, ["square", "rectangle"], self.shape, bg
+            self.params_content_frame, ["Square", "Rectangle"], self.shape, bg
         )
     
     # --- Button ---
@@ -1367,7 +1357,7 @@ class WormAnalysisApp:
             "binning": self.binning_dropdown,
             #"shutter": self.shutter_toggle,
             "dual_view": self.dual_view_toggle,
-            "display_mode": self.display_mode_dropdown,
+            #"display_mode": self.display_mode_dropdown,
             "scan_objective": self.scan_objective_dropdown,
             #"fluo_objective": self.fluo_objective_dropdown,
             "scan_shape": self.scan_shape_dropdown
@@ -1490,10 +1480,10 @@ class WormAnalysisApp:
             container_width = middle_container.winfo_width()
             container_height = middle_container.winfo_height()
 
-            if self.shape.get() == 'square':
+            if self.shape.get() == 'Square':
                 side = min(container_width, container_height)
                 width = height = side
-            elif self.shape.get() == 'rectangle':
+            elif self.shape.get() == 'Rectangle':
                 x_length = int(self.loaded_params.get("scan_height_length"))
                 y_length = int(self.loaded_params.get("scan_width_length"))
                 proportion = y_length/x_length
@@ -1788,7 +1778,7 @@ class WormAnalysisApp:
                         scan_image_position_height = i-1
                         break
                     
-                if self.shape.get() == "square":
+                if self.shape.get() == "Square":
                     filename_scan_image_associate = f"SlideScan_R{int(self.scan_width.get())-scan_image_position_width-1}_C{scan_image_position_height}_"
                 else:
                     filename_scan_image_associate = f"SlideScan_R{int(self.scan_height.get()) - scan_image_position_height - 1}_C{int(self.scan_width.get())-scan_image_position_width-1}_"
@@ -2105,7 +2095,8 @@ class WormAnalysisApp:
                 df_combined_results.to_csv(csv_path, index=False, mode='w')
                 
             else:
-                img = self.find_worm_segmentation(self.live_img)
+                snap_img = self.snap_image()
+                img = self.find_worm_segmentation(snap_img)
                 cv2.imwrite(str(classified_path), img)
         except Exception as e:
             self.context_error = log_error(e, f"Classify as WT failed")
@@ -2163,7 +2154,8 @@ class WormAnalysisApp:
                 df_combined_results.to_csv(csv_path, index=False, mode='w')
                 
             else:
-                img = self.find_worm_segmentation(self.live_img)
+                snap_img = self.snap_image()
+                img = self.find_worm_segmentation(snap_img)
                 cv2.imwrite(str(classified_path), img)
         except Exception as e:
             self.context_error = log_error(e, f"Classify as mutant failed")
@@ -2260,44 +2252,48 @@ class WormAnalysisApp:
         mutant). The prediction result is saved and displayed to the user.
         If the model fails, a default prediction is used.
         """
-        if self.live_image == False: # we have to be in the snap mode to analyse the worm
-            # Step 0: Tell the user the analysis is starting
-            self.prediction_label_2.configure(text=f"with a probability of : computing...")
+        # Step 0: Tell the user the analysis is starting
+        self.prediction_label_2.configure(text=f"with a probability of : computing...")
+        self.root.update_idletasks()
+        
+        # Step 1: Segment the image and save it
+        img = self.snap_image()
+        img = self.find_worm_segmentation(img) 
+        id = self.worms_position.get_id_worm_seen()
+        unclassified_path = Path(DATA_DIR) / "Unclassified" / f"{id}.tif"
+        imwrite(str(unclassified_path), img)
+        self.prediction_label_2.configure(text=f"with a probability of : segmenting...")
+        self.root.update_idletasks()
+
+        # Step 2: Try to predict with model, fallback to random
+        try:
+            dataset = Dataset_Manager()
+            dataset.load_images()
+            dataset.set_features()
+            self.prediction_label_2.configure(text=f"with a probability of : set features...")
+            self.root.update_idletasks()
+            model = dataset.get_model()
+            pred = model.predict(dataset.get_features_selected()[0])[0]
+            print(f"Model-derived prediction : {pred:.2f}")
             
-            # Step 1: Segment the image and save it
-            img = self.find_worm_segmentation(self.snap_img) 
-            id = self.worms_position.get_id_worm_seen()
-            unclassified_path = Path(DATA_DIR) / "Unclassified" / f"{id}.tif"
-            imwrite(str(unclassified_path), img)
-            self.prediction_label_2.configure(text=f"with a probability of : segmenting...")
-            
-            # Step 2: Try to predict with model, fallback to random
-            try:
-                dataset = Dataset_Manager()
-                dataset.load_images()
-                dataset.set_features()
-                self.prediction_label_2.configure(text=f"with a probability of : set features...")
-                model = dataset.get_model()
-                pred = model.predict(dataset.get_features_selected()[0])[0]
-                print(f"Model-derived prediction : {pred:.2f}")
-                
-                big_dataset = Dataset_Manager()
-                big_dataset.load_images(compute=False, name_dataset="big_dataset")
-                big_dataset.merge_with(dataset)
-            except Exception as e:
-                self.context_error = log_error(e, f"Prediction failed")
-                pred = 0.5
-                time.sleep(2)
-            
-            # Step 3: Save image in the corresponding directory 
-            directory = Path(DATA_DIR) / ("Mutant_prediction" if pred > 0.5 else "WT_prediction")
-            classified_path = directory / f"{id}.tif" 
-            shutil.move(str(unclassified_path), str(classified_path))
-            
-            # Step 4: Update prediction in worm database
-            self.worms_position.update_worm_prediction(id, pred)
-            self.prediction = int(100*pred)
-            self.prediction_label_2.configure(text=f"with a probability of {self.prediction}%")
+            big_dataset = Dataset_Manager()
+            big_dataset.load_images(compute=False, name_dataset="big_dataset")
+            big_dataset.merge_with(dataset)
+        except Exception as e:
+            self.context_error = log_error(e, f"Prediction failed")
+            pred = 0.5
+            time.sleep(2)
+        
+        # Step 3: Save image in the corresponding directory 
+        directory = Path(DATA_DIR) / ("Mutant_prediction" if pred > 0.5 else "WT_prediction")
+        classified_path = directory / f"{id}.tif" 
+        shutil.move(str(unclassified_path), str(classified_path))
+        
+        # Step 4: Update prediction in worm database
+        self.worms_position.update_worm_prediction(id, pred)
+        self.prediction = int(100*pred)
+        self.prediction_label_2.configure(text=f"with a probability of {self.prediction}%")
+        self.root.update_idletasks()
     
     def start_live(self):
         """
@@ -2317,6 +2313,20 @@ class WormAnalysisApp:
         
     def snap_image(self):
         """
+        Snaps a single image from the microscope
+        """
+        try:
+            self.CORE.setExposure(int(self.exposure_time.get()))
+            self.CORE.snapImage()
+            img = self.CORE.getImage()
+            self.CORE.setExposure(EXPOSURE_TIME_LIVE)
+            return img
+        except Exception as e:
+            self.context_error = log_error(e, f"Snap image failed")
+            return None
+
+    def snap_image_mode(self):
+        """
         Snaps a single image from the microscope and displays it.
 
         This function stops the live image loop, captures a single image with a
@@ -2329,15 +2339,7 @@ class WormAnalysisApp:
             self.root.after_cancel(self._live_after_id)
             self._live_after_id = None
 
-        try:
-            self.CORE.setExposure(int(self.exposure_time.get()))
-            self.CORE.snapImage()
-            self.snap_img = self.CORE.getImage()
-            self.CORE.setExposure(EXPOSURE_TIME_LIVE)
-        except Exception as e:
-            self.context_error = log_error(e, f"Snap image failed")
-            file_path = Path(DATA_DIR) / "default_img.jpg" 
-            self.snap_img = cv2.imread(str(file_path), cv2.IMREAD_GRAYSCALE)
+        self.snap_img = self.snap_image()
 
         # Now show the page, which creates the display widgets
         self.show_load_position_page()
@@ -2507,6 +2509,10 @@ class WormAnalysisApp:
                     user_directory.mkdir(parents=True, exist_ok=True)
                 imwrite(str(path), self.snap_img) 
                 
+                self.root.after(2000, lambda: self.save_button_label_ref.configure(text=""))
+            else:
+                self.save_button_label_ref.configure(text="Only in snap mode")
+                self.root.update_idletasks()
                 self.root.after(2000, lambda: self.save_button_label_ref.configure(text=""))
         except Exception as e:
             self.context_error = log_error(e, f"Save snap image failed")
@@ -3011,7 +3017,7 @@ class WormAnalysisApp:
             text_color=self.colors.theme["primary_text"],
             hover_color=self.colors.theme["secondary_background"],
             font=(self.font, 16),
-            width_pixels=200,
+            width_pixels=180,
             height_pixels=60,
             corner_radius=20,
             side=tk.TOP,
@@ -3040,12 +3046,12 @@ class WormAnalysisApp:
             text="",
             icon=icon_snap_button,
             icon_hover=self.snap_icon_hover,
-            command=lambda: self.snap_image(),
+            command=lambda: self.snap_image_mode(),
             bg_color=bg_snap_button,
             text_color=self.colors.theme["primary_text"],
             hover_color=self.colors.theme["secondary_background"],
             font=(self.font, 16),
-            width_pixels=200,
+            width_pixels=180,
             height_pixels=60,
             corner_radius=20,
             side=tk.TOP,
@@ -3065,7 +3071,7 @@ class WormAnalysisApp:
         
         # --- Third button + label ---
         button3_analysis_container = tk.Frame(button_label_row_analysis_container, bg=self.colors.theme["primary_background"])
-        button3_analysis_container.pack(side=tk.LEFT, padx=10)
+        button3_analysis_container.pack(side=tk.LEFT, padx=(20,10))
 
         self.save_snap_button_ref = self.create_rounded_button(
             parent=button3_analysis_container,
@@ -3075,7 +3081,7 @@ class WormAnalysisApp:
             text_color=self.colors.theme["tertiary_text"],
             hover_color=self.colors.theme["secondary_background"],
             font=(self.font, 10),
-            width_pixels=100,
+            width_pixels=120,
             height_pixels=30,
             corner_radius=20,
             side=tk.TOP,
@@ -3197,7 +3203,8 @@ class WormAnalysisApp:
         tk.Label(sub1_2_analysis_container, text="Wild-Type", bg=self.colors.theme["primary_background"],
                 fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack()
         self.proportion_wt_label_ref = tk.Label(sub1_2_analysis_container, text=f"{int(100*(1-self.worms_position.get_mutant_proportion()))}%", bg=self.colors.theme["primary_background"],
-                fg=self.colors.theme["secondary_text"], font=(self.font, 7)).pack()
+                fg=self.colors.theme["secondary_text"], font=(self.font, 7))
+        self.proportion_wt_label_ref.pack()
         
         # 2nd - classify as mutant
         sub2_2_analysis_container = tk.Frame(mid_buttons_2_analysis_container, bg=self.colors.theme["primary_background"])
@@ -3226,7 +3233,8 @@ class WormAnalysisApp:
         tk.Label(sub2_2_analysis_container, text="Mutation", bg=self.colors.theme["primary_background"],
                 fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack()
         self.proportion_mutant_label_ref = tk.Label(sub2_2_analysis_container, text=f"{int(100*(self.worms_position.get_mutant_proportion()))}%", bg=self.colors.theme["primary_background"],
-                fg=self.colors.theme["secondary_text"], font=(self.font, 7)).pack()
+                fg=self.colors.theme["secondary_text"], font=(self.font, 7))
+        self.proportion_mutant_label_ref.pack()
 
         # 3. Text Container
         text_3_analysis_container = tk.Frame(right_map_analysis_container, bg=self.colors.theme["primary_background"])
@@ -3400,7 +3408,7 @@ class WormAnalysisApp:
 
         # section with buttons dual view
         buttons_dual_view_frame = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
-        buttons_dual_view_frame.pack(fill=tk.BOTH, expand=True, pady=(10,10))
+        buttons_dual_view_frame.pack(fill=tk.BOTH, expand=True, pady=(50,10))
 
         # Machine_has_dual_view button
         self.Machine_has_dual_view_toggle = self.create_custom_toggle(buttons_dual_view_frame, "", self.machine_has_dual_view, size="big", bg="primary_background")
@@ -3471,7 +3479,7 @@ class WormAnalysisApp:
         info_scan_label.pack(side=tk.LEFT, padx=(5, 0))  # small gap between text and icon
 
         # Tooltip on hover
-        Tooltip(info_scan_label, "When you let the microscope scan the entire lame, it will use the above value to decide the width and height of the scan (in the microscope unit system). When the 'square' option is used, its edged length are : width. When the 'rectangle' option is used, the 2 values set the rectangle shape.", title="Info", theme="info", posx=70, posy=-70)
+        Tooltip(info_scan_label, "When you let the microscope scan the entire lame, it will use the above value to decide the width and height of the scan (in the microscope unit system). When the 'Square' option is used, its edged length are : width. When the 'Rectangle' option is used, the 2 values set the rectangle shape.", title="Info", theme="info", posx=70, posy=-70)
 
 
         # -------------------------------------------------------------------------------------------------- #
@@ -3517,7 +3525,7 @@ class WormAnalysisApp:
         # -------------------------------------------------------------------------------------------------- #
         # section with button size of the objective on the microscope
         buttons_objective_size = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
-        buttons_objective_size.pack(fill=tk.BOTH, expand=True, pady=(10,10))
+        buttons_objective_size.pack(fill=tk.BOTH, expand=True, pady=(10,50))
 
         # Create an inner frame to hold the canvas
         input_container_size_objective_frame = tk.Frame(buttons_objective_size, bg=self.colors.theme["primary_background"])
@@ -3582,59 +3590,6 @@ class WormAnalysisApp:
 
         # Tooltip on hover
         Tooltip(info_objective_size_label, "Enter the size of the magnification of each objective you have on your microscope.", title="Info", theme="info", posx=70, posy=-70)
-
-
-        # -------------------------------------------------------------------------------------------------- #
-        # section with button size of the binning on the microscope
-        buttons_binning_size = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
-        buttons_binning_size.pack(fill=tk.BOTH, expand=True, pady=(10,10))
-
-        # Create an inner frame to hold the canvas
-        input_container_size_binning_frame = tk.Frame(buttons_binning_size, bg=self.colors.theme["primary_background"])
-        # Center this inner frame horizontally
-        input_container_size_binning_frame.pack(pady=0)
-
-        # Create the first canvas (size_scan_height) and pack it to the left
-        self.size_binning_microscope_canva = self.create_rounded_input(
-            input_container_size_binning_frame, self.microscope_binning_size_1, bg="machine_config_button", width=80
-        )
-        self.size_binning_microscope_canva.pack(side=tk.LEFT, padx=5) 
-        
-        # Create the 2nd canvas (size_scan_height) and pack it to the left
-        self.size_binning_microscope_canva = self.create_rounded_input(
-            input_container_size_binning_frame, self.microscope_binning_size_2, bg="machine_config_button", width=80
-        )
-        self.size_binning_microscope_canva.pack(side=tk.LEFT, padx=5) 
-        
-        # Create the 3th canvas (size_scan_height) and pack it to the left
-        self.size_binning_microscope_canva = self.create_rounded_input(
-            input_container_size_binning_frame, self.microscope_binning_size_3, bg="machine_config_button", width=80
-        )
-        self.size_binning_microscope_canva.pack(side=tk.LEFT, padx=5) 
-
-
-        # Container to hold label + info icon
-        microscope_binning_size_label_frame = tk.Frame(buttons_binning_size, bg=self.colors.theme["primary_background"])
-        microscope_binning_size_label_frame.pack()
-
-        # Text label
-        title_binning_size = tk.Label(
-            microscope_binning_size_label_frame, text="Manage the size of the binnings of your microscope",
-            bg=self.colors.theme["primary_background"], fg=self.colors.theme["tertiary_text"],
-            font=(self.font, 10)
-        )
-        title_binning_size.pack(side=tk.LEFT)
-
-        # Info icon
-        info_binning_size_label = tk.Label(
-            microscope_binning_size_label_frame, image=self.info_icon,
-            bg=self.colors.theme["primary_background"]
-        )
-        info_binning_size_label.pack(side=tk.LEFT, padx=(5, 0))  # small gap between text and icon
-
-        # Tooltip on hover
-        Tooltip(info_binning_size_label, "Enter the size of each binning you have on your microscope.", title="Info", theme="info", posx=70, posy=-70)
-
         
     
     

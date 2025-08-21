@@ -18,7 +18,7 @@ class ScanSlice:
     worm detection. It handles the stitching of individual image tiles into a
     final, complete slice.
     """
-    def __init__(self, mmc, grossissement, dual_view=False, scan_shape="square", overlap_percent=10):
+    def __init__(self, mmc, grossissement, dual_view=False, scan_shape="Square", overlap_percent=10):
         """
         Initializes the ScanSlice object.
         
@@ -26,8 +26,8 @@ class ScanSlice:
             mmc: The Micro-Manager core object for microscope control.
             grossissement (str): The magnification level (e.g., "10x").
             dual_view (bool): True if using a dual-view camera setup, False otherwise.
-            scan_shape (str): The shape of the scanning area ("square" or "rectangle").
-                              Defaults to "square".
+            scan_shape (str): The shape of the scanning area ("Square" or "Rectangle").
+                              Defaults to "Square".
             overlap_percent (int): The percentage of overlap between adjacent images
                                    to ensure complete coverage and aid in stitching.
                                    Defaults to 10.
@@ -72,7 +72,7 @@ class ScanSlice:
         
         # Calculate scan area
         config = load_config_file()
-        end_x = self.start_x + (int(config.get("scan_height_length")) if self.scan_shape == "square" else int(config.get("scan_width_length")))
+        end_x = self.start_x + (int(config.get("scan_height_length")) if self.scan_shape == "Square" else int(config.get("scan_width_length")))
         end_y = self.start_y + int(config.get("scan_height_length"))
         
         # Compute the scan dimensions
@@ -490,7 +490,7 @@ class ScanSlice:
         if pil_image.mode != "L":
             pil_image = pil_image.convert("L")
         
-        if self.scan_shape == "square":
+        if self.scan_shape == "Square":
             pil_image = pil_image.resize((1424, 1424), Image.LANCZOS)
         else:
             pil_image = pil_image.resize((1064, 1748), Image.LANCZOS)

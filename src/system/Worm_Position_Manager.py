@@ -418,7 +418,7 @@ class WormPositionManager:
 
         config = load_config_file()
         shape = config.get("shape")
-        if shape == "square":
+        if shape == "Square":
             # 0,0 is in the top right corner, so we need to change the origin
             x_prop = 1 - y
             y_prop = x
@@ -447,7 +447,7 @@ class WormPositionManager:
 
         config = load_config_file()
         shape = config.get("shape")
-        if shape == "square":
+        if shape == "Square":
             x = y_prop
             y = 1 - x_prop
         else:
