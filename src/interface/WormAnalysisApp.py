@@ -1498,7 +1498,7 @@ class WormAnalysisApp:
                 y_length = int(self.loaded_params.get("scan_width_length"))
                 proportion = y_length/x_length
                 height = min(container_height, container_width / proportion) 
-                width = proportion * height
+                width = proportion * height # Here is the only way of modifying the size of the result scan container
             else:
                 height = min(container_height, container_width)
                 width = height
