@@ -8,7 +8,7 @@ from config import set_up_environment, loadCore, start_new_session_get_statistic
 
 from config import log_error
 
-# Commande pour créer l'executable: pyinstaller --onefile --icon=icon_worm_detection_analysis.ico --name=Worm_detection main.py
+# Commande pour créer l'executable: pyinstaller --onefile --icon=icon_desktop.ico --name=Worm_detection --add-data "C:/Program Files/Micro-Manager-2.0gamma;Micro-Manager-2.0gamma" main.py
 
 def main():
     # Setup environment
