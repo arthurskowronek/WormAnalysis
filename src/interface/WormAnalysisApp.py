@@ -1494,8 +1494,11 @@ class WormAnalysisApp:
                 side = min(container_width, container_height)
                 width = height = side
             elif self.shape.get() == 'rectangle':
-                height = min(container_height, container_width / 2)
-                width = 2 * height
+                x_length = int(self.loaded_params.get("scan_height_length"))
+                y_length = int(self.loaded_params.get("scan_width_length"))
+                proportion = y_length/x_length
+                height = min(container_height, container_width / proportion) 
+                width = proportion * height
             else:
                 height = min(container_height, container_width)
                 width = height

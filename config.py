@@ -105,8 +105,8 @@ def loadCore():
     Raises:
         Any exception raised by pymmcore methods (e.g., loading configuration or setting devices).
     """
-    DIRECTORY = "C:/Program Files/Micro-Manager-2.0gamma" # Select the folder which contains Micro-Manager.
-    CONFIG = "BESSEREAU_Lab.cfg" # Name of the config file (has to be in the Micro-Manager root folder)
+    DIRECTORY = "C:/Program Files/Micro-Manager-2.0gamma" # Select the folder which contains Micro-Manager. # TODO
+    CONFIG = "BESSEREAU_Lab.cfg" # Name of the config file (has to be in the Micro-Manager root folder) # TODO
     os.chdir(os.path.dirname(os.path.abspath(__file__))) # Set the current working directory
     mmc = pymmcore.CMMCore()
     mmc.setDeviceAdapterSearchPaths([DIRECTORY])
