@@ -75,13 +75,6 @@ class ScanSlice:
         end_x = self.start_x + (int(config.get("scan_height_length")) if self.scan_shape == "square" else int(config.get("scan_width_length")))
         end_y = self.start_y + int(config.get("scan_height_length"))
         
-        # Get the actual corner positions (it was the center before)
-        start_corner_x = self.start_x - self.step_size_x // 2
-        start_corner_y = self.start_y - self.step_size_y // 2
-        end_corner_x = end_x + self.step_size_x // 2
-        end_corner_y = end_y + self.step_size_y // 2
-        save_corner_positions_into_yaml_config_file(start_corner_x, start_corner_y, end_corner_x, end_corner_y)
-        
         # Compute the scan dimensions
         self.scan_width = int((end_x - self.start_x) / self.actual_step_x)
         self.scan_height = int((end_y - self.start_y) / self.actual_step_y)
@@ -96,7 +89,7 @@ class ScanSlice:
         self.final_end_x = 0
         self.final_end_y = 0
     
-    def scan(self):
+    def scan(self, verbose=False):
         """
         Executes the main scanning loop.
 
@@ -139,14 +132,21 @@ class ScanSlice:
                 # Record position info
                 self.positions_info.append([self.file_count, pos_x, pos_y, x_idx, y_idx])
                 self.file_count += 1
-                #print(f"Image {self.file_count-1}/{self.scan_width*self.scan_height} captured at X={pos_x:.2f}, Y={pos_y:.2f}")
+                if verbose: print(f"Image {self.file_count-1}/{self.scan_width*self.scan_height} captured at X={pos_x:.2f}, Y={pos_y:.2f}")
+        
+        # Return to starting position
+        self.mmc.setXYPosition(self.mmc.getXYStageDevice(), self.start_x, self.start_y)
         
         # Process final image
         if self.image is not None:
             imwrite(self.scan_modified_dir / self.file_name, self.image)
         
-        # Return to starting position
-        self.mmc.setXYPosition(self.mmc.getXYStageDevice(), self.start_x, self.start_y)
+        # Get the actual corner positions (it was the center before)
+        start_corner_x = self.start_x - self.actual_step_x // 2
+        start_corner_y = self.start_y - self.actual_step_y // 2
+        end_corner_x = self.final_end_x + self.actual_step_x // 2
+        end_corner_y = self.final_end_y + self.actual_step_y // 2
+        save_corner_positions_into_yaml_config_file(start_corner_x, start_corner_y, end_corner_x, end_corner_y)
         
         return self.get_worms_position()
 
@@ -412,7 +412,7 @@ class ScanSlice:
         return inter_area / union_area
         
     # Others methods
-    def reconstruct_slice(self):
+    def reconstruct_slice(self, verbose=False):
         """
         Reconstructs a single, large image from the individual scanned tiles.
 
@@ -461,7 +461,7 @@ class ScanSlice:
         i = 0
         for fname, x_idx, y_idx in positions:
             i += 1
-            #print(f"Processing tile {i}")
+            if verbose: print(f"Processing tile {i}")
             img_full = imread(self.scan_dir / fname)
             
             # 1. Crop to right half if dual view
@@ -499,4 +499,4 @@ class ScanSlice:
         pil_image = pil_image.convert('RGB')
         
         pil_image.save(output_path, 'JPEG', quality=95)
-        #print(f"✅ Final stitched image saved to: {output_path}")
+        if verbose: print(f"✅ Final stitched image saved to: {output_path}")

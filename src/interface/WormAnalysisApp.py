@@ -1615,7 +1615,7 @@ class WormAnalysisApp:
             clear_scan_directory()
             scanner = ScanSlice(self.CORE, self.scan_objective, self.dual_view, self.shape)
         except Exception as e:
-            self.context_error = log_error(e, f"Initialize scan failed")
+            self.context_error = log_error(e, "Initialize scan failed")
 
         # Update: scanning
         self.scan_status_label.config(text="      Scanning in progress...      ")
@@ -1628,7 +1628,7 @@ class WormAnalysisApp:
             self.scan_width.set(scanner.scan_width)
             self.scan_height.set(scanner.scan_height)
         except Exception as e:
-            self.context_error = log_error(e, f"Launch scan failed")
+            self.context_error = log_error(e, "Launch scan failed")
 
         # Update: saving worm positions
         self.scan_status_label.config(text="Saving worm positions...")
@@ -1637,7 +1637,7 @@ class WormAnalysisApp:
             self.worms_position = WormPositionManager(table_worm_position=worms_microscope_position)
             update_user_statistics('nb_vers_detected', self.worms_position.get_number_of_worms())
         except Exception as e:
-            self.context_error = log_error(e, f"Saving worm position failed")
+            self.context_error = log_error(e, "Saving worm position failed")
 
         # Update: reconstructing image
         self.scan_status_label.config(text="Reconstructing scan result...")
@@ -1645,7 +1645,7 @@ class WormAnalysisApp:
         try:
             scanner.reconstruct_slice()
         except Exception as e:
-            self.context_error = log_error(e, f"Reconstruct slice failed")
+            self.context_error = log_error(e, "Reconstruct slice failed")
 
         # Update: switching page
         self.scan_status_label.config(text="Scan complete. Displaying results...")
@@ -3449,7 +3449,7 @@ class WormAnalysisApp:
         info_scan_label.pack(side=tk.LEFT, padx=(5, 0))  # small gap between text and icon
 
         # Tooltip on hover
-        Tooltip(info_scan_label, "When you let the microscope scan the entire lame, it will use the above value to decide the width and height of the scan (in the microscope unit system).", title="Info", theme="info", posx=70, posy=-70)
+        Tooltip(info_scan_label, "When you let the microscope scan the entire lame, it will use the above value to decide the width and height of the scan (in the microscope unit system). When the 'square' option is used, its edged length are : width. When the 'rectangle' option is used, the 2 values set the rectangle shape.", title="Info", theme="info", posx=70, posy=-70)
 
 
         # -------------------------------------------------------------------------------------------------- #
