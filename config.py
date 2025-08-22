@@ -2,6 +2,7 @@
 Global configuration file for the project.
 """
 import os
+import sys
 import csv
 import yaml
 import datetime
@@ -10,7 +11,10 @@ import traceback
 from pathlib import Path
 
 # Get the project root (assuming we run from the project root)
-PROJECT_ROOT = Path.cwd()
+if getattr(sys, 'frozen', False):
+    PROJECT_ROOT = Path(sys._MEIPASS)
+else:
+    PROJECT_ROOT = Path(__file__).parent.resolve()
 
 # Define all project directories
 DATA_DIR = PROJECT_ROOT / "data"
@@ -56,7 +60,7 @@ def set_up_environment():
     paths and avoid errors if they already exist.
     """
     # Create root-level directories
-    for directory in [DATA_DIR, MODELS_DIR, RESSOURCES_DIR, SRC_DIR, USER_DIR]:
+    for directory in [DATA_DIR, MODELS_DIR, RESSOURCES_DIR, SRC_DIR, USER_DIR, LOG_DIR]:
         directory.mkdir(parents=True, exist_ok=True)
 
     # List of subdirectories to create in DATA_DIR

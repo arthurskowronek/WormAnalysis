@@ -633,7 +633,7 @@ class WormAnalysisApp:
         border_frame.pack_propagate(False)
         
         # Title
-        title_label = tk.Label(top_frame, text="Worm Analysis", bg=self.colors.theme["primary_background"], fg=self.colors.theme["primary_text"],
+        title_label = tk.Label(top_frame, text="Worm Analysis - If you have any thoughts or suggestions about the app, please email me ! (arthur.skowronek@etu.univ-lyon1.fr)", bg=self.colors.theme["primary_background"], fg=self.colors.theme["primary_text"],
                               font=(self.font, 13, 'bold'))
         title_label.pack(side=tk.LEFT, padx=80)
         
@@ -2252,48 +2252,49 @@ class WormAnalysisApp:
         mutant). The prediction result is saved and displayed to the user.
         If the model fails, a default prediction is used.
         """
-        # Step 0: Tell the user the analysis is starting
-        self.prediction_label_2.configure(text=f"with a probability of : computing...")
-        self.root.update_idletasks()
-        
-        # Step 1: Segment the image and save it
-        img = self.snap_image()
-        img = self.find_worm_segmentation(img) 
-        id = self.worms_position.get_id_worm_seen()
-        unclassified_path = Path(DATA_DIR) / "Unclassified" / f"{id}.tif"
-        imwrite(str(unclassified_path), img)
-        self.prediction_label_2.configure(text=f"with a probability of : segmenting...")
-        self.root.update_idletasks()
-
-        # Step 2: Try to predict with model, fallback to random
-        try:
-            dataset = Dataset_Manager()
-            dataset.load_images()
-            dataset.set_features()
-            self.prediction_label_2.configure(text=f"with a probability of : set features...")
+        if False: # TODO
+            # Step 0: Tell the user the analysis is starting
+            self.prediction_label_2.configure(text=f"with a probability of : computing...")
             self.root.update_idletasks()
-            model = dataset.get_model()
-            pred = model.predict(dataset.get_features_selected()[0])[0]
-            print(f"Model-derived prediction : {pred:.2f}")
             
-            big_dataset = Dataset_Manager()
-            big_dataset.load_images(compute=False, name_dataset="big_dataset")
-            big_dataset.merge_with(dataset)
-        except Exception as e:
-            self.context_error = log_error(e, f"Prediction failed")
-            pred = 0.5
-            time.sleep(2)
-        
-        # Step 3: Save image in the corresponding directory 
-        directory = Path(DATA_DIR) / ("Mutant_prediction" if pred > 0.5 else "WT_prediction")
-        classified_path = directory / f"{id}.tif" 
-        shutil.move(str(unclassified_path), str(classified_path))
-        
-        # Step 4: Update prediction in worm database
-        self.worms_position.update_worm_prediction(id, pred)
-        self.prediction = int(100*pred)
-        self.prediction_label_2.configure(text=f"with a probability of {self.prediction}%")
-        self.root.update_idletasks()
+            # Step 1: Segment the image and save it
+            img = self.snap_image()
+            img = self.find_worm_segmentation(img) 
+            id = self.worms_position.get_id_worm_seen()
+            unclassified_path = Path(DATA_DIR) / "Unclassified" / f"{id}.tif"
+            imwrite(str(unclassified_path), img)
+            self.prediction_label_2.configure(text=f"with a probability of : segmenting...")
+            self.root.update_idletasks()
+
+            # Step 2: Try to predict with model, fallback to random
+            try:
+                dataset = Dataset_Manager()
+                dataset.load_images()
+                dataset.set_features()
+                self.prediction_label_2.configure(text=f"with a probability of : set features...")
+                self.root.update_idletasks()
+                model = dataset.get_model()
+                pred = model.predict(dataset.get_features_selected()[0])[0]
+                print(f"Model-derived prediction : {pred:.2f}")
+                
+                big_dataset = Dataset_Manager()
+                big_dataset.load_images(compute=False, name_dataset="big_dataset")
+                big_dataset.merge_with(dataset)
+            except Exception as e:
+                self.context_error = log_error(e, f"Prediction failed")
+                pred = 0.5
+                time.sleep(2)
+            
+            # Step 3: Save image in the corresponding directory 
+            directory = Path(DATA_DIR) / ("Mutant_prediction" if pred > 0.5 else "WT_prediction")
+            classified_path = directory / f"{id}.tif" 
+            shutil.move(str(unclassified_path), str(classified_path))
+            
+            # Step 4: Update prediction in worm database
+            self.worms_position.update_worm_prediction(id, pred)
+            self.prediction = int(100*pred)
+            self.prediction_label_2.configure(text=f"with a probability of {self.prediction}%")
+            self.root.update_idletasks()
     
     def start_live(self):
         """
@@ -3151,7 +3152,7 @@ class WormAnalysisApp:
 
         self.prediction_label_2 = tk.Label(
             self.top_label_frame,
-            text=f"with a probability of {self.prediction}%",
+            text=f"with a probability of -- %", # TODO : {self.prediction}
             bg=self.colors.theme["primary_background"],
             fg=self.colors.theme["secondary_text"],
             justify="center",  # changed from "left" to "center"
@@ -3334,7 +3335,7 @@ class WormAnalysisApp:
 
         tk.Label(
             final_5_analysis_container,
-            text="Launch analysis",
+            text="(Button has been deactivated)", # TODO : Launch analysis
             bg=self.colors.theme["primary_background"],
             fg=self.colors.theme["secondary_text"],
             font=(self.font, 10)
@@ -3420,7 +3421,7 @@ class WormAnalysisApp:
 
         # Text label
         title_launch_scan = tk.Label(
-            launch_label_frame, text="Has a dual view mode ?",
+            launch_label_frame, text="Does it have a dual-view mode ?",
             bg=self.colors.theme["primary_background"], fg=self.colors.theme["tertiary_text"],
             font=(self.font, 10)
         )
@@ -3434,7 +3435,7 @@ class WormAnalysisApp:
         info_label.pack(side=tk.LEFT, padx=(5, 0))  # small gap between text and icon
 
         # Tooltip on hover
-        Tooltip(info_label, "If your microscope has a dual view mode, you can active this button to have the possibility to use the scan with it. (will appear in the parameters panel)", title="Info", theme="info", posx=70, posy=-70)
+        Tooltip(info_label, "If your microscope has a dual-view mode, you can active this button to enable the use of the scan with it. (It will appear in the parameters panel)", title="Info", theme="info", posx=70, posy=-70)
 
         # -------------------------------------------------------------------------------------------------- #
         # section with button scan length
@@ -3465,7 +3466,7 @@ class WormAnalysisApp:
 
         # Text label
         title_scan = tk.Label(
-            scan_length_label_frame, text="Manage the size of the scan",
+            scan_length_label_frame, text="Manage the scan area (default values : 26 000 ; 45 000)",
             bg=self.colors.theme["primary_background"], fg=self.colors.theme["tertiary_text"],
             font=(self.font, 10)
         )
@@ -3479,7 +3480,7 @@ class WormAnalysisApp:
         info_scan_label.pack(side=tk.LEFT, padx=(5, 0))  # small gap between text and icon
 
         # Tooltip on hover
-        Tooltip(info_scan_label, "When you let the microscope scan the entire lame, it will use the above value to decide the width and height of the scan (in the microscope unit system). When the 'Square' option is used, its edged length are : width. When the 'Rectangle' option is used, the 2 values set the rectangle shape.", title="Info", theme="info", posx=70, posy=-70)
+        Tooltip(info_scan_label, "When you let the microscope scan the entire slide, it will use the above value to determine the width and height of the scan (in the microscope's system unit). When the 'Square' option is used, its edge lengthis the width. When the 'Rectangle' option is used, the 2 values define the rectangle's shape.", title="Info", theme="info", posx=70, posy=-70)
 
 
         # -------------------------------------------------------------------------------------------------- #
@@ -3505,7 +3506,7 @@ class WormAnalysisApp:
 
         # Text label
         title_step_size = tk.Label(
-            microscope_step_size_label_frame, text="Manage the size of the microscope step",
+            microscope_step_size_label_frame, text="Manage the microscope step size (default value : 13 180)",
             bg=self.colors.theme["primary_background"], fg=self.colors.theme["tertiary_text"],
             font=(self.font, 10)
         )
@@ -3519,7 +3520,7 @@ class WormAnalysisApp:
         info_step_size_label.pack(side=tk.LEFT, padx=(5, 0))  # small gap between text and icon
 
         # Tooltip on hover
-        Tooltip(info_step_size_label, "This value represent the size (in the microscope unit system) of a window when the objective magnitude is 1.", title="Info", theme="info", posx=70, posy=-70)
+        Tooltip(info_step_size_label, "This value represents the size of a window (in the microscope unit system) when the objective magnification is 1x.", title="Info", theme="info", posx=70, posy=-70)
 
 
         # -------------------------------------------------------------------------------------------------- #
@@ -3575,7 +3576,7 @@ class WormAnalysisApp:
 
         # Text label
         title_objective_size = tk.Label(
-            microscope_objective_size_label_frame, text="Manage the size of the objectives of your microscope",
+            microscope_objective_size_label_frame, text="Manage the magnifications on your microscope",
             bg=self.colors.theme["primary_background"], fg=self.colors.theme["tertiary_text"],
             font=(self.font, 10)
         )
@@ -3589,7 +3590,7 @@ class WormAnalysisApp:
         info_objective_size_label.pack(side=tk.LEFT, padx=(5, 0))  # small gap between text and icon
 
         # Tooltip on hover
-        Tooltip(info_objective_size_label, "Enter the size of the magnification of each objective you have on your microscope.", title="Info", theme="info", posx=70, posy=-70)
+        Tooltip(info_objective_size_label, "Enter the magnification of each objective you have on your microscope.", title="Info", theme="info", posx=70, posy=-70)
         
     
     

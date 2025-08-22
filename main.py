@@ -4,11 +4,21 @@ Created on Thursday June 12 10:41:44 2025
 """
 import tkinter as tk
 from src.interface.WormAnalysisApp import WormAnalysisApp
-from config import set_up_environment, loadCore, start_new_session_get_statistics
+from config import set_up_environment, loadCore, start_new_session_get_statistics, log_error
 
-from config import log_error
-
-# Commande pour créer l'executable: pyinstaller --onefile --icon=icon_desktop.ico --name=Worm_detection --add-data "C:/Program Files/Micro-Manager-2.0gamma;Micro-Manager-2.0gamma" main.py
+# Commande pour créer l'executable: 
+"""pyinstaller --onefile --windowed `
+    --icon=icon_desktop.ico `
+    --name=Worm_detection `
+    --add-data "C:/Program Files/Micro-Manager-2.0gamma;Micro-Manager-2.0gamma" `
+    --add-data "data;data" `
+    --add-data "logs;logs" `
+    --add-data "models;models" `
+    --add-data "ressources;ressources" `
+    --add-data "src;src" `
+    --add-data "user;user" `
+    main.py
+    """
 
 def main():
     # Setup environment
@@ -19,7 +29,6 @@ def main():
     try: 
         mmc = loadCore()
     except Exception as e:
-        mmc = None
         log_error(e, "Load core failed")
     
     # Launch application
