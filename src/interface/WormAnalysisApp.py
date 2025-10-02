@@ -1993,7 +1993,7 @@ class WormAnalysisApp:
             except Exception:
                 pass
 
-    def go_to_next_worm(self):
+    def go_to_next_worm(self, event=None):
         """
         Navigates the microscope stage to the position of the next worm in the
         recorded list.
@@ -2017,7 +2017,7 @@ class WormAnalysisApp:
         except Exception as e:
             self.context_error = log_error(e, "Microscope move to next worm failed")
         
-    def go_to_last_worm(self):
+    def go_to_last_worm(self, event=None):
         """
         Navigates the microscope stage to the position of the last seen worm in
         the recorded list.
@@ -3342,6 +3342,10 @@ class WormAnalysisApp:
             fg=self.colors.theme["secondary_text"],
             font=(self.font, 10)
         ).pack()
+        
+        self.main_content.focus_set()  # Make sure the frame has focus to capture key events
+        self.main_content.bind("<Left>", lambda event: self.go_to_last_worm())
+        self.main_content.bind("<Right>", lambda event: self.go_to_next_worm())
 
         # Update the live image
         if self.live_image:
