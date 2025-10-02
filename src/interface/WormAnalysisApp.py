@@ -68,7 +68,7 @@ class WormAnalysisApp:
 
         # Initialize variables
         self.show_parameters = initial_show_parameters
-        self.current_page = first_page
+        self.current_page = first_page if self.CORE is not None else "loading_page"
         self.dark_mode = initial_dark_mode
         self.worms_position = None
         self.prediction = 85
@@ -104,6 +104,8 @@ class WormAnalysisApp:
             self.show_placeholder_page(self.current_page.replace('_', ' ').title())
         elif self.current_page == "configuration":
             self.show_machine_configuration_page()
+        elif self.current_page == "loading_page":
+            self.show_loading_page()
     
     # --- Initalization helper function ---
     def _cleanup_for_reinit(self):
@@ -605,7 +607,8 @@ class WormAnalysisApp:
         self.create_sidebar()
 
         # Parameters (RIGHT)
-        self.create_parameters_panel()
+        if self.CORE is not None:
+            self.create_parameters_panel()
 
         # Content frame (CENTER) - fills the remaining space
         self.content_frame = tk.Frame(self.body_frame, bg=self.colors.theme["primary_background"])
@@ -633,7 +636,7 @@ class WormAnalysisApp:
         border_frame.pack_propagate(False)
         
         # Title
-        title_label = tk.Label(top_frame, text="Worm Analysis - If you have any thoughts or suggestions about the app, please email me ! (arthur.skowronek@etu.univ-lyon1.fr)", bg=self.colors.theme["primary_background"], fg=self.colors.theme["primary_text"],
+        title_label = tk.Label(top_frame, text="Worm Analysis App", bg=self.colors.theme["primary_background"], fg=self.colors.theme["primary_text"],
                               font=(self.font, 13, 'bold'))
         title_label.pack(side=tk.LEFT, padx=80)
         
@@ -2252,49 +2255,48 @@ class WormAnalysisApp:
         mutant). The prediction result is saved and displayed to the user.
         If the model fails, a default prediction is used.
         """
-        if False: # TODO
-            # Step 0: Tell the user the analysis is starting
-            self.prediction_label_2.configure(text=f"with a probability of : computing...")
-            self.root.update_idletasks()
-            
-            # Step 1: Segment the image and save it
-            img = self.snap_image()
-            img = self.find_worm_segmentation(img) 
-            id = self.worms_position.get_id_worm_seen()
-            unclassified_path = Path(DATA_DIR) / "Unclassified" / f"{id}.tif"
-            imwrite(str(unclassified_path), img)
-            self.prediction_label_2.configure(text=f"with a probability of : segmenting...")
-            self.root.update_idletasks()
+        # Step 0: Tell the user the analysis is starting
+        self.prediction_label_2.configure(text=f"with a probability of : computing...")
+        self.root.update_idletasks()
+        
+        # Step 1: Segment the image and save it
+        img = self.snap_image()
+        img = self.find_worm_segmentation(img) 
+        id = self.worms_position.get_id_worm_seen()
+        unclassified_path = Path(DATA_DIR) / "Unclassified" / f"{id}.tif"
+        imwrite(str(unclassified_path), img)
+        self.prediction_label_2.configure(text=f"with a probability of : segmenting...")
+        self.root.update_idletasks()
 
-            # Step 2: Try to predict with model, fallback to random
-            try:
-                dataset = Dataset_Manager()
-                dataset.load_images()
-                dataset.set_features()
-                self.prediction_label_2.configure(text=f"with a probability of : set features...")
-                self.root.update_idletasks()
-                model = dataset.get_model()
-                pred = model.predict(dataset.get_features_selected()[0])[0]
-                print(f"Model-derived prediction : {pred:.2f}")
-                
-                big_dataset = Dataset_Manager()
-                big_dataset.load_images(compute=False, name_dataset="big_dataset")
-                big_dataset.merge_with(dataset)
-            except Exception as e:
-                self.context_error = log_error(e, f"Prediction failed")
-                pred = 0.5
-                time.sleep(2)
-            
-            # Step 3: Save image in the corresponding directory 
-            directory = Path(DATA_DIR) / ("Mutant_prediction" if pred > 0.5 else "WT_prediction")
-            classified_path = directory / f"{id}.tif" 
-            shutil.move(str(unclassified_path), str(classified_path))
-            
-            # Step 4: Update prediction in worm database
-            self.worms_position.update_worm_prediction(id, pred)
-            self.prediction = int(100*pred)
-            self.prediction_label_2.configure(text=f"with a probability of {self.prediction}%")
+        # Step 2: Try to predict with model, fallback to random
+        try:
+            dataset = Dataset_Manager()
+            dataset.load_images()
+            dataset.set_features()
+            self.prediction_label_2.configure(text=f"with a probability of : set features...")
             self.root.update_idletasks()
+            model = dataset.get_model()
+            pred = model.predict(dataset.get_features_selected()[0])[0]
+            print(f"Model-derived prediction : {pred:.2f}")
+            
+            big_dataset = Dataset_Manager()
+            big_dataset.load_images(compute=False, name_dataset="big_dataset")
+            big_dataset.merge_with(dataset)
+        except Exception as e:
+            self.context_error = log_error(e, f"Prediction failed")
+            pred = 0.5
+            time.sleep(2)
+        
+        # Step 3: Save image in the corresponding directory 
+        directory = Path(DATA_DIR) / ("Mutant_prediction" if pred > 0.5 else "WT_prediction")
+        classified_path = directory / f"{id}.tif" 
+        shutil.move(str(unclassified_path), str(classified_path))
+        
+        # Step 4: Update prediction in worm database
+        self.worms_position.update_worm_prediction(id, pred)
+        self.prediction = int(100*pred)
+        self.prediction_label_2.configure(text=f"with a probability of {self.prediction}%")
+        self.root.update_idletasks()
     
     def start_live(self):
         """
@@ -3138,24 +3140,24 @@ class WormAnalysisApp:
             bg=self.colors.theme["primary_background"],
             fg=self.colors.theme["secondary_text"],
             font=(self.font, 10, "bold")
-        ).pack(pady=(0, 0), anchor="center")  # changed from "w" to "center"
+        ).pack(pady=(0, 0), anchor="center")  
 
         self.prediction_label = tk.Label(
             self.top_label_frame,
             text=f"The analysed worm is a mutant",
             bg=self.colors.theme["primary_background"],
             fg=self.colors.theme["secondary_text"],
-            justify="center",  # changed from "left" to "center"
+            justify="center",  
             font=(self.font, 8)
         )
         self.prediction_label.pack(pady=(5, 0), anchor="center")
 
         self.prediction_label_2 = tk.Label(
             self.top_label_frame,
-            text=f"with a probability of -- %", # TODO : {self.prediction}
+            text=f"with a probability of {self.prediction} %",
             bg=self.colors.theme["primary_background"],
             fg=self.colors.theme["secondary_text"],
-            justify="center",  # changed from "left" to "center"
+            justify="center",  
             font=(self.font, 8)
         )
         self.prediction_label_2.pack(pady=(0, 0), anchor="center")
@@ -3335,7 +3337,7 @@ class WormAnalysisApp:
 
         tk.Label(
             final_5_analysis_container,
-            text="(Button has been deactivated)", # TODO : Launch analysis
+            text="Launch analysis", 
             bg=self.colors.theme["primary_background"],
             fg=self.colors.theme["secondary_text"],
             font=(self.font, 10)
@@ -3592,5 +3594,38 @@ class WormAnalysisApp:
         # Tooltip on hover
         Tooltip(info_objective_size_label, "Enter the magnification of each objective you have on your microscope.", title="Info", theme="info", posx=70, posy=-70)
         
+    def show_loading_page(self):
+        """
+        Page displayed when the microscope is still initializing and the application is not ready.
+        """
+        # Clear previous widgets if needed
+        for widget in self.main_content.winfo_children():
+            widget.destroy()
+
+        # Text section
+        bottom_frame = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
+        bottom_frame.pack(fill=tk.X, pady=(330,5))
+        
+        # Container to hold message
+        launch_label_frame = tk.Frame(bottom_frame, bg=self.colors.theme["primary_background"])
+        launch_label_frame.pack()
+
+        # Text label
+        title_launch_scan = tk.Label(
+            launch_label_frame, text="Microscope is initializing, please wait and restart the program.",
+            bg=self.colors.theme["primary_background"], fg=self.colors.theme["primary_text"],
+            font=(self.font, 20)
+        )
+        title_launch_scan.pack(side=tk.LEFT)
+
+        # Trigger resizing after layout completes with error handling
+        try:
+            if hasattr(self, 'main_content') and self.main_content.winfo_exists():
+                after_id = self.main_content.after(100, self.resize_scan_content_area)
+                if not hasattr(self, '_after_ids'):
+                    self._after_ids = []
+                self._after_ids.append(after_id)
+        except:
+            pass
     
     

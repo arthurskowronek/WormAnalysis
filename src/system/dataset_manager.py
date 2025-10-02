@@ -2,6 +2,7 @@
 Dataset management.
 """
 import os
+import pathlib
 import joblib
 import numpy as np
 import pandas as pd
@@ -60,6 +61,7 @@ class Dataset_Manager:
                    test_mode: bool = False,
                    visualize: bool = False,
                    training: bool = False,
+                   validation: bool = False,
                    name_dataset: str = DEFAULT_PKL_NAME) -> 'Dataset_Manager':
         """
         Loads and preprocesses images from the specified data directories.
@@ -79,6 +81,7 @@ class Dataset_Manager:
             training (bool): If True, loads data from 'Mutant' and 'WT'
                              directories. If False, loads data from the
                              'Unclassified' directory. Defaults to False.
+            validation (bool): If True, loads data from the 'validation' directory
             name_dataset (str): The name of the dataset to be loaded or saved.
                                 Defaults to DEFAULT_PKL_NAME.
             
@@ -113,6 +116,8 @@ class Dataset_Manager:
                 label_dirs = ['Unclassified']
             else:
                 label_dirs = ['Mutant', 'WT']
+            if validation:
+                label_dirs = ['validation']
             
             for label_dir in label_dirs:
                 dir_path = self.data_dir / label_dir
@@ -148,6 +153,8 @@ class Dataset_Manager:
                             coiled = False
                             maxima, graph, median_width, diff_slice, diff_segment, NUMBER_OF_CORDS = preprocessing.get_synapse_using_graph(img, worm_mask)
 
+                        if validation: 
+                            label_dir = 'Mutant' if 'Mut' in img_path.name else 'WT'
                         # Create a new Data object and populate its attributes.
                         new_data = Data()
                         new_data.label = label_dir
@@ -301,8 +308,8 @@ class Dataset_Manager:
         for item in self.data:
             features.append(item.get_features()[0])
             
-        features = np.array(features)
-        feature_names = self.data[0].get_features()[1]        
+        features = np.array(features) 
+        feature_names = self._get_feature_names_selected()
                 
         return features, feature_names
     
@@ -321,16 +328,26 @@ class Dataset_Manager:
                 features.append(item.get_features_selected()[0])
    
         features = np.array(features)
-        feature_names = self.data[0].get_features_selected()[1]
+        feature_names = self._get_feature_names_selected()
         
         return features, feature_names
+    
+    def _get_feature_names_selected(self):
+        for item in self.data:
+            try:
+                fn = item.get_features_selected()[1]
+                if fn is not None and len(fn) > 0:
+                    return fn
+            except Exception:
+                continue
+        raise ValueError("No feature names found (no non-coiled item with selected features).")
     
     def set_features(self, 
                      compute: bool = True, 
                      save_features: bool = False, 
                      name_dataset: str = DEFAULT_PKL_NAME,  
                      feature_reduction: bool = False, 
-                     selection_method: str = "saved", 
+                     selection_method: str = "none", 
                      verbose: bool = False) -> None:
         """
         Computes, selects, and sets the features for the dataset.
@@ -393,22 +410,32 @@ class Dataset_Manager:
                 except Exception as e:
                     print(f"Error saving dataset with features: {e}")
         
-        # Handle feature selection based on the specified method.
+        # -------------------------
+        # Handle feature selection
+        # -------------------------
+        # NOTE: Selection methods that use labels (kbest, lasso, boruta, mRMR, elasticnet)
+        # MUST be applied during training inside the pipeline (evaluate_models_with_scalers)
+        # to avoid data leakage. 
+        # set_features() will only:
+        #  - compute raw features (done above),
+        #  - optionally apply 'none' (i.e. keep all features) for bookkeeping,
+        #  - or apply 'saved' to reproduce a previously stored subset (for inference).
         if feature_reduction:
             print("Applying feature reduction...")
             _, y = self.get_data()
             indices_coiled = self.get_coiled_worms()
             feature_extractor.feature_reduction(y, indices_coiled)
         elif selection_method == 'none':
+            # No selection: just compute scaled features for storage (optional)
             _, y = self.get_data()
             indices_coiled = self.get_coiled_worms()
-            features, feature_names, y = feature_extractor._process_features(y, indices_coiled)          
-        
-            # Scale and handle NaNs before setting selected features.
-            scaler = StandardScaler() 
+            features, feature_names, y = feature_extractor._process_features(y, indices_coiled)
+
+            # handle NaNs then scale
+            scaler = StandardScaler()
             features = scaler.fit_transform(features)
             features = np.nan_to_num(features)
-            
+
             count = 0
             for item in self.data:
                 if not item.coiled:
@@ -416,19 +443,24 @@ class Dataset_Manager:
                     count += 1
             return self
         elif selection_method == 'saved':
+            # Load a pre-computed list of selected indices and apply them (for inference reproduction)
             if verbose: print("Loading saved features...")
             _, y = self.get_data()
             indices_coiled = self.get_coiled_worms()
-            features, feature_names, y = feature_extractor._process_features(y, indices_coiled)          
-        
-            scaler = StandardScaler() 
-            features = scaler.fit_transform(features)
+            features, feature_names, y = feature_extractor._process_features(y, indices_coiled)
+
             features = np.nan_to_num(features)
-            
-            # Load pre-selected feature indices from a file.
-            with open('models/selected_features.txt', 'r') as f:
+            scaler = StandardScaler()
+            features = scaler.fit_transform(features)
+
+            script_path = pathlib.Path(__file__).resolve()
+            root_dir = script_path.parent.parent.parent
+            file_path = root_dir / 'models' / 'selected_features.txt'
+            if not file_path.exists():
+                raise FileNotFoundError(f"selected_features.txt not found at {file_path}")
+            with open(file_path, 'r') as f:
                 selected_indices = [int(line.strip()) for line in f]
-                
+
             features = features[:, selected_indices]
             feature_names = [feature_names[i] for i in selected_indices]
             count = 0
@@ -436,32 +468,14 @@ class Dataset_Manager:
                 if not item.coiled:
                     item.set_features_selected(features[count], feature_names)
                     count += 1
-        elif selection_method in ['kbest', 'boruta', 'mRMR', 'elasticnet', 'lasso']:
-            print(f"Applying feature selection using {selection_method}...")
-            _, y = self.get_data()
-            indices_coiled = self.get_coiled_worms()
-            # Perform feature selection.
-            features_selected, feature_names_selected = feature_extractor.feature_selection(
-                method=selection_method,
-                y = y,
-                coiled_worms = indices_coiled,
-                verbose_features_selected=verbose
-            )
-            
-            count = 0
-            for item in self.data:
-                if not item.coiled:
-                    item.set_features_selected(features_selected[count], feature_names_selected)
-                    count += 1
-            try:
-                # Save the dataset with selected features.
-                joblib.dump(self.data, self.dataset_pkl_dir / (name_dataset + "_features_selected.pkl"))
-                print("Features selected saved to", self.dataset_pkl_dir / (name_dataset + "_features_selected.pkl"))
-            except Exception as e:
-                print(f"Error saving dataset with features selected: {e}")
+            return self
         else:
+            # If user asked for an in-training selection method, skip it here and instruct.
+            if selection_method in ['kbest', 'boruta', 'mRMR', 'elasticnet', 'lasso']:
+                print(f"Selection method '{selection_method}' must be applied during training (get_model) inside the pipeline to avoid data leakage. Skipping selection in set_features().")
+                return self
             raise ValueError(f"Unknown feature selection method: {selection_method}")
-      
+  
     def get_model(self, 
                   compute: bool = False, 
                   retrain: bool = True,
@@ -471,7 +485,8 @@ class Dataset_Manager:
                   scaler: List[str] = ['NoScaler','StandardScaler','RobustScaler','MinMaxScaler','MaxAbsScaler','Normalizer','QuantileTransformer'],
                   optimizing: bool = False,
                   verbose: bool = False,
-                  shap_analysis: bool = False):
+                  shap_analysis: bool = False,
+                  feature_selection_method: str = 'lasso'):
         """
         Trains or loads a machine learning model.
 
@@ -505,11 +520,17 @@ class Dataset_Manager:
         Raises:
             ValueError: If an unknown model or outlier type is specified.
         """
-                        
+        
         X, _ = self.get_features_selected()
-        y_labels = self.get_y_without_coiled_worm()
-        label_mapping = {'Mutant': 1, 'WT': 0}
-        y = np.array([label_mapping[label] for label in y_labels])
+        y_labels = self.get_y_without_coiled_worm()  # strings 'Mutant'/'WT'
+        # Only when training a classifier:
+        if model_type == 'classifier':
+            label_mapping = {'Mutant': 1, 'WT': 0}
+            y = np.array([label_mapping[label] for label in y_labels])
+        # For outlier:
+        if model_type == 'outlier':
+            X = X[np.array([lbl == 'WT' for lbl in y_labels])]
+
 
         # Balance the dataset to prevent class imbalance issues.
         indices_class_0 = np.where(y == 0)[0]
@@ -525,9 +546,12 @@ class Dataset_Manager:
         
         # Check if the dataset has new samples to decide whether to retrain.
         csv_path = Path(MODELS_DIR) / "best_model_tracking.csv"
-        df = pd.read_csv(csv_path)        
+        if csv_path.exists():
+            df = pd.read_csv(csv_path)
+        else:
+            df = pd.DataFrame(columns=['date','best_scaler_name','best_model_name','best_score','len_y'])      
         max_len_y = df['len_y'].max()
-        if len(y) <= max_len_y and retrain:
+        if len(y) <= max_len_y and not retrain:
             print("Dataset has not changed significantly. No need to retrain the model.")
             model = joblib.load(MODELS_DIR / "model_prediction.pkl")
             return model
@@ -556,7 +580,32 @@ class Dataset_Manager:
                 }
                 scaler_dict = {name: scaler_dict_complete[name] for name in scaler if name in scaler_dict_complete}
 
-                results_df, model, best_scaler_name, best_model_name, best_score = evaluate_models_with_scalers(X, y, classifier_type, scaler_dict, ClassifierFactory, optimize_hyperparams = optimizing, verbose = verbose, shap_analysis = shap_analysis)  
+                # scoring can be : "accuracy", "all_mutants", "all_wts"
+                results_df, model, best_scaler_name, best_model_name, best_score = evaluate_models_with_scalers(
+                    X, y, classifier_type, scaler_dict, ClassifierFactory,
+                    scoring='accuracy', optimize_hyperparams=optimizing, verbose=verbose,
+                    shap_analysis=shap_analysis,
+                    feature_selection_method=feature_selection_method,
+                    random_state=42
+                )
+                joblib.dump(model, MODELS_DIR / "model_prediction.pkl") # TODO : pas toujours sauvegarder, voir la fin de la fonction
+                
+                # --- Sauvegarde des features sélectionnées (si pas "none") ---
+                if feature_selection_method != 'none':
+                    selector = model.named_steps.get('selector', None)
+                    if selector is not None and hasattr(selector, 'get_support'):
+                        support = selector.get_support(indices=True)
+                        
+                        script_path = pathlib.Path(__file__).resolve()
+                        root_dir = script_path.parent.parent.parent
+                        file_path = root_dir / 'models' / 'selected_features.txt'
+                        
+                        with open(file_path, 'w') as f:
+                            for idx in support:
+                                f.write(f"{idx}\n")
+                        
+                        print(f"[INFO] Saved {len(support)} selected feature indices to {file_path}")
+
                 
                 # Visualize results with a heatmap if multiple models or scalers were tested.
                 if len(classifier_type) > 1 or len(scaler) > 1:

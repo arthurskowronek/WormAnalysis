@@ -29,6 +29,7 @@ def main():
     try: 
         mmc = loadCore()
     except Exception as e:
+        mmc = None
         log_error(e, "Load core failed")
     
     # Launch application

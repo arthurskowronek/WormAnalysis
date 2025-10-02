@@ -11,8 +11,13 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier, HistGradientBoostingClassifier as SKHistGradientBoostingClassifier
 from sklearn.neural_network import MLPClassifier as SklearnMLPClassifier
 from sklearn.model_selection import cross_val_score, StratifiedKFold, cross_val_predict, learning_curve
-from sklearn.metrics import confusion_matrix
-
+from sklearn.metrics import confusion_matrix, make_scorer, recall_score
+from sklearn.pipeline import Pipeline
+from sklearn.feature_selection import SelectKBest, f_classif, SelectFromModel
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.linear_model import LassoCV, ElasticNetCV
+from sklearn.preprocessing import FunctionTransformer
+from boruta import BorutaPy
 
 from src.system.base import BaseModel
 from config import DEFAULT_RANDOM_STATE, DEFAULT_CV_FOLDS
@@ -60,47 +65,20 @@ class BaseClassifier(BaseModel):
         X: np.ndarray,
         y: np.ndarray,
         n_trials: int = 50,
-        cv: int = DEFAULT_CV_FOLDS
+        cv: int = DEFAULT_CV_FOLDS,
+        scoring: str = 'accuracy',
+        direction: str = 'maximize'
     ) -> Tuple[float, Dict[str, Any]]:
-        """
-        Optimize the model's hyperparameters using Optuna with cross-validation.
-
-        Args:
-            X (np.ndarray): Feature matrix of shape (n_samples, n_features).
-            y (np.ndarray): Target vector of shape (n_samples,).
-            n_trials (int): Number of trials to run in the optimization.
-            cv (int): Number of cross-validation folds (e.g., 5 or 10).
-
-        Returns:
-            Tuple[float, Dict[str, Any]]:
-                - best_value: The best cross-validation score found.
-                - best_params: The hyperparameters corresponding to the best score.
-        
-        Raises:
-            NotImplementedError: If `_get_trial_params()` is not implemented in a subclass.
-        """
-
+        ...
         def objective(trial):
-            """
-            Objective function for Optuna trial.
-
-            This function defines how each trial is evaluated by:
-            - Sampling hyperparameters via `_get_trial_params()`
-            - Setting them using `set_params()`
-            - Running cross-validation and returning the mean accuracy
-            """
             params = self._get_trial_params(trial)
             self.set_params(**params)
-
-            # Stratified k-fold CV to preserve class distribution
             kf = StratifiedKFold(n_splits=cv, shuffle=True, random_state=self.random_state)
-
-            # Evaluate cross-validation accuracy
-            scores = cross_val_score(self.model, X, y, cv=kf, scoring='accuracy', n_jobs=-1)
+            scores = cross_val_score(self.model, X, y, cv=kf, scoring=scoring, n_jobs=-1)
             return np.mean(scores)
 
         # Create a study aiming to maximize accuracy
-        study = optuna.create_study(direction='maximize')
+        study = optuna.create_study(direction=direction)
         study.optimize(objective, n_trials=n_trials)
 
         # Save visualizations to HTML files
@@ -737,106 +715,208 @@ def plot_shap_summary(model, X, class_index=1, max_background=100):
         return
 
 def evaluate_models_with_scalers(
-    X, y, model_types, scaler_dict, classifier_factory, cv=5, scoring='accuracy',
-    optimize_hyperparams=False, n_trials=30, cv_optimize=5, verbose=False, shap_analysis=False
+    X, y, model_types, scaler_dict, classifier_factory,
+    cv=5, scoring='accuracy',
+    optimize_hyperparams=False, n_trials=30, cv_optimize=5,
+    verbose=False, shap_analysis=False,
+    feature_selection_method='lasso', k_features=20,
+    random_state=42
 ):
     """
-    Evaluate each combination of scaler + model via cross-validation.
-    Can optimize hyperparameters if requested.
-    Returns a DataFrame of average scores, the best trained model and the best combination of scaler and model.
-    
-    Args:
-        X: Training features
-        y: Training labels
-        model_types: List of model types to evaluate
-        scaler_dict: Dictionary of scalers to evaluate
-        classifier_factory: Factory for creating classifiers
-        cv: Number of cross-validation folds
-        optimize_hyperparams: Whether to optimize hyperparameters
-        n_trials: Number of trials for hyperparameter optimization
-        cv_optimize: Number of cross-validation folds for hyperparameter optimization
-        verbose: Whether to print verbose output
-        shap_analysis: Whether to perform SHAP analysis on the best model
-    Returns:
-        results: DataFrame of average scores
-        best_model: Best trained model
-        best_combo: Best combination of scaler and model
+    Évalue chaque combinaison scaler + feature_selector + model via cross-validation
+    (la sélection de features est refaite dans chaque fold).
+    Retourne DataFrame des scores moyens, le pipeline entraîné (scaler+selector+model),
+    le meilleur scaler & modèle, et le meilleur score.
     """
     results = {}
     best_score = -float('inf')
     best_combo = (None, None)
-    
+    best_pipeline = None
+
+    # set scorer
+    if scoring == 'all_mutants':
+        scorer = make_scorer(recall_score, pos_label=1)
+    elif scoring == 'all_wts':
+        scorer = make_scorer(recall_score, pos_label=0)
+    elif scoring == 'accuracy':
+        scorer = 'accuracy'
+    else:
+        scorer = scoring
+
     for scaler_name, scaler in scaler_dict.items():
-        if scaler_name == 'NoScaler':
-            X_scaled = X.copy()
-        else:
-            X_scaled = scaler.fit_transform(X)
         scaler_results = {}
         for model_type in model_types:
             clf = classifier_factory.create(model_type)
-            # Hyperparameter optimization if requested and possible
+
+            # build pipeline: scaler + selector + classifier
+            selector = make_feature_selector(method=feature_selection_method, k=k_features, random_state=random_state)
+            steps = []
+            # NoScaler may be a FunctionTransformer(identity) — still ok in pipeline
+            steps.append(('scaler', scaler))
+            steps.append(('selector', selector))
+            steps.append(('clf', clf))
+            pipe = Pipeline(steps)
+
+            # optionally optimize hyperparams inside the pipeline (if classifier supports)
             if optimize_hyperparams and hasattr(clf, 'optimize_hyperparameters'):
                 try:
-                    clf.optimize_hyperparameters(
-                        X_scaled, y, n_trials=n_trials, cv=cv_optimize
-                    )
+                    # caller must handle how optimization is applied to the pipeline;
+                    clf.optimize_hyperparameters(X, y, n_trials=n_trials, cv=cv_optimize, scoring=scoring)
                 except Exception as e:
                     print(f"[WARN] Optimization failed for {model_type} with {scaler_name}: {e}")
-            kf = StratifiedKFold(n_splits=cv, shuffle=True, random_state=DEFAULT_RANDOM_STATE)
-            scores = cross_val_score(clf, X_scaled, y, cv=kf, scoring=scoring)
-            mean_score = scores.mean()
+
+            kf = StratifiedKFold(n_splits=cv, shuffle=True, random_state=random_state)
+            try:
+                scores = cross_val_score(pipe, X, y, cv=kf, scoring=scorer, n_jobs=-1)
+                mean_score = scores.mean()
+            except Exception as e:
+                print(f"[ERROR] cross_val_score failed for {model_type} with {scaler_name}: {e}")
+                mean_score = np.nan
+
             scaler_results[model_type] = mean_score
 
-            if mean_score > best_score:
+            if mean_score is not None and not np.isnan(mean_score) and mean_score > best_score:
                 best_score = mean_score
                 best_combo = (scaler_name, model_type)
-        
+                best_pipeline = pipe  # pipeline, but not yet fitted
+
         results[scaler_name] = scaler_results
 
-    # Retrain only the best model on the complete data
+    # Retrain only the best pipeline on the complete data (fit scaler+selector+clf on full X)
+    if best_pipeline is None:
+        raise RuntimeError("No valid pipeline found (best_pipeline is None).")
+
+    # If best_scaler_name is NoScaler (FunctionTransformer), pipeline still works
+    # Fit best_pipeline on full dataset
+    best_pipeline.fit(X, y)
+
     best_scaler_name, best_model_type = best_combo
-    best_scaler = scaler_dict[best_scaler_name]
-    if best_scaler_name == 'NoScaler':
-        X_best_scaled = X.copy()
-    else:
-        X_best_scaled = best_scaler.fit_transform(X)
-    best_model = classifier_factory.create(best_model_type)
-    # Optimization on the entire dataset if requested
-    if optimize_hyperparams and hasattr(best_model, 'optimize_hyperparameters'):
-        try:
-            best_model.optimize_hyperparameters(
-                X_best_scaled, y, n_trials=n_trials, cv=cv_optimize
-            )
-        except Exception as e:
-            print(f"[WARN] Optimization failed for the best model: {e}")
-    best_model.fit(X_best_scaled, y)
+    
+    
+    # Si on n'a testé qu'un seul scaler et un seul modèle, afficher courbes + confusion
+    if verbose and len(model_types) == 1 and len(scaler_dict) == 1:
+        kf = StratifiedKFold(n_splits=cv, shuffle=True, random_state=random_state)
+        # cross_val_predict sur le pipeline complet
+        y_pred_cv = cross_val_predict(best_pipeline, X, y, cv=kf, n_jobs=-1)
+        
+        # Matrice de confusion
+        cm = confusion_matrix(y, y_pred_cv)
+        
+        # Courbe d'apprentissage
+        train_sizes, train_scores, test_scores = learning_curve(
+            best_pipeline, X, y, cv=kf, scoring='accuracy', n_jobs=-1
+        )
+        train_mean = np.mean(train_scores, axis=1)
+        train_std = np.std(train_scores, axis=1)
+        test_mean = np.mean(test_scores, axis=1)
+        test_std = np.std(test_scores, axis=1)
 
-    if len(model_types) == 1 and len(scaler_dict) == 1:
-        if verbose:
-            # Display for the best model/scaler only
-            kf = StratifiedKFold(n_splits=cv, shuffle=True, random_state=DEFAULT_RANDOM_STATE)
-            # Use best_model.model if best_model is a wrapper, otherwise use best_model directly
-            model_for_cv = getattr(best_model, "model", best_model)
-            y_pred_cv = cross_val_predict(model_for_cv, X_best_scaled, y, cv=kf, n_jobs=-1)
-            cm = confusion_matrix(y, y_pred_cv)
+        # Affichage (réutiliser ta fonction ou matplotlib)
+        plot_confusion_matrix_and_learning_curve(cm, train_sizes, train_mean, train_std, test_mean, test_std)
 
-            # Learning curve
-            train_sizes, train_scores, test_scores = learning_curve(
-                model_for_cv, X_best_scaled, y, cv=kf, scoring='accuracy', n_jobs=-1
-            )
-            train_mean = np.mean(train_scores, axis=1)
-            train_std = np.std(train_scores, axis=1)
-            test_mean = np.mean(test_scores, axis=1)
-            test_std = np.std(test_scores, axis=1)
-            
-            plot_confusion_matrix_and_learning_curve(cm, train_sizes, train_mean, train_std, test_mean, test_std)
+        # Afficher indices mal classés
+        misclassified_indices = np.where(y != y_pred_cv)[0]
+        print("Misclassified samples indices:", misclassified_indices)
 
-            # Show misclassified indices
-            misclassified_indices = np.where(y != y_pred_cv)[0]
-            print("Misclassified samples indices:", misclassified_indices)
-
+        # Option SHAP
         if shap_analysis:
             print("Launching SHAP analysis for the best model...")
-            plot_shap_summary(best_model, X_best_scaled)
+            plot_shap_summary(best_pipeline, X)
 
-    return pd.DataFrame(results), best_model, best_scaler_name, best_model_type, best_score
+    
+    
+    
+    # Return DataFrame results, trained pipeline (scaler+selector+clf), best scaler/model names and score
+    return pd.DataFrame(results), best_pipeline, best_scaler_name, best_model_type, best_score
+
+    
+class LassoFeatureSelector(BaseEstimator, TransformerMixin):
+    def __init__(self, cv=5, random_state=42):
+        self.cv = cv
+        self.random_state = random_state
+
+    def fit(self, X, y):
+        self.model_ = LassoCV(cv=self.cv, random_state=self.random_state, n_jobs=-1).fit(X, y)
+        self.mask_ = self.model_.coef_ != 0
+        return self
+
+    def transform(self, X):
+        return X[:, self.mask_]
+
+    def get_support(self, indices=False):
+        if indices:
+            return np.where(self.mask_)[0]
+        return self.mask_
+
+class ElasticNetFeatureSelector(BaseEstimator, TransformerMixin):
+    def __init__(self, cv=5, random_state=42, l1_ratio=[.1, .5, .7, .9, .95, .99, 1]):
+        self.cv = cv
+        self.random_state = random_state
+        self.l1_ratio = l1_ratio
+
+    def fit(self, X, y):
+        self.model_ = ElasticNetCV(
+            cv=self.cv,
+            l1_ratio=self.l1_ratio,
+            random_state=self.random_state
+        ).fit(X, y)
+        # mask of selected features
+        self.mask_ = self.model_.coef_ != 0
+        return self
+
+    def transform(self, X):
+        return X[:, self.mask_]
+
+    def get_support(self, indices=False):
+        if indices:
+            return np.where(self.mask_)[0]
+        return self.mask_
+
+class BorutaFeatureSelector(BaseEstimator, TransformerMixin):
+    def __init__(self, rf_estimator, n_estimators='auto', verbose=0, random_state=42):
+        self.rf_estimator = rf_estimator
+        self.n_estimators = n_estimators
+        self.verbose = verbose
+        self.random_state = random_state
+
+    def fit(self, X, y):
+        self.boruta_ = BorutaPy(
+            self.rf_estimator,
+            n_estimators=self.n_estimators,
+            verbose=self.verbose,
+            random_state=self.random_state
+        )
+        self.boruta_.fit(X, y)
+        self.mask_ = self.boruta_.support_
+        return self
+
+    def transform(self, X):
+        return X[:, self.mask_]
+
+    def get_support(self, indices=False):
+        if indices:
+            return np.where(self.mask_)[0]
+        return self.mask_
+
+def make_feature_selector(method='lasso', k=20, random_state=42):
+    """
+    Retourne un objet transformer compatible sklearn selon la méthode.
+    method: 'kbest', 'lasso', 'elasticnet', 'boruta', 'none'
+    """
+    method = method.lower()
+    if method == 'kbest':
+        return SelectKBest(score_func=f_classif, k=k)
+    elif method == 'lasso':
+        return LassoFeatureSelector(cv=5, random_state=random_state)
+    elif method == 'elasticnet':
+        return ElasticNetFeatureSelector(cv=5, random_state=random_state)
+    elif method == 'boruta':
+        from sklearn.ensemble import RandomForestClassifier
+        rf = RandomForestClassifier(n_jobs=-1, random_state=random_state, max_depth=5)
+        return BorutaFeatureSelector(rf_estimator=rf, n_estimators='auto', verbose=0, random_state=random_state)
+    elif method == 'none':
+        # Pas de sélection : identite
+        return FunctionTransformer(lambda X: X, validate=False)
+    else:
+        raise ValueError(f"Unknown feature selection method: {method}")
+    

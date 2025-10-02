@@ -1,6 +1,8 @@
 """
 Feature extraction from images.
 """
+import os
+import pathlib
 import pyfeats
 import warnings
 import numpy as np
@@ -305,13 +307,17 @@ class FeatureExtractor:
         scaler = StandardScaler()
         features = scaler.fit_transform(features)
         
+        script_path = pathlib.Path(__file__).resolve()
+        root_dir = script_path.parent.parent.parent
+        file_path = root_dir / 'models' / 'selected_features.txt'
+        
         if method == 'kbest':
             selector = SelectKBest(score_func=f_classif, k=k)
             features = selector.fit_transform(features, y)
             selected_indices = selector.get_support(indices=True)
             selected_feature_names = [feature_names[i] for i in selected_indices]
             # save indices of selected features in a file "selected_features.txt" in 'models' folder
-            with open('models/selected_features.txt', 'w') as f:
+            with open(file_path, 'w') as f:
                 counter = 0
                 for item in selected_indices:
                     if item == True:
@@ -328,7 +334,7 @@ class FeatureExtractor:
             selected_feature_names = [feature_names[i] for i, selected in enumerate(selected_indices) if selected]
             if verbose_features_selected : print(f"Selected features (boruta): {selected_feature_names}")
             # save indices of selected features in a file "selected_features.txt" in 'models' folder
-            with open('models/selected_features.txt', 'w') as f:
+            with open(file_path, 'w') as f:
                 counter = 0
                 for item in selected_indices:
                     if item == True:
@@ -343,7 +349,7 @@ class FeatureExtractor:
             selected_indices = np.where(mask)[0]
             selected_feature_names = [feature_names[i] for i in selected_indices]
             # Save indices of selected features in a file "selected_features.txt" in 'models' folder
-            with open('models/selected_features.txt', 'w') as f:
+            with open(file_path, 'w') as f:
                 for index in selected_indices:
                     f.write("%s\n" % index)
             
@@ -352,6 +358,23 @@ class FeatureExtractor:
                 print(f"Selected features (lasso): {selected_feature_names}")
                 
             return features[:, selected_indices], selected_feature_names
+        elif method == 'elasticnet':
+            # ElasticNet feature selection
+            elasticnet = ElasticNetCV(cv=5, random_state=42, l1_ratio=[.1, .5, .7, .9, .95, .99, 1])
+            elasticnet.fit(features, y)
+            mask = elasticnet.coef_ != 0
+            selected_indices = np.where(mask)[0]
+            selected_feature_names = [feature_names[i] for i in selected_indices]
+            
+            # Save indices of selected features in a file "selected_features.txt" in 'models' folder
+            with open(file_path, 'w') as f:
+                for index in selected_indices:
+                    f.write("%s\n" % index)
+            
+            if verbose_features_selected:
+                print(f"Selected {np.sum(mask)} features out of {features.shape[1]}")
+                print(f"Selected features (elasticnet): {selected_feature_names}")
+            return features[:, mask], selected_feature_names 
         elif method == 'mRMR':
             # Convert numpy array to pandas DataFrame if needed
             if not isinstance(features, pd.DataFrame):
@@ -381,7 +404,7 @@ class FeatureExtractor:
             selected_feature_names = [feature_names[i] for i in selected_indices]
             
             # Save selected feature indices
-            with open('models/selected_features.txt', 'w') as f:
+            with open(file_path, 'w') as f:
                 counter = 0
                 for item in selected_indices:
                     if item == True:
@@ -395,23 +418,6 @@ class FeatureExtractor:
             
             # Return selected features and their indices
             return features[:, selected_indices], selected_feature_names
-        elif method == 'elasticnet':
-            # ElasticNet feature selection
-            elasticnet = ElasticNetCV(cv=5, random_state=42, l1_ratio=[.1, .5, .7, .9, .95, .99, 1])
-            elasticnet.fit(features, y)
-            mask = elasticnet.coef_ != 0
-            selected_indices = np.where(mask)[0]
-            selected_feature_names = [feature_names[i] for i in selected_indices]
-            
-            # Save indices of selected features in a file "selected_features.txt" in 'models' folder
-            with open('models/selected_features.txt', 'w') as f:
-                for index in selected_indices:
-                    f.write("%s\n" % index)
-            
-            if verbose_features_selected:
-                print(f"Selected {np.sum(mask)} features out of {features.shape[1]}")
-                print(f"Selected features (elasticnet): {selected_feature_names}")
-            return features[:, mask], selected_feature_names 
 
     # Utils functions
     def _create_synapse_mask(self, original_image, coords_synapses, disk_radius=5):
@@ -847,14 +853,16 @@ class FeatureExtractor:
         
         # Detect indice of elements in features which contain only 0s -> Coil worm
         indices_row = np.where(np.all(features == 0, axis=1))[0]
-        # Detect features with all 0s
-        indices_column = np.where(np.all(features == 0, axis=0))[0]
         
         # Remove these elements 
         features = np.delete(features, indices_row, axis=0)
         y = np.delete(y, indices_row, axis=0)
-        features = np.delete(features, indices_column, axis=1)
-        features_name = np.delete(features_name, indices_column, axis=0)
+        
+        # NOTE: We remove this part to be sure to keep the same number of features each time
+        # Detect features with all 0s
+        # indices_column = np.where(np.all(features == 0, axis=0))[0]
+        # features = np.delete(features, indices_column, axis=1)
+        # features_name = np.delete(features_name, indices_column, axis=0)
         
         # Convert labels to numeric
         unique_labels = np.unique(y)
@@ -862,3 +870,5 @@ class FeatureExtractor:
         y = np.array([label_map[label] for label in y])
         
         return features, features_name, y
+    
+    
