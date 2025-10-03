@@ -2257,7 +2257,7 @@ class WormAnalysisApp:
         """
         # Step 0: Tell the user the analysis is starting
         self.prediction_label_2.configure(text=f"with a probability of : computing...")
-        self.root.update_idletasks()
+        self.root.update() # tester avec self.root.update() vs self.root.update_idletasks()
         
         # Step 1: Segment the image and save it
         img = self.snap_image()
@@ -2266,7 +2266,7 @@ class WormAnalysisApp:
         unclassified_path = Path(DATA_DIR) / "Unclassified" / f"{id}.tif"
         imwrite(str(unclassified_path), img)
         self.prediction_label_2.configure(text=f"with a probability of : segmenting...")
-        self.root.update_idletasks()
+        self.root.update() # tester avec self.root.update() vs self.root.update_idletasks()
 
         # Step 2: Try to predict with model, fallback to random
         try:
@@ -2274,7 +2274,7 @@ class WormAnalysisApp:
             dataset.load_images()
             dataset.set_features()
             self.prediction_label_2.configure(text=f"with a probability of : set features...")
-            self.root.update_idletasks()
+            self.root.update() # tester avec self.root.update() vs self.root.update_idletasks()
 
             model = dataset.get_model()
             pred = model.predict(dataset.get_features_selected()[0])[0]
@@ -2288,11 +2288,11 @@ class WormAnalysisApp:
             self.worms_position.update_worm_prediction(id, pred)
             self.prediction = int(100*pred)
             self.prediction_label_2.configure(text=f"with a probability of {self.prediction}%")
-            self.root.update_idletasks()
+            self.root.update() # tester avec self.root.update() vs self.root.update_idletasks()
         except Exception as e:
             self.context_error = log_error(e, f"Prediction failed")
             self.prediction_label_2.configure(text=f"with a probability of : doesn't succeed to make a prediction")
-            self.root.update_idletasks()
+            self.root.update() # tester avec self.root.update() vs self.root.update_idletasks()
             pred = -1
         
         # Step 4: Save image in the corresponding directory 
