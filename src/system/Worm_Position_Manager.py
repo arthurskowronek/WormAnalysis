@@ -585,7 +585,7 @@ class WormPositionManager:
         positions = df[['x_microscope', 'y_microscope']].values
         dist_matrix = np.linalg.norm(positions[:, np.newaxis] - positions, axis=2)
         
-        if len(df) <= 25:
+        if len(df) <= 10: # software bug with more points
             # Use exact method
             permutation, dist_opt = solve_tsp_dynamic_programming(dist_matrix)
         else:
