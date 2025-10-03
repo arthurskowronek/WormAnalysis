@@ -2275,6 +2275,7 @@ class WormAnalysisApp:
             dataset.set_features()
             self.prediction_label_2.configure(text=f"with a probability of : set features...")
             self.root.update_idletasks()
+
             model = dataset.get_model()
             pred = model.predict(dataset.get_features_selected()[0])[0]
             print(f"Model-derived prediction : {pred:.2f}")
@@ -2282,21 +2283,26 @@ class WormAnalysisApp:
             big_dataset = Dataset_Manager()
             big_dataset.load_images(compute=False, name_dataset="big_dataset")
             big_dataset.merge_with(dataset)
+
+            # Step 3: Update prediction in worm database
+            self.worms_position.update_worm_prediction(id, pred)
+            self.prediction = int(100*pred)
+            self.prediction_label_2.configure(text=f"with a probability of {self.prediction}%")
+            self.root.update_idletasks()
         except Exception as e:
             self.context_error = log_error(e, f"Prediction failed")
-            pred = 0.5
-            time.sleep(2)
+            self.prediction_label_2.configure(text=f"with a probability of : doesn't succeed to make a prediction")
+            self.root.update_idletasks()
+            pred = -1
         
-        # Step 3: Save image in the corresponding directory 
+        # Step 4: Save image in the corresponding directory 
         directory = Path(DATA_DIR) / ("Mutant_prediction" if pred > 0.5 else "WT_prediction")
+        if pred == -1:
+            directory = Path(DATA_DIR) / "Error" 
+        id = len(list(directory.glob("*")))
         classified_path = directory / f"{id}.tif" 
         shutil.move(str(unclassified_path), str(classified_path))
         
-        # Step 4: Update prediction in worm database
-        self.worms_position.update_worm_prediction(id, pred)
-        self.prediction = int(100*pred)
-        self.prediction_label_2.configure(text=f"with a probability of {self.prediction}%")
-        self.root.update_idletasks()
     
     def start_live(self):
         """
@@ -3032,7 +3038,7 @@ class WormAnalysisApp:
 
         tk.Label(
             button1_analysis_container,
-            text="Start analysis",
+            text="Live",
             bg=self.colors.theme["primary_background"],
             fg=self.colors.theme["secondary_text"],
             font=(self.font, 10)
@@ -3066,7 +3072,7 @@ class WormAnalysisApp:
 
         tk.Label(
             button2_analysis_container,
-            text="Take snapshot",
+            text="Snap image",
             bg=self.colors.theme["primary_background"],
             fg=self.colors.theme["secondary_text"],
             font=(self.font, 10)
@@ -3310,6 +3316,17 @@ class WormAnalysisApp:
             border_width=2,
             border_color=self.colors.theme["stroke_button"]
         )
+        
+        warning_label = tk.Label(
+            bottom_buttons_4_analysis_container,
+            text="⚠️ Don't use the joystick to move from one worm to another. ⚠️\n"
+                 "Use the buttons above, or the arrows on the keyboard instead.",
+            bg=self.colors.theme["primary_background"],
+            fg=self.colors.theme["secondary_text"],
+            font=(self.font, 9, "bold"),
+            justify="center"
+        )
+        warning_label.pack(pady=(5, 0))
 
         # 5. Button + Text with Padding
         final_5_analysis_container = tk.Frame(right_map_analysis_container, bg=self.colors.theme["primary_background"])

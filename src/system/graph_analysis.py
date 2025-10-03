@@ -49,11 +49,12 @@ def get_synapses_graph(worm_mask: np.ndarray,
                    by the distribution of maxima.
     """
     # Default return value for error cases
-    DEFAULT_RETURN = (np.array([]), nx.Graph(), 0.0, 0.0, 0.0, np.array([]), np.array([]))
+    DEFAULT_RETURN = (np.array([]), nx.Graph(), 0.0, 0.0, 0.0, 1)
     
     # ----- Input validation -----
     if worm_mask is None or worm_mask.size == 0 or maxima_coords is None or len(maxima_coords) == 0:
         print("Warning: Empty worm mask or maxima coordinates provided")
+        print(maxima_coords)
         return DEFAULT_RETURN
         
     # -- 1 -- Skeletonize worm and get main branch
@@ -543,7 +544,6 @@ def _order_skeleton_points_skan(skeleton):
     """
     # Create the Skeleton object
     skel_obj = skan.csr.Skeleton(skeleton)
-    summary = skan.summarize(skel_obj, separator='-')
     
     # Get the summary with branch information
     try:

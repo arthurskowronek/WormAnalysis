@@ -121,7 +121,7 @@ class Dataset_Manager:
             
             for label_dir in label_dirs:
                 dir_path = self.data_dir / label_dir
-                print(dir_path)
+
                 if not dir_path.exists():
                     continue
                     
@@ -519,41 +519,41 @@ class Dataset_Manager:
         Raises:
             ValueError: If an unknown model or outlier type is specified.
         """
-        
-        X, _ = self.get_features_selected()
-        y_labels = self.get_y_without_coiled_worm()  # strings 'Mutant'/'WT'
-        # Only when training a classifier:
-        if model_type == 'classifier':
-            label_mapping = {'Mutant': 1, 'WT': 0}
-            y = np.array([label_mapping[label] for label in y_labels])
-        # For outlier:
-        if model_type == 'outlier':
-            X = X[np.array([lbl == 'WT' for lbl in y_labels])]
+        if compute:
+            X, _ = self.get_features_selected()
+            y_labels = self.get_y_without_coiled_worm()  # strings 'Mutant'/'WT'
+            # Only when training a classifier:
+            if model_type == 'classifier':
+                label_mapping = {'Mutant': 1, 'WT': 0}
+                y = np.array([label_mapping[label] for label in y_labels])
+            # For outlier:
+            if model_type == 'outlier':
+                X = X[np.array([lbl == 'WT' for lbl in y_labels])]
 
 
-        # Balance the dataset to prevent class imbalance issues.
-        indices_class_0 = np.where(y == 0)[0]
-        indices_class_1 = np.where(y == 1)[0]
-        min_size = min(len(indices_class_0), len(indices_class_1))
-        balanced_indices_0 = np.random.choice(indices_class_0, min_size, replace=False)
-        balanced_indices_1 = np.random.choice(indices_class_1, min_size, replace=False)
-        balanced_indices = np.concatenate([balanced_indices_0, balanced_indices_1])
-        X_balanced = X[balanced_indices]
-        y_balanced = y[balanced_indices]
-        X, y = shuffle(X_balanced, y_balanced, random_state=42)
-        
-        
-        # Check if the dataset has new samples to decide whether to retrain.
-        csv_path = Path(MODELS_DIR) / "best_model_tracking.csv"
-        if csv_path.exists():
-            df = pd.read_csv(csv_path)
-        else:
-            df = pd.DataFrame(columns=['date','best_scaler_name','best_model_name','best_score','len_y'])      
-        max_len_y = df['len_y'].max()
-        if len(y) <= max_len_y and not retrain:
-            print("Dataset has not changed significantly. No need to retrain the model.")
-            model = joblib.load(MODELS_DIR / "model_prediction.pkl")
-            return model
+            # Balance the dataset to prevent class imbalance issues.
+            indices_class_0 = np.where(y == 0)[0]
+            indices_class_1 = np.where(y == 1)[0]
+            min_size = min(len(indices_class_0), len(indices_class_1))
+            balanced_indices_0 = np.random.choice(indices_class_0, min_size, replace=False)
+            balanced_indices_1 = np.random.choice(indices_class_1, min_size, replace=False)
+            balanced_indices = np.concatenate([balanced_indices_0, balanced_indices_1])
+            X_balanced = X[balanced_indices]
+            y_balanced = y[balanced_indices]
+            X, y = shuffle(X_balanced, y_balanced, random_state=42)
+            
+            
+            # Check if the dataset has new samples to decide whether to retrain.
+            csv_path = Path(MODELS_DIR) / "best_model_tracking.csv"
+            if csv_path.exists():
+                df = pd.read_csv(csv_path)
+            else:
+                df = pd.DataFrame(columns=['date','best_scaler_name','best_model_name','best_score','len_y'])      
+            max_len_y = df['len_y'].max()
+            if len(y) <= max_len_y and not retrain:
+                print("Dataset has not changed significantly. No need to retrain the model.")
+                model = joblib.load(MODELS_DIR / "model_prediction.pkl")
+                return model
     
 
         if not compute:

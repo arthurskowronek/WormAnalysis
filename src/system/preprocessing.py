@@ -159,10 +159,7 @@ class Preprocessing():
             img, local_max = self.find_local_maxima(image)
             
             # Get synapses graph
-            maxima, G, median_width, diff_slice, diff_segment, NUMBER_OF_CORDS = get_synapses_graph(
-                worm_mask,
-                local_max
-            )
+            maxima, G, median_width, diff_slice, diff_segment, NUMBER_OF_CORDS = get_synapses_graph(worm_mask, local_max)
 
             maxima = list(map(tuple, maxima))
 
