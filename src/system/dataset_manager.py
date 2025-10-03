@@ -364,9 +364,8 @@ class Dataset_Manager:
             feature_reduction (bool): DEPRECATED. Use `selection_method` instead.
                                       Defaults to False.
             selection_method (str): The method to use for feature selection.
-                                    Options include 'saved', 'kbest', 'boruta',
-                                    'mRMR', 'elasticnet', 'lasso', or 'none'.
-                                    Defaults to 'saved'.
+                                    Options include 'saved', 'none'. But 'none' has to be always used. 
+                                    Because the selection is made in the pipeline
             verbose (bool): If True, prints additional information during the process.
                             Defaults to False.
         
