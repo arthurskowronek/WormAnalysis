@@ -207,8 +207,8 @@ class WormAnalysisApp:
         self.scan_objective = tk.StringVar(value=self.loaded_params.get("scan_objective", '4x'))
         self.scan_objective.trace_add("write", lambda *args: self.save_parameters())
         
-        """self.fluo_objective = tk.StringVar(value=self.loaded_params.get("fluo_objective", '10x'))
-        self.fluo_objective.trace_add("write", lambda *args: self.save_parameters())"""
+        self.fluo_objective = tk.StringVar(value=self.loaded_params.get("fluo_objective", '10x'))
+        self.fluo_objective.trace_add("write", lambda *args: self.save_parameters())
         
         self.user_directory = tk.StringVar(value=self.loaded_params.get("user_directory", 'Arthur_2025_07_24'))
         self.user_directory.trace_add("write", lambda *args: self.save_parameters())
@@ -262,6 +262,7 @@ class WormAnalysisApp:
             "dual_view": self.dual_view.get(),
             "display_mode": self.display_mode.get(),
             "scan_objective": self.scan_objective.get(),
+            "fluo_objective": self.fluo_objective.get(),
             "shape": self.shape.get(),
             "user_directory": self.user_directory.get(),
             "machine_has_dual_view": self.machine_has_dual_view.get(),
@@ -880,11 +881,11 @@ class WormAnalysisApp:
         )
 
         # Fluo objective
-        """bg = "parameters_button_background" if "fluo_objective" in self.enable_parameters_buttons else "parameters_button_disabled_background"
+        bg = "parameters_button_background" if "fluo_objective" in self.enable_parameters_buttons else "parameters_button_disabled_background"
         tk.Label(self.params_content_frame, text="Fluo objective", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
         _, self.fluo_objective_dropdown = self.create_rounded_dropdown(
-            self.params_content_frame, ["10x", "20x", "40x"], self.fluo_objective, bg
-        )"""
+            self.params_content_frame, list_scan_objective, self.fluo_objective, bg
+        )
 
         # Scan shape
         bg = "parameters_button_background" if "scan_shape" in self.enable_parameters_buttons else "parameters_button_disabled_background"
@@ -1362,7 +1363,7 @@ class WormAnalysisApp:
             "dual_view": self.dual_view_toggle,
             #"display_mode": self.display_mode_dropdown,
             "scan_objective": self.scan_objective_dropdown,
-            #"fluo_objective": self.fluo_objective_dropdown,
+            "fluo_objective": self.fluo_objective_dropdown,
             "scan_shape": self.scan_shape_dropdown
         }
         
@@ -1688,7 +1689,7 @@ class WormAnalysisApp:
         finally:
             self.root.quit()
         
-    # Scan result page
+    # Scan result page : TODO
     def draw_prediction_result_box(self):
         """
         Loads a stitched scan image, draws bounding boxes around detected worm
@@ -2302,8 +2303,7 @@ class WormAnalysisApp:
         id = len(list(directory.glob("*")))
         classified_path = directory / f"{id}.tif" 
         shutil.move(str(unclassified_path), str(classified_path))
-        
-    
+          
     def start_live(self):
         """
         Starts the live image acquisition loop.
