@@ -491,12 +491,12 @@ class WormAnalysisApp:
         # Process live.png
         live_path = Path(RESSOURCES_DIR) / "icon" / "live.png" 
         self.live_icon = self.flatten_and_resize_icon(live_path, 40, 40, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
-        self.live_icon_hover = self.flatten_and_resize_icon(live_path, 40, 40, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
+        self.live_icon_hover = self.flatten_and_resize_icon(live_path, 40, 40, self.colors.theme["tertiary_background"], self.colors.theme["stroke_button"])
         
         # Process snap.png
         snap_path = Path(RESSOURCES_DIR) / "icon" / "snap.png" 
         self.snap_icon = self.flatten_and_resize_icon(snap_path, 40, 40, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
-        self.snap_icon_hover = self.flatten_and_resize_icon(snap_path, 40, 40, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
+        self.snap_icon_hover = self.flatten_and_resize_icon(snap_path, 40, 40, self.colors.theme["tertiary_background"], self.colors.theme["stroke_button"])
         
         # Process wildtype.png
         wildtype_path = Path(RESSOURCES_DIR) / "icon" / "wildtype.png" 
@@ -521,12 +521,12 @@ class WormAnalysisApp:
         # Process add_worm.png
         add_worm_path = Path(RESSOURCES_DIR) / "icon" / "add_worm.png" 
         self.add_worm_icon = self.flatten_and_resize_icon(add_worm_path, 20, 20, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
-        self.add_worm_icon_hover = self.flatten_and_resize_icon(add_worm_path, 20, 20, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
+        self.add_worm_icon_hover = self.flatten_and_resize_icon(add_worm_path, 20, 20, self.colors.theme["tertiary_background"], self.colors.theme["stroke_button"])
         
         # Process remove_worm.png
         remove_worm_path = Path(RESSOURCES_DIR) / "icon" / "remove_worm.png" 
         self.remove_worm_icon = self.flatten_and_resize_icon(remove_worm_path, 20, 20, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
-        self.remove_worm_icon_hover = self.flatten_and_resize_icon(remove_worm_path, 20, 20, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
+        self.remove_worm_icon_hover = self.flatten_and_resize_icon(remove_worm_path, 20, 20, self.colors.theme["tertiary_background"], self.colors.theme["stroke_button"])
                
         # Machine config icon
         # Process toggle_open.png - big size
@@ -1770,7 +1770,7 @@ class WormAnalysisApp:
         x_bounding_box_proportion = float(self.bounding_box_size / display_width)
         y_bounding_box_proportion = float(self.bounding_box_size / display_height)
         
-        # Get scan image associated
+        # Get scan image associated for a futur annotation and improvement of the model
         if self.add_worm_scan_result:
             try:
                 for i in range(int(self.scan_width.get()) + 1):
@@ -1878,6 +1878,38 @@ class WormAnalysisApp:
         self.worms_position.add_worm_microscope_position(x_microscope, y_microscope)
     
     # load position page
+    def on_live_image_click(self, event):
+        """
+        Handles click events on the live image to move the camera to the position being clicked.
+
+        Args:
+            event (tk.Event): The event object from the click, containing
+                            the `x` and `y` coordinates of the click.
+        """
+        # Get clicked coordinates in displayed image
+        x_display, y_display = event.x, event.y
+
+        # Get displayed image size
+        display_width = self.live_image_label.winfo_width()
+        display_height = self.live_image_label.winfo_height()
+        
+        # Compute position
+        config = load_config_file()
+        objective = int(self.fluo_objective.get().replace("x", ""))
+        y_mouse = 1 - float(x_display / display_width)
+        x_mouse = float(y_display / display_height)  
+        display_real_size = int(int(config.get("microscope_step_size")) / objective)
+        
+        # Move microscope to the clicked position
+        x_microscope, y_microscope = self.CORE.getXYPosition()
+        x_new = x_microscope + (x_mouse - 0.5) * display_real_size
+        y_new = y_microscope + (y_mouse - 0.5) * display_real_size
+        self.CORE.setXYPosition(self.CORE.getXYStageDevice(), x_new, y_new)
+
+        # Save new position in the worm position csv file
+        id = self.worms_position.get_id_worm_seen()
+        self.worms_position.update_worm_position(id, x_new, y_new)
+
     def start_live(self):
         """Start live loop (safe): set flag and launch update loop."""
         self.live_image = True
@@ -2664,8 +2696,8 @@ class WormAnalysisApp:
         button_row_frame.pack(pady=5, anchor="center")  
         
         # Choose which button appears "selected"
-        add_bg = self.colors.theme["secondary_background"] if self.add_worm_scan_result else self.colors.theme["primary_background"]
-        remove_bg = self.colors.theme["secondary_background"] if not self.add_worm_scan_result else self.colors.theme["primary_background"]
+        add_bg = self.colors.theme["tertiary_background"] if self.add_worm_scan_result else self.colors.theme["primary_background"]
+        remove_bg = self.colors.theme["tertiary_background"] if not self.add_worm_scan_result else self.colors.theme["primary_background"]
         add_icon = self.add_worm_icon if not self.add_worm_scan_result else self.add_worm_icon_hover
         rmeove_icon = self.remove_worm_icon if self.add_worm_scan_result else self.remove_worm_icon_hover
         
@@ -2681,7 +2713,7 @@ class WormAnalysisApp:
             command=lambda: self.toggle_add_worm_scan_result(),
             bg_color=add_bg,
             text_color=self.colors.theme["primary_text"],
-            hover_color=self.colors.theme["secondary_background"],
+            hover_color=self.colors.theme["tertiary_background"],
             font=(self.font, 16),
             width_pixels=100,
             height_pixels=60,
@@ -2756,7 +2788,7 @@ class WormAnalysisApp:
             command=lambda: self.toggle_add_worm_scan_result(),
             bg_color=remove_bg,
             text_color=self.colors.theme["primary_text"],
-            hover_color=self.colors.theme["secondary_background"],
+            hover_color=self.colors.theme["tertiary_background"],
             font=(self.font, 16),
             width_pixels=100,
             height_pixels=60,
@@ -3001,6 +3033,8 @@ class WormAnalysisApp:
         if not hasattr(self, "live_image_label") or not self.live_image_label.winfo_exists():
             self.live_image_label = tk.Label(live_analysis_container, bg="black")
             self.live_image_label.pack(expand=True, fill=tk.BOTH)
+            
+            self.live_image_label.bind("<Button-1>", self.on_live_image_click)
 
         # Bottom: Buttons + labels
         bottom_analysis_container = tk.Frame(left_live_analysis_container, bg=self.colors.theme["primary_background"])
@@ -3014,7 +3048,7 @@ class WormAnalysisApp:
         button1_analysis_container = tk.Frame(button_label_row_analysis_container, bg=self.colors.theme["primary_background"])
         button1_analysis_container.pack(side=tk.LEFT, padx=10)
 
-        bg_live_button = self.colors.theme["secondary_background"] if self.live_image else self.colors.theme["primary_background"]
+        bg_live_button = self.colors.theme["tertiary_background"] if self.live_image else self.colors.theme["primary_background"]
         icon_live_button = self.live_icon_hover if self.live_image else self.live_icon
         self.live_button_ref = self.create_rounded_button(
             parent=button1_analysis_container,
@@ -3024,7 +3058,7 @@ class WormAnalysisApp:
             command=lambda: self.start_live(),
             bg_color=bg_live_button,
             text_color=self.colors.theme["primary_text"],
-            hover_color=self.colors.theme["secondary_background"],
+            hover_color=self.colors.theme["tertiary_background"],
             font=(self.font, 16),
             width_pixels=180,
             height_pixels=60,
@@ -3048,7 +3082,7 @@ class WormAnalysisApp:
         button2_analysis_container = tk.Frame(button_label_row_analysis_container, bg=self.colors.theme["primary_background"])
         button2_analysis_container.pack(side=tk.LEFT, padx=10)
 
-        bg_snap_button = self.colors.theme["primary_background"] if self.live_image else self.colors.theme["secondary_background"]
+        bg_snap_button = self.colors.theme["primary_background"] if self.live_image else self.colors.theme["tertiary_background"]
         icon_snap_button = self.snap_icon if self.live_image else self.snap_icon_hover
         self.snap_button_ref = self.create_rounded_button(
             parent=button2_analysis_container,
@@ -3058,7 +3092,7 @@ class WormAnalysisApp:
             command=lambda: self.snap_image_mode(),
             bg_color=bg_snap_button,
             text_color=self.colors.theme["primary_text"],
-            hover_color=self.colors.theme["secondary_background"],
+            hover_color=self.colors.theme["tertiary_background"],
             font=(self.font, 16),
             width_pixels=180,
             height_pixels=60,
@@ -3087,8 +3121,8 @@ class WormAnalysisApp:
             text="Save image",
             command=lambda: self.save_snap_image(), 
             bg_color=self.colors.theme["primary_background"],
-            text_color=self.colors.theme["tertiary_text"],
-            hover_color=self.colors.theme["secondary_background"],
+            text_color=self.colors.theme["secondary_text"],
+            hover_color=self.colors.theme["tertiary_background"],
             font=(self.font, 10),
             width_pixels=120,
             height_pixels=30,

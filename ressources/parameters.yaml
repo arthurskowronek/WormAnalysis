@@ -5,10 +5,10 @@ exposure_time: '100'
 scan_objective: 4x
 shape: Square
 user_directory: Arthur_2025_08_25
-start_x: -17249.900390625
-start_y: -6272.39990234375
-end_x: 6472.599609375
-end_y: 17450.10009765625
+start_x: 6082.89990234375
+start_y: -13171.599609375
+end_x: 29805.39990234375
+end_y: 10550.900390625
 scan_width: '8'
 scan_height: '8'
 machine_has_dual_view: false
@@ -21,3 +21,4 @@ microscope_objective_size_3: '10'
 microscope_objective_size_4: '20'
 microscope_objective_size_5: ''
 microscope_objective_size_6: ''
+fluo_objective: 4x

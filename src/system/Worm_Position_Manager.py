@@ -364,6 +364,41 @@ class WormPositionManager:
         except Exception as e:
             print(f"Error when updating: {e}")
             return False
+        
+    def update_worm_position(self, worm_id: int, microscope_position_x: float, microscope_position_y: float) -> bool:
+        """
+        Updates the microscope position for a specific worm.
+        
+        Args:
+            worm_id (int): The unique identifier of the worm.
+            microscope_position_x (float): The new x position
+            microscope_position_y (float): The new y position
+            
+        Returns:
+            bool: True if the update was successful, False otherwise.
+        """
+        try:
+            df = pd.read_csv(self.csv_file_path)
+            if df.empty:
+                return False
+                
+            mask = df['worm_id'] == worm_id
+            if not mask.any():
+                print(f"Worm ID {worm_id} not find for update")
+                return False
+            
+            df.loc[mask, 'x_microscope'] = float(microscope_position_x)
+            df.loc[mask, 'y_microscope'] = float(microscope_position_y)
+            x_proportion, y_proportion = self.transform_microscope_positions_into_proportion(microscope_position_x,microscope_position_y)
+            df.loc[mask, 'x_proportion'] = float(x_proportion)
+            df.loc[mask, 'y_proportion'] = float(y_proportion)
+            df.to_csv(self.csv_file_path, index=False)
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error when updating: {e}")
+            return False
     
     def update_worm_prediction(self, worm_id: int, prediction: float) -> bool:
         """
