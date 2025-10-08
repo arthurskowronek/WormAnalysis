@@ -466,7 +466,12 @@ class WormAnalysisApp:
         
         # ---------------- Menu icon ----------------
         # Process scan.png
-        scan_path = Path(RESSOURCES_DIR) / "icon" / "scan.png" 
+        """scan_path = Path(RESSOURCES_DIR) / "icon" / "scan.png" 
+        self.scan_icon = self.flatten_and_resize_icon(scan_path, 18, 18, self.colors.theme["primary_background"], self.colors.theme["icon"])
+        self.scan_icon_hover = self.flatten_and_resize_icon(scan_path, 18, 18, self.colors.theme["secondary_background"], self.colors.theme["icon"])
+        """
+        # Process loupe.png
+        scan_path = Path(RESSOURCES_DIR) / "icon" / "loupe.png" 
         self.scan_icon = self.flatten_and_resize_icon(scan_path, 18, 18, self.colors.theme["primary_background"], self.colors.theme["icon"])
         self.scan_icon_hover = self.flatten_and_resize_icon(scan_path, 18, 18, self.colors.theme["secondary_background"], self.colors.theme["icon"])
         
@@ -476,7 +481,13 @@ class WormAnalysisApp:
         self.validation_icon_hover = self.flatten_and_resize_icon(validation_path, 18, 18, self.colors.theme["secondary_background"], self.colors.theme["icon"])
         
         # Process load.png
-        load_path = Path(RESSOURCES_DIR) / "icon" / "load.png" 
+        """load_path = Path(RESSOURCES_DIR) / "icon" / "load.png" 
+        self.loading_icon = self.flatten_and_resize_icon(load_path, 18, 18, self.colors.theme["primary_background"], self.colors.theme["icon"])
+        self.loading_icon_hover = self.flatten_and_resize_icon(load_path, 18, 18, self.colors.theme["secondary_background"], self.colors.theme["icon"])
+        """
+        
+        # Process analyse.png
+        load_path = Path(RESSOURCES_DIR) / "icon" / "analyse.png" 
         self.loading_icon = self.flatten_and_resize_icon(load_path, 18, 18, self.colors.theme["primary_background"], self.colors.theme["icon"])
         self.loading_icon_hover = self.flatten_and_resize_icon(load_path, 18, 18, self.colors.theme["secondary_background"], self.colors.theme["icon"])
         
