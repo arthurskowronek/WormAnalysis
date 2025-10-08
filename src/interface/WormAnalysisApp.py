@@ -87,7 +87,7 @@ class WormAnalysisApp:
         self.hist_ax = None
         self.hist_canvas = None
         self.last_hist_update_time = 0.0
-        self.hist_update_interval = 0.5  # seconds: ~2Hz histogram updates
+        self.hist_update_interval = 1  # seconds: 1Hz histogram updates
         self._contrast_slider_active = False
         self._sensor_min_possible = 0
         self._sensor_max_possible = 65535
@@ -2352,7 +2352,7 @@ class WormAnalysisApp:
                 image_data = self.CORE.getImage()
             except Exception as e:
                 # log, but keep running (don't crash the app)
-                if self.context_error != "Update live image failed":
+                if self.context_error != "Update live image failed (camera)":
                     self.context_error = log_error(e, "Update live image failed (camera)")
                 image_data = None
 
@@ -2596,48 +2596,44 @@ class WormAnalysisApp:
         We only expand range when user is NOT interacting with sliders.
         expand_ratio adds a little padding to avoid frequent small changes.
         """
-        try:
-            if getattr(self, "_contrast_slider_active", False):
-                return  # user is interacting, do not auto-change
+        if getattr(self, "_contrast_slider_active", False):
+            return  # user is interacting, do not auto-change
 
-            if not getattr(self, "vmin_slider", None) or not getattr(self, "vmax_slider", None):
-                return
+        if not getattr(self, "vmin_slider", None) or not getattr(self, "vmax_slider", None):
+            return
 
-            # Convert to ints for slider ranges
-            img_min_i = int(np.floor(float(img_min)))
-            img_max_i = int(np.ceil(float(img_max)))
-            if img_max_i == img_min_i:
-                img_max_i = img_min_i + 1
+        # Convert to ints for slider ranges
+        img_min_i = int(np.floor(float(img_min)))
+        img_max_i = int(np.ceil(float(img_max)))
+        if img_max_i == img_min_i:
+            img_max_i = img_min_i + 1
 
-            # add padding
-            pad = max(1, int((img_max_i - img_min_i) * expand_ratio))
-            new_from = max(int(self._sensor_min_possible), img_min_i - pad)
-            new_to   = min(int(self._sensor_max_possible), img_max_i + pad)
+        # add padding
+        pad = max(1, int((img_max_i - img_min_i) * expand_ratio))
+        new_from = max(int(self._sensor_min_possible), img_min_i - pad)
+        new_to   = min(int(self._sensor_max_possible), img_max_i + pad)
 
-            # read current slider config (they share the same from/to in our UI)
-            cur_from = int(float(self.vmin_slider.cget("from")))
-            cur_to   = int(float(self.vmin_slider.cget("to")))
+        # read current slider config (they share the same from/to in our UI)
+        cur_from = int(float(self.vmin_slider.cget("from")))
+        cur_to   = int(float(self.vmin_slider.cget("to")))
 
-            # Only update if image min/max outside current bounds (avoid jitter)
-            if img_min_i < cur_from or img_max_i > cur_to:
-                # keep user values but clamp into new range
-                vmin_val = int(float(self.vmin_var.get()))
-                vmax_val = int(float(self.vmax_var.get()))
+        # Only update if image min/max outside current bounds (avoid jitter)
+        if img_min_i < cur_from or img_max_i > cur_to:
+            # keep user values but clamp into new range
+            vmin_val = int(float(self.vmin_var.get()))
+            vmax_val = int(float(self.vmax_var.get()))
 
-                # clamp
-                vmin_val = max(new_from, min(vmin_val, new_to - 1))
-                vmax_val = max(new_from + 1, min(vmax_val, new_to))
+            # clamp
+            vmin_val = max(new_from, min(vmin_val, new_to - 1))
+            vmax_val = max(new_from + 1, min(vmax_val, new_to))
 
-                # apply new range to both sliders (same from/to)
-                self.vmin_slider.config(from_=new_from, to=new_to)
-                self.vmax_slider.config(from_=new_from, to=new_to)
+            # apply new range to both sliders (same from/to)
+            self.vmin_slider.config(from_=new_from, to=new_to)
+            self.vmax_slider.config(from_=new_from, to=new_to)
 
-                # update variables (no sudden jump if within range; clamped otherwise)
-                self.vmin_var.set(vmin_val)
-                self.vmax_var.set(vmax_val)
-        except Exception as e:
-            # avoid breaking live loop if something goes wrong
-            self.context_error = log_error(e, "_maybe_update_slider_range failed")
+            # update variables (no sudden jump if within range; clamped otherwise)
+            self.vmin_var.set(vmin_val)
+            self.vmax_var.set(vmax_val)
 
     def update_image_and_histogram(self, img_array=None, live_mode=False):
         """
@@ -2700,7 +2696,8 @@ class WormAnalysisApp:
                 label_width = self.live_image_label.winfo_width()
                 label_height = self.live_image_label.winfo_height()
                 if label_width > 0 and label_height > 0:
-                    image = image.resize((label_width, label_height), Image.Resampling.LANCZOS)
+                    resample_method = Image.Resampling.BILINEAR if live_mode else Image.Resampling.LANCZOS
+                    image = image.resize((label_width, label_height), resample_method)
             except Exception:
                 pass
 
@@ -2731,7 +2728,8 @@ class WormAnalysisApp:
                     self.hist_canvas.draw_idle()
                 self.last_hist_update_time = now
         except Exception as e:
-            self.context_error = log_error(e, f"Update image histogram failed")
+            if self.context_error != "Update image histogram failed":
+                self.context_error = log_error(e, f"Update image histogram failed")
         finally:
             self._image_update_lock = False 
 
