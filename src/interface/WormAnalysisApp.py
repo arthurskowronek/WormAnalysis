@@ -3832,10 +3832,7 @@ class WormAnalysisApp:
             "Use the L camera for scan acquisitions.",
             "Ensure stage is homed and objective turret is in correct position before starting."
         ]
-        automatic_warning = [
-            "Starting a scan will lock many scan parameters until it completes. Do not change objectives during an active scan.",
-            "The worm detection model has been trained with the 4x objective with the maximum white light intensity; using other settings may yield suboptimal results"
-        ]
+        automatic_warning = "The worm detection model has been trained with the 4x objective with the maximum white light intensity; using other settings may yield suboptimal results"
 
         # ----------------- Scan Results Page -----------------
         result_content = [
@@ -3869,6 +3866,7 @@ class WormAnalysisApp:
             "Use the on-screen navigation buttons instead of the joystick for reliable positioning."
         ]
         load_tips = [
+            "Click on the live image to move the microscope stage to center your clicked position in the field of view.",
             "If live mode is enabled, `update_live_image()` keeps the preview refreshed. Snap to freeze before saving.",
             "Save snapshots with 'Save image' button to preserve data for later review. Only works in snap mode."
         ]
