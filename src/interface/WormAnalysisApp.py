@@ -113,9 +113,7 @@ class WormAnalysisApp:
         elif self.current_page == "load_position":
             self.show_load_position_page()
         elif self.current_page == "documentation":
-            self.show_placeholder_page(self.current_page.replace('_', ' ').title())
-        elif self.current_page == "tutorial":
-            self.show_placeholder_page(self.current_page.replace('_', ' ').title())
+            self.show_documentation_page()
         elif self.current_page == "configuration":
             self.show_machine_configuration_page()
         elif self.current_page == "loading_page":
@@ -760,7 +758,6 @@ class WormAnalysisApp:
         
         self.create_menu_section("Help", [
             ("Documentation", "documentation", self.page_icon, self.page_icon_hover),
-            ("Tutorial", "tutorial", self.question_icon, self.question_icon_hover),
             ("Machine Config", "configuration", self.machine_parameters_icon, self.machine_parameters_icon_hover)
         ])
         
@@ -2801,6 +2798,155 @@ class WormAnalysisApp:
             self.context_error = log_error(e, f"Save snap image failed")
               
     # --- Pages ---  
+    def show_assist_acquisition_page(self): # UNUSED and DEPRECATED
+        """
+        Constructs the UI for the assisted worm acquisition page.
+
+        This page is designed to help users manually find and save the positions
+        of worms. It features a live image feed, a button to save the current
+        position, and a small map to visualize the saved positions. Users can
+        then proceed to the analysis stage once they have acquired all their
+        worm positions.
+        """
+        # Clear previous widgets
+        for widget in self.main_content.winfo_children():
+            widget.destroy()
+          
+        # Disable some paramaters buttons   
+        self.update_parameter_widgets_state(disabled_widgets=["scan_shape"]) 
+        self.refresh_parameters_interface()
+        self.update_parameter_widgets_state(disabled_widgets=["scan_shape"])
+
+        # Configure grid layout for main_content
+        self.main_content.grid_columnconfigure(0, weight=60)
+        self.main_content.grid_columnconfigure(1, weight=30)
+        self.main_content.grid_rowconfigure(0, weight=1)
+
+        # ----- LEFT CONTAINER -----
+        left_live_assist_container = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"]) 
+        left_live_assist_container.grid(row=0, column=0, sticky="nsew", padx=(0, 10))  
+        self.left_live_assist_container_ref = left_live_assist_container
+
+        # Use grid in left container to stack content
+        left_live_assist_container.grid_rowconfigure(0, weight=1)  # for live_assist_container
+        left_live_assist_container.grid_rowconfigure(1, weight=0)  # for bottom_assist_container
+        left_live_assist_container.grid_columnconfigure(0, weight=1)
+
+        # Top: Live assist square
+        live_assist_container = tk.Frame(left_live_assist_container, bg=self.colors.theme["secondary_background"], relief=tk.RAISED, bd=1)
+        live_assist_container.grid(row=0, column=0, sticky="nsew")
+        self.live_assist_container_ref = live_assist_container
+
+        # Bind resize for square behavior
+        self.left_live_assist_container_ref.bind("<Configure>", self.resize_live_image)
+        
+        # Placeholder for live image
+        if not self.live_image_label.winfo_exists():
+            self.live_image_label = tk.Label(live_assist_container, bg="black")
+            self.live_image_label.pack(expand=True, fill=tk.BOTH)
+
+        # Bottom: Buttons + label
+        bottom_assist_container = tk.Frame(left_live_assist_container, bg=self.colors.theme["primary_background"])
+        bottom_assist_container.grid(row=1, column=0, sticky="ew", pady=(10, 10))
+        
+        self.create_rounded_button(
+            parent=bottom_assist_container,
+            text="",
+            icon=self.play_icon,
+            icon_hover=self.play_icon_hover,
+            command=lambda: self.switch_page("load_position"),
+            bg_color=self.colors.theme["primary_background"],
+            text_color=self.colors.theme["primary_text"],
+            hover_color=self.colors.theme["secondary_background"],
+            font=(self.font, 16),
+            width_pixels=200,
+            height_pixels=60,
+            corner_radius=20,
+            side=tk.TOP,
+            pady=5,
+            padx_text=-10,
+            border_width=2,
+            border_color=self.colors.theme["stroke_button"]
+        )
+
+        # Info label with tooltip
+        launch_label_assist_container = tk.Frame(bottom_assist_container, bg=self.colors.theme["primary_background"])
+        launch_label_assist_container.pack()
+
+        tk.Label(
+            launch_label_assist_container, text="Start analysis",
+            bg=self.colors.theme["primary_background"], fg=self.colors.theme["tertiary_text"],
+            font=(self.font, 10)
+        ).pack(side=tk.LEFT)
+
+        tk.Label(
+            launch_label_assist_container, image=self.info_icon,
+            bg=self.colors.theme["primary_background"]
+        ).pack(side=tk.LEFT, padx=(5, 0))
+
+        Tooltip(launch_label_assist_container, "Be sure to use the L camera.", posx=160, posy=-60)
+
+        # ----- RIGHT CONTAINER -----
+        right_map_assist_container = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
+        right_map_assist_container.grid(row=0, column=1, sticky="nsew", padx=(0, 20))
+        self.right_map_assist_container_ref = right_map_assist_container
+
+        # Make right container expand vertically
+        right_map_assist_container.grid_rowconfigure(0, weight=1)
+        right_map_assist_container.grid_columnconfigure(0, weight=1)
+
+        # Container for button + text
+        top_button_assist_container = tk.Frame(right_map_assist_container, bg=self.colors.theme["primary_background"])
+        top_button_assist_container.pack(pady=(70, 0))  # adjust padding as needed
+
+        # Button at the top
+        self.create_rounded_button(
+            parent=top_button_assist_container,
+            text="",
+            icon=self.plus_icon,
+            icon_hover=self.plus_icon_hover,
+            command=lambda: self.add_worm_assist_acquisition,
+            bg_color=self.colors.theme["secondary_background"],
+            text_color=self.colors.theme["primary_text"],
+            hover_color=self.colors.theme["tertiary_background"],
+            font=(self.font, 14),
+            width_pixels=150,
+            height_pixels=120,
+            corner_radius=20,
+            side=tk.TOP,
+            pady=5,
+            padx_text=-5,
+            border_width=0
+        )
+
+        # Two lines of text under the button
+        tk.Label(
+            top_button_assist_container,
+            text="Save position",
+            bg=self.colors.theme["primary_background"],
+            fg=self.colors.theme["tertiary_text"],
+            font=(self.font, 10)
+        ).pack()
+
+        tk.Label(
+            top_button_assist_container,
+            text="(you can use the press bar)",
+            bg=self.colors.theme["primary_background"],
+            fg=self.colors.theme["tertiary_text"],
+            font=(self.font, 7)
+        ).pack()
+
+        # Bottom: Black square (map)
+        map_assist_container = tk.Frame(right_map_assist_container, bg="black")
+        map_assist_container.place(x=0, y=0, width=0, height=0)
+        self.map_assist_containter_ref = map_assist_container
+        self.right_map_assist_container_ref.bind("<Configure>", self.resize_map_assist)
+        
+        # Update the live image
+        if self.live_image:
+            self._live_running = True
+            self.update_live_image()
+    
     def show_automatic_scan_page(self):
         """
         Constructs the UI for the automatic scanning page.
@@ -3068,156 +3214,7 @@ class WormAnalysisApp:
         # Bind click event to the image label
         self.img_label.bind("<Button-1>", self.on_stitching_image_click)
         self.img_label.bind("<B1-Motion>", self.on_stitching_image_drag)
-
-    def show_assist_acquisition_page(self):
-        """
-        Constructs the UI for the assisted worm acquisition page.
-
-        This page is designed to help users manually find and save the positions
-        of worms. It features a live image feed, a button to save the current
-        position, and a small map to visualize the saved positions. Users can
-        then proceed to the analysis stage once they have acquired all their
-        worm positions.
-        """
-        # Clear previous widgets
-        for widget in self.main_content.winfo_children():
-            widget.destroy()
-          
-        # Disable some paramaters buttons   
-        self.update_parameter_widgets_state(disabled_widgets=["scan_shape"]) 
-        self.refresh_parameters_interface()
-        self.update_parameter_widgets_state(disabled_widgets=["scan_shape"])
-
-        # Configure grid layout for main_content
-        self.main_content.grid_columnconfigure(0, weight=60)
-        self.main_content.grid_columnconfigure(1, weight=30)
-        self.main_content.grid_rowconfigure(0, weight=1)
-
-        # ----- LEFT CONTAINER -----
-        left_live_assist_container = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"]) 
-        left_live_assist_container.grid(row=0, column=0, sticky="nsew", padx=(0, 10))  
-        self.left_live_assist_container_ref = left_live_assist_container
-
-        # Use grid in left container to stack content
-        left_live_assist_container.grid_rowconfigure(0, weight=1)  # for live_assist_container
-        left_live_assist_container.grid_rowconfigure(1, weight=0)  # for bottom_assist_container
-        left_live_assist_container.grid_columnconfigure(0, weight=1)
-
-        # Top: Live assist square
-        live_assist_container = tk.Frame(left_live_assist_container, bg=self.colors.theme["secondary_background"], relief=tk.RAISED, bd=1)
-        live_assist_container.grid(row=0, column=0, sticky="nsew")
-        self.live_assist_container_ref = live_assist_container
-
-        # Bind resize for square behavior
-        self.left_live_assist_container_ref.bind("<Configure>", self.resize_live_image)
-        
-        # Placeholder for live image
-        if not self.live_image_label.winfo_exists():
-            self.live_image_label = tk.Label(live_assist_container, bg="black")
-            self.live_image_label.pack(expand=True, fill=tk.BOTH)
-
-        # Bottom: Buttons + label
-        bottom_assist_container = tk.Frame(left_live_assist_container, bg=self.colors.theme["primary_background"])
-        bottom_assist_container.grid(row=1, column=0, sticky="ew", pady=(10, 10))
-        
-        self.create_rounded_button(
-            parent=bottom_assist_container,
-            text="",
-            icon=self.play_icon,
-            icon_hover=self.play_icon_hover,
-            command=lambda: self.switch_page("load_position"),
-            bg_color=self.colors.theme["primary_background"],
-            text_color=self.colors.theme["primary_text"],
-            hover_color=self.colors.theme["secondary_background"],
-            font=(self.font, 16),
-            width_pixels=200,
-            height_pixels=60,
-            corner_radius=20,
-            side=tk.TOP,
-            pady=5,
-            padx_text=-10,
-            border_width=2,
-            border_color=self.colors.theme["stroke_button"]
-        )
-
-        # Info label with tooltip
-        launch_label_assist_container = tk.Frame(bottom_assist_container, bg=self.colors.theme["primary_background"])
-        launch_label_assist_container.pack()
-
-        tk.Label(
-            launch_label_assist_container, text="Start analysis",
-            bg=self.colors.theme["primary_background"], fg=self.colors.theme["tertiary_text"],
-            font=(self.font, 10)
-        ).pack(side=tk.LEFT)
-
-        tk.Label(
-            launch_label_assist_container, image=self.info_icon,
-            bg=self.colors.theme["primary_background"]
-        ).pack(side=tk.LEFT, padx=(5, 0))
-
-        Tooltip(launch_label_assist_container, "Be sure to use the L camera.", posx=160, posy=-60)
-
-        # ----- RIGHT CONTAINER -----
-        right_map_assist_container = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
-        right_map_assist_container.grid(row=0, column=1, sticky="nsew", padx=(0, 20))
-        self.right_map_assist_container_ref = right_map_assist_container
-
-        # Make right container expand vertically
-        right_map_assist_container.grid_rowconfigure(0, weight=1)
-        right_map_assist_container.grid_columnconfigure(0, weight=1)
-
-        # Container for button + text
-        top_button_assist_container = tk.Frame(right_map_assist_container, bg=self.colors.theme["primary_background"])
-        top_button_assist_container.pack(pady=(70, 0))  # adjust padding as needed
-
-        # Button at the top
-        self.create_rounded_button(
-            parent=top_button_assist_container,
-            text="",
-            icon=self.plus_icon,
-            icon_hover=self.plus_icon_hover,
-            command=lambda: self.add_worm_assist_acquisition,
-            bg_color=self.colors.theme["secondary_background"],
-            text_color=self.colors.theme["primary_text"],
-            hover_color=self.colors.theme["tertiary_background"],
-            font=(self.font, 14),
-            width_pixels=150,
-            height_pixels=120,
-            corner_radius=20,
-            side=tk.TOP,
-            pady=5,
-            padx_text=-5,
-            border_width=0
-        )
-
-        # Two lines of text under the button
-        tk.Label(
-            top_button_assist_container,
-            text="Save position",
-            bg=self.colors.theme["primary_background"],
-            fg=self.colors.theme["tertiary_text"],
-            font=(self.font, 10)
-        ).pack()
-
-        tk.Label(
-            top_button_assist_container,
-            text="(you can use the press bar)",
-            bg=self.colors.theme["primary_background"],
-            fg=self.colors.theme["tertiary_text"],
-            font=(self.font, 7)
-        ).pack()
-
-        # Bottom: Black square (map)
-        map_assist_container = tk.Frame(right_map_assist_container, bg="black")
-        map_assist_container.place(x=0, y=0, width=0, height=0)
-        self.map_assist_containter_ref = map_assist_container
-        self.right_map_assist_container_ref.bind("<Configure>", self.resize_map_assist)
-        
-        # Update the live image
-        if self.live_image:
-            self._live_running = True
-            self.update_live_image()
-    
+ 
     def show_load_position_page(self):
         """
         Constructs the UI for the worm analysis and classification page.
@@ -3646,23 +3643,306 @@ class WormAnalysisApp:
                 self._live_running = True
                 self.update_live_image()
             self.root.after(300, self._try_open_histogram)
-
-    def show_placeholder_page(self, page_name):
-        """
-        Constructs a placeholder page with a message indicating that the page is coming soon.
-
-        Args:
-            page_name (str): The name of the page to display in the placeholder.
-        """
-        placeholder = tk.Label(self.main_content, text=f"{page_name} Page\n(Coming soon...)",
-                             bg=self.colors.theme["primary_background"], fg=self.colors.theme["primary_text"], font=(self.font, 16))
-        placeholder.pack(expand=True)
         
-        # Disable some paramaters buttons 
-        self.update_parameter_widgets_state(disabled_widgets=["exposure_time","binning","shutter","dual_view","display_mode","scan_objective","fluo_objective","scan_shape"]) 
-        self.refresh_parameters_interface()
-        self.update_parameter_widgets_state(disabled_widgets=["exposure_time","binning","shutter","dual_view","display_mode","scan_objective","fluo_objective","scan_shape"])
-        
+    def show_documentation_page(self):
+        """
+        Constructs the UI for a Documentation page that explains the three main pages:
+        - Automatic Scan (show_automatic_scan_page)
+        - Scan Results (show_result_scan_page)
+        - Worm Analysis (show_load_position_page)
+
+        The doc page provides:
+        - A scrollable area containing one section per page with description, steps,
+            important controls, tips, and warnings.
+        - A search box to filter sections.
+        - Collapsible sections for compactness.
+        """
+        # Clear previous widgets
+        for widget in self.main_content.winfo_children():
+            widget.destroy()
+
+        # Top area: Title + search
+        top_frame = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
+        top_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
+
+        title_label = tk.Label(
+            top_frame,
+            text="Documentation",
+            bg=self.colors.theme["primary_background"],
+            fg=self.colors.theme["secondary_text"],
+            font=(self.font, 16, "bold")
+        )
+        title_label.pack(side=tk.LEFT, anchor="w")
+
+        # Search entry to filter sections
+        search_frame = tk.Frame(top_frame, bg=self.colors.theme["primary_background"])
+        search_frame.pack(side=tk.RIGHT, anchor="e")
+
+        search_var = tk.StringVar()
+
+        search_entry = tk.Entry(
+            search_frame,
+            textvariable=search_var,
+            bg=self.colors.theme["secondary_background"],
+            fg=self.colors.theme["primary_text"],
+            relief=tk.FLAT,
+            font=(self.font, 10),
+            width=28
+        )
+        search_entry.pack(side=tk.LEFT, padx=(0,8))
+
+        search_icon_label = tk.Label(search_frame, image=getattr(self, "info_icon", None),
+                                    bg=self.colors.theme["primary_background"])
+        # safe: if info_icon missing it will show nothing
+        search_icon_label.pack(side=tk.LEFT)
+        Tooltip(search_icon_label, "Type to filter documentation sections", theme="info", title="Info", posx=70, posy=-40)
+
+        # Middle: Scrollable area
+        scroll_container = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
+        scroll_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=(5,10))
+
+        doc_canvas = tk.Canvas(
+            scroll_container,
+            bg=self.colors.theme["primary_background"],
+            highlightthickness=0
+        )
+        v_scroll = tk.Scrollbar(scroll_container, orient=tk.VERTICAL, command=doc_canvas.yview)
+        doc_canvas.configure(yscrollcommand=v_scroll.set)
+
+        v_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        doc_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        inner_frame = tk.Frame(doc_canvas, bg=self.colors.theme["primary_background"])
+        inner_id = doc_canvas.create_window((0, 0), window=inner_frame, anchor="nw")
+
+        # Ensure scrolling region updates
+        def _on_configure(event):
+            doc_canvas.configure(scrollregion=doc_canvas.bbox("all"))
+        inner_frame.bind("<Configure>", _on_configure)
+
+        # Resize inner window width on canvas resize
+        def _on_canvas_resize(event):
+            canvas_width = event.width
+            doc_canvas.itemconfig(inner_id, width=canvas_width)
+        doc_canvas.bind("<Configure>", _on_canvas_resize)
+
+        # Helper: create a collapsible section for each page
+        section_frames = []  # store tuples (frame, text) to allow search filtering
+
+        def make_section(title, content_lines, quick_action=None, shortcuts=None, tips=None, warning=None):
+            """
+            title: str
+            content_lines: list[str] - paragraphs / bullet points
+            quick_action: dict with keys {'label': 'Open page', 'command': lambda: ...}
+            shortcuts: list[str]
+            tips: list[str]
+            warning: str
+            """
+            container = tk.Frame(inner_frame, bg=self.colors.theme["primary_background"], bd=0)
+            container.pack(fill=tk.X, pady=(8, 8), padx=4)
+
+            # Header (clickable)
+            header_frame = tk.Frame(container, bg=self.colors.theme["secondary_background"])
+            header_frame.pack(fill=tk.X, ipady=6)
+
+            header_lbl = tk.Label(
+                header_frame,
+                text=title,
+                bg=self.colors.theme["secondary_background"],
+                fg=self.colors.theme["primary_text"],
+                font=(self.font, 12, "bold"),
+                anchor="w"
+            )
+            header_lbl.pack(side=tk.LEFT, padx=10)
+
+            # Info icon on header
+            info_lbl = tk.Label(header_frame, image=getattr(self, "info_icon", None),
+                                bg=self.colors.theme["secondary_background"])
+            info_lbl.pack(side=tk.LEFT, padx=(6,0))
+            Tooltip(info_lbl, f"Show details about: {title}", theme="info", title="Info", posx=70, posy=-40)
+
+            # Body (collapsible)
+            body = tk.Frame(container, bg=self.colors.theme["primary_background"], padx=10, pady=8)
+            body.pack(fill=tk.X)
+
+            # fill content
+            for line in content_lines:
+                tk.Label(body, text=line, wraplength=860,
+                        justify="left",
+                        bg=self.colors.theme["primary_background"],
+                        fg=self.colors.theme["secondary_text"],
+                        font=(self.font, 10)).pack(anchor="w", pady=(2,2))
+
+            if shortcuts:
+                tk.Label(body, text="Shortcuts:", bg=self.colors.theme["primary_background"],
+                        fg=self.colors.theme["tertiary_text"], font=(self.font, 9, "bold")).pack(anchor="w", pady=(6,0))
+                for s in shortcuts:
+                    tk.Label(body, text=f"• {s}", wraplength=860, justify="left",
+                            bg=self.colors.theme["primary_background"], fg=self.colors.theme["secondary_text"],
+                            font=(self.font, 9)).pack(anchor="w")
+
+            if tips:
+                tk.Label(body, text="Tips:", bg=self.colors.theme["primary_background"],
+                        fg=self.colors.theme["tertiary_text"], font=(self.font, 9, "bold")).pack(anchor="w", pady=(6,0))
+                for t in tips:
+                    tk.Label(body, text=f"• {t}", wraplength=860, justify="left",
+                            bg=self.colors.theme["primary_background"], fg=self.colors.theme["secondary_text"],
+                            font=(self.font, 9)).pack(anchor="w")
+
+            if warning:
+                tk.Label(body, text="Warning:", bg=self.colors.theme["primary_background"],
+                        fg=self.colors.theme["tertiary_text"], font=(self.font, 9, "bold")).pack(anchor="w", pady=(6,0))
+                tk.Label(body, text=warning, wraplength=860, justify="left",
+                        bg=self.colors.theme["primary_background"], fg=self.colors.theme["secondary_text"],
+                        font=(self.font, 9, "bold")).pack(anchor="w", pady=(2,0))
+
+            # Collapsible behavior
+            body.visible = True
+            def toggle_body(event=None):
+                if body.visible:
+                    body.pack_forget()
+                    body.visible = False
+                else:
+                    body.pack(fill=tk.X)
+                    body.visible = True
+
+            # clicking header toggles
+            header_frame.bind("<Button-1>", toggle_body)
+            header_lbl.bind("<Button-1>", toggle_body)
+            info_lbl.bind("<Button-1>", toggle_body)
+
+            # record for search
+            section_frames.append((container, " ".join([title] + content_lines + (tips or []) + (shortcuts or []))))
+            return container
+
+        # Prepare content for each of your three pages
+        # ----------------- Automatic Scan Page -----------------
+        automatic_content = [
+            "Purpose: Start and run an automated microscope scan that stitches images to produce a full field view.",
+            "Main UI elements: large resizable content area (for live scan preview), 'Launch scan' rounded button, status label showing scan steps.",
+            "Behavior notes: Many scan parameters get disabled on this page to prevent inconsistent state during scanning.",
+            "The scan search for worms during acquisition and marks them with bounding boxes while saving their positions."
+            "The scan preview area does not update during an active scan to avoid performance issues.",
+            "After scan completion, you will be automatically redirected to the Scan Results page.",
+        ]
+        automatic_shortcuts = [
+            "Make sure the objective is in the lower-right corner before launching.",
+        ]
+        automatic_tips = [
+            "Use the L camera for scan acquisitions.",
+            "Ensure stage is homed and objective turret is in correct position before starting."
+        ]
+        automatic_warning = [
+            "Starting a scan will lock many scan parameters until it completes. Do not change objectives during an active scan.",
+            "The worm detection model has been trained with the 4x objective with the maximum white light intensity; using other settings may yield suboptimal results"
+        ]
+
+        # ----------------- Scan Results Page -----------------
+        result_content = [
+            "Purpose: Display stitched scan image with detected-worm bounding boxes. Allow manual correction (add/remove worms).",
+            "Main UI elements: stitched image display, Add / Remove worm buttons, Start analysis button to go to worm-by-worm analysis.",
+            "Behavior notes: Many scan parameters get disabled on this page to prevent inconsistent state during correction."
+        ]
+        result_shortcuts = [
+            "Click on the stitched image to add a worm (when in Add mode).",
+            "Drag over worms to remove them (when in Remove mode)."
+        ]
+        result_tips = [
+            "Switch between Add / Remove mode using the two small rounded buttons — the active one visually highlights.",
+            "After corrections, press 'Start analysis' to proceed to the worm-by-worm review screen."
+        ]
+        result_warning = "Do not try to change scan geometry or objectives on this page; parameters are disabled intentionally."
+
+        # ----------------- Worm Analysis Page -----------------
+        load_content = [
+            "Purpose: Review and analyze individual worm snapshots; allow live preview, snapping, manual classification, and launching the analysis model.",
+            "Main UI elements: left live/snap image area (resizable), right panel with prediction & manual classification buttons, navigation (next/previous worm).",
+            "Behavior notes: Live mode periodically updates the image; snapping freezes frame for manual inspection or saving.",
+            "Use the navigation buttons or keyboard arrows to move between worms; avoid using the joystick for this purpose.",
+            "The analysis button run the prediction model on the currently displayed worm, giving a classification and confidence score in the top-right panel about the synaptic profile of the worm.",
+            "You can manually classify the worm as Wild-Type or Mutant using the buttons below the prediction panel. The proportion of each class is shown below the respective buttons.",
+            "The histogram window let you adjust the brightness/contrast of the live/snap image for better visualization.",
+            "The save image button allows you to save the currently snapped image. It will not take care of the modifications you made using the histogram window."
+        ]
+        load_shortcuts = [
+            "Left / Right arrow keys: navigate between worms.",
+            "Use the on-screen navigation buttons instead of the joystick for reliable positioning."
+        ]
+        load_tips = [
+            "If live mode is enabled, `update_live_image()` keeps the preview refreshed. Snap to freeze before saving.",
+            "Save snapshots with 'Save image' button to preserve data for later review. Only works in snap mode."
+        ]
+        load_warning = "⚠️ Don't use the joystick to move between worms; use the provided buttons or keyboard arrows."
+
+
+        # Create sections with quick navigation buttons that try to call your page switcher
+        make_section(
+            "Automatic Scan",
+            automatic_content,
+            quick_action={"label": "Open Automatic Scan", "command": lambda: self.switch_page("automatic_scan")},
+            shortcuts=automatic_shortcuts, tips=automatic_tips, warning=automatic_warning
+        )
+
+        make_section(
+            "Scan Results",
+            result_content,
+            quick_action={"label": "Open Scan Results", "command": lambda: self.switch_page("result_scan")},
+            shortcuts=result_shortcuts, tips=result_tips, warning=result_warning
+        )
+
+        make_section(
+            "Analyse Worms",
+            load_content,
+            quick_action={"label": "Open Worm Analysis", "command": lambda: self.switch_page("load_position")},
+            shortcuts=load_shortcuts, tips=load_tips, warning=load_warning
+        )
+
+        # Footer: general notes and close/back button
+        footer_frame = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
+        footer_frame.pack(fill=tk.X, padx=10, pady=(6,12))
+
+        notes_label = tk.Label(
+            footer_frame,
+            text="Notes: This documentation page gives quick operational tips. For implementation details, check the source methods in the codebase.",
+            bg=self.colors.theme["primary_background"],
+            fg=self.colors.theme["tertiary_text"],
+            font=(self.font, 9),
+            justify="left"
+        )
+        notes_label.pack(side=tk.LEFT, anchor="w")
+
+
+        # Live search functionality
+        def apply_search(*args):
+            q = search_var.get().strip().lower()
+            for frame, text in section_frames:
+                if q == "" or q in text.lower():
+                    frame.pack(fill=tk.X, pady=(8,8), padx=4)
+                else:
+                    frame.pack_forget()
+
+            # scroll to top after filtering
+            self.main_content.update_idletasks()
+            doc_canvas.yview_moveto(0.0)
+
+        search_var.trace_add("write", apply_search)
+
+        # Set focus to main_content for key handling if needed
+        try:
+            self.main_content.focus_set()
+        except:
+            pass
+
+        # Trigger layout resize helper similar to other pages
+        try:
+            if hasattr(self, 'main_content') and self.main_content.winfo_exists():
+                after_id = self.main_content.after(100, lambda: doc_canvas.configure(scrollregion=doc_canvas.bbox("all")))
+                if not hasattr(self, '_after_ids'):
+                    self._after_ids = []
+                self._after_ids.append(after_id)
+        except:
+            pass
+       
     def show_machine_configuration_page(self):
         """
         Displays the machine configuration page in the main content area.
