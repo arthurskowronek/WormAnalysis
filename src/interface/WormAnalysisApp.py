@@ -3755,12 +3755,6 @@ class WormAnalysisApp:
             )
             header_lbl.pack(side=tk.LEFT, padx=10)
 
-            # Info icon on header
-            info_lbl = tk.Label(header_frame, image=getattr(self, "info_icon", None),
-                                bg=self.colors.theme["secondary_background"])
-            info_lbl.pack(side=tk.LEFT, padx=(6,0))
-            Tooltip(info_lbl, f"Show details about: {title}", theme="info", title="Info", posx=70, posy=-40)
-
             # Body (collapsible)
             body = tk.Frame(container, bg=self.colors.theme["primary_background"], padx=10, pady=8)
             body.pack(fill=tk.X)
@@ -3809,7 +3803,6 @@ class WormAnalysisApp:
             # clicking header toggles
             header_frame.bind("<Button-1>", toggle_body)
             header_lbl.bind("<Button-1>", toggle_body)
-            info_lbl.bind("<Button-1>", toggle_body)
 
             # record for search
             section_frames.append((container, " ".join([title] + content_lines + (tips or []) + (shortcuts or []))))
