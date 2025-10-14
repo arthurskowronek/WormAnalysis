@@ -10,19 +10,34 @@ import pymmcore
 import traceback
 from pathlib import Path
 
-# Get the project root (assuming we run from the project root)
+# --- 1. DÉFINITION DU CHEMIN STABLE D'EXÉCUTION (Lecture/Écriture Externe) ---
+# EXECUTION_PATH = Dossier contenant le .exe (où se trouvent data, user, Micro-Manager, etc.)
+if getattr(sys, 'frozen', False):
+    # En mode exécutable (.exe ou .app), le chemin est le dossier parent du binaire
+    EXECUTION_PATH = Path(sys.executable).parent
+else:
+    # En mode développement, c'est la racine du projet
+    EXECUTION_PATH = Path(__file__).parent.resolve()
+
+# --- 2. DÉFINITION DE LA RACINE PYINSTALLER (Lecture Interne) ---
+# PROJECT_ROOT = Dossier temporaire _MEIPASS (où se trouvent logs, models, ressources)
 if getattr(sys, 'frozen', False):
     PROJECT_ROOT = Path(sys._MEIPASS)
 else:
-    PROJECT_ROOT = Path(__file__).parent.resolve()
+    PROJECT_ROOT = EXECUTION_PATH # Identique en développement
 
-# Define all project directories
-DATA_DIR = PROJECT_ROOT / "data"
+# --- 3. DÉFINITION DES CHEMINS FINAUX ---
+
+# Chemins INTERNES (inclus dans l'EXE via --add-data) : LECTURE
+LOG_DIR = PROJECT_ROOT / "logs"
 MODELS_DIR = PROJECT_ROOT / "models"
 RESSOURCES_DIR = PROJECT_ROOT / "ressources"
 SRC_DIR = PROJECT_ROOT / "src"
-USER_DIR = PROJECT_ROOT / "user"
-LOG_DIR = PROJECT_ROOT / "logs"
+
+# Chemins EXTERNES (NON inclus dans l'EXE) : LECTURE et ÉCRITURE
+DATA_DIR = EXECUTION_PATH / "data"
+USER_DIR = EXECUTION_PATH / "user"
+MM_DIR = EXECUTION_PATH / "Micro-Manager-2.0gamma"
 
 # Path to the parameters file
 PARAMETERS_FILE = Path(RESSOURCES_DIR) / "parameters.yaml"
@@ -46,6 +61,38 @@ DEFAULT_CV_FOLDS = 5  # Number of cross-validation folds
 EXPOSURE_TIME_LIVE = 50  # Default exposure time for live mode in milliseconds
 NAME_CAMERA = "Camera-1" # TODO : name of the camera
 
+def set_up_environment():
+    # 2. Crée les dossiers EXTERNES (ceux qui sont à côté de l'EXE)
+    # MM_DIR est supposé exister (copié manuellement) et ne doit pas être créé ici.
+    for directory in [DATA_DIR, USER_DIR]:
+        directory.mkdir(parents=True, exist_ok=True) # Utilise EXECUTION_PATH
+
+    # List of subdirectories to create in DATA_DIR
+    data_subdirs = [
+        "Dataset_pkl",
+        "Mutant",
+        "Mutant_prediction",
+        "Scan",
+        "Scan_modified",
+        "Unclassified",
+        "WT",
+        "WT_prediction"
+    ]
+
+    # Create all subdirectories in DATA_DIR (utilise DATA_DIR qui est basé sur EXECUTION_PATH)
+    for subdir in data_subdirs:
+        subdir_path = DATA_DIR / subdir
+        subdir_path.mkdir(parents=True, exist_ok=True)
+
+    # Clear specific subdirectories (utilise DATA_DIR qui est basé sur EXECUTION_PATH)
+    dirs_to_clear = ["Unclassified", "Mutant_prediction", "WT_prediction"]
+    for subdir in dirs_to_clear:
+        directory = DATA_DIR / subdir
+        for file in directory.iterdir():
+            if file.is_file():
+                file.unlink()
+
+# Le reste du code est correct.
 
 def set_up_environment():
     """
@@ -60,7 +107,8 @@ def set_up_environment():
     paths and avoid errors if they already exist.
     """
     # Create root-level directories
-    for directory in [DATA_DIR, MODELS_DIR, RESSOURCES_DIR, SRC_DIR, USER_DIR, LOG_DIR]:
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    for directory in [DATA_DIR, USER_DIR]:
         directory.mkdir(parents=True, exist_ok=True)
 
     # List of subdirectories to create in DATA_DIR
@@ -74,16 +122,16 @@ def set_up_environment():
         "WT",
         "WT_prediction"
     ]
-
+    
     # Create all subdirectories in DATA_DIR
     for subdir in data_subdirs:
-        subdir_path = Path(DATA_DIR) / subdir
+        subdir_path = DATA_DIR / subdir
         subdir_path.mkdir(parents=True, exist_ok=True)
 
-    # Clear specific subdirectories
+    # Clear specific subdirectories 
     dirs_to_clear = ["Unclassified", "Mutant_prediction", "WT_prediction"]
     for subdir in dirs_to_clear:
-        directory = Path(DATA_DIR) / subdir
+        directory = DATA_DIR / subdir
         for file in directory.iterdir():
             if file.is_file():
                 file.unlink()
@@ -110,14 +158,13 @@ def loadCore(verbose = False):
     Raises:
         Any exception raised by pymmcore methods (e.g., loading configuration or setting devices).
     """
-    DIRECTORY = "C:/Program Files/Micro-Manager-2.0gamma" # Select the folder which contains Micro-Manager. # TODO
-    CONFIG = "BESSEREAU_Lab.cfg" # Name of the config file (has to be in the Micro-Manager root folder) # TODO
-    os.chdir(os.path.dirname(os.path.abspath(__file__))) # Set the current working directory
-    config = load_config_file()
+    CONFIG = "BESSEREAU_Lab.cfg" 
     
+    config = load_config_file()
     mmc = pymmcore.CMMCore()
-    mmc.setDeviceAdapterSearchPaths([DIRECTORY])
-    mmc.loadSystemConfiguration(os.path.join(DIRECTORY, CONFIG))
+    mmc.setDeviceAdapterSearchPaths([str(MM_DIR)]) 
+    mmc.loadSystemConfiguration(str(MM_DIR / CONFIG)) 
+    
     mmc.setExposure(EXPOSURE_TIME_LIVE)
     mmc.setAutoShutter(False)
     mmc.setProperty(NAME_CAMERA, "Binning",str(config.get("binning")))
@@ -125,7 +172,7 @@ def loadCore(verbose = False):
 
     if verbose: 
         print(mmc.getDevicePropertyNames("Camera-1"))
-
+        
     return mmc
 
 def load_config_file():

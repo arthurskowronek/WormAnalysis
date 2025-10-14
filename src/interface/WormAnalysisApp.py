@@ -1729,7 +1729,6 @@ class WormAnalysisApp:
         finally:
             self.root.quit()
         
-    # Scan result page : TODO
     def draw_prediction_result_box(self):
         """
         Loads a stitched scan image, draws bounding boxes around detected worm
@@ -2193,7 +2192,7 @@ class WormAnalysisApp:
                 # Image grayscale 2D
                 result[mask_bool] = image[mask_bool]
             else:
-                # Image couleur 3D (rare dans ton cas)
+                # Image couleur 3D
                 for c in range(image.shape[2]):
                     result[..., c][mask_bool] = image[..., c][mask_bool]
             

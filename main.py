@@ -2,6 +2,8 @@
 Created on Thursday June 12 10:41:44 2025
 @author: Arthur SKOWRONEK, BESSEREAU LAB, INMG, LYON
 """
+import os, sys
+import pathlib
 import tkinter as tk
 from src.interface.WormAnalysisApp import WormAnalysisApp
 from config import set_up_environment, loadCore, start_new_session_get_statistics, log_error
@@ -19,6 +21,31 @@ from config import set_up_environment, loadCore, start_new_session_get_statistic
     --add-data "user;user" `
     main.py
     """
+    
+# For Windows use
+"""pyinstaller --onefile --windowed ^
+    --icon=icon_desktop.ico ^
+    --name=Worm_detection ^
+    --add-data "data;data" ^
+    --add-data "logs;logs" ^
+    --add-data "models;models" ^
+    --add-data "ressources;ressources" ^
+    --add-data "Micro-Manager-2.0gamma;Micro-Manager-2.0gamma" ^
+    main.py"""
+    
+# For Mac use
+"""pyinstaller --onedir --windowed \
+    --name=Worm_detection \
+    --add-data "logs:logs" \
+    --add-data "models:models" \
+    --add-data "ressources:ressources" \
+    --hidden-import skan \
+    main.py 
+"""
+
+if getattr(sys, 'frozen', False):
+    app_path = pathlib.Path(sys.executable).resolve().parent
+    os.chdir(app_path)
 
 def main():
     # Setup environment

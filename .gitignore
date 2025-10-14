@@ -15,3 +15,7 @@ notebooks/YOLO_data/train/images
 notebooks/YOLO_data/train/labels
 notebooks/YOLO_data/val/images
 notebooks/YOLO_data/val/labels
+Micro-Manager-2.0gamma
+Worm_detection
+Worm_detection.app
+main.spec
