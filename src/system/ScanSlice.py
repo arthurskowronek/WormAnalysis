@@ -252,6 +252,8 @@ class ScanSlice:
             List[List[float]]: A list of unique worm positions, each represented as a
                                list of `[x_microscope, y_microscope]` coordinates.
         """
+        self._apply_nms(iou_threshold=0.8)
+        
         overlapping_pairs = []
         best_matches = defaultdict(dict)  # {idx1: {id2: (idx2, iou)}}
         
@@ -410,7 +412,61 @@ class ScanSlice:
             return 0.0
         
         return inter_area / union_area
+     
+    def _apply_nms(self, iou_threshold=0.7):
+        """
+        Applique la Non-Maximum Suppression (NMS) pour supprimer les boîtes
+        englobantes qui se chevauchent fortement au sein d'une même image.
+        """
         
+        # 1. Grouper les boîtes par ID d'image
+        boxes_by_image = defaultdict(list)
+        for i, box in enumerate(self.list_bounding_boxes):
+            image_id = box[0]
+            # Stocker la boîte et son index original
+            boxes_by_image[image_id].append((i, box))
+
+        new_list_bounding_boxes = []
+        original_indices_map = {} # Pour garder une trace des indices
+        
+        # 2. Appliquer NMS pour chaque image
+        for image_id, boxes_with_indices in boxes_by_image.items():
+            
+            # Trier les boîtes (si vous avez un score de confiance)
+            # Puisque vous n'avez pas de score, vous pouvez les traiter dans l'ordre actuel
+            
+            keep = set(range(len(boxes_with_indices))) # Indices à conserver dans le groupe
+            
+            for i in range(len(boxes_with_indices)):
+                if i not in keep:
+                    continue
+                
+                # Récupérer l'index original et les coordonnées de la boîte de référence
+                idx1_original, box1 = boxes_with_indices[i]
+                
+                for j in range(i + 1, len(boxes_with_indices)):
+                    if j not in keep:
+                        continue
+                    
+                    # Récupérer l'index original et les coordonnées de la boîte à comparer
+                    idx2_original, box2 = boxes_with_indices[j]
+                    
+                    # NMS : Si l'IoU est supérieur au seuil, on supprime la boîte j (celle de l'index supérieur)
+                    # Note : On réutilise _compute_iou, qui fonctionne pour les boîtes de même ID.
+                    iou = self._compute_iou(box1, box2)
+                    
+                    if iou >= iou_threshold:
+                        # Supprimer la boîte j
+                        keep.remove(j)
+            
+            # 3. Ajouter les boîtes conservées à la nouvelle liste
+            for i in keep:
+                original_index, box = boxes_with_indices[i]
+                new_list_bounding_boxes.append(box)
+                
+        # Remplacer l'ancienne liste par la nouvelle liste filtrée
+        self.list_bounding_boxes = new_list_bounding_boxes  
+         
     # Others methods
     def reconstruct_slice(self, verbose=False):
         """
