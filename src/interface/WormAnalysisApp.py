@@ -79,6 +79,7 @@ class WormAnalysisApp:
         self.loaded_params = load_config_file()
         self.set_parameters()
         self.enable_parameters_buttons = ["exposure_time","binning","shutter","dual_view","display_mode","scan_objective","fluo_objective","scan_shape"]
+        self.list_files_to_annotate = []
 
         self.contrast_win = None
         self.vmin_var = None
@@ -1831,14 +1832,16 @@ class WormAnalysisApp:
                 
                 # Find files that start with filename and end with .tif
                 matching_files = list(source_dir.glob(f"{filename_scan_image_associate}*.tif"))
-                source_file = matching_files[0]
-                
-                # Count existing files in destination directory and create new filename
-                existing_files = list(dest_dir.glob("*.tif"))  # Count .tif files
-                file_number = len(existing_files) + 1  # Next number in sequence
-                
-                dest_file = dest_dir / f"{file_number}.tif"
-                shutil.copy2(source_file, dest_file)
+                if filename_scan_image_associate not in self.list_files_to_annotate:
+                    self.list_files_to_annotate.append(filename_scan_image_associate)
+                    source_file = matching_files[0]
+                    
+                    # Count existing files in destination directory and create new filename
+                    existing_files = list(dest_dir.glob("*.tif"))  # Count .tif files
+                    file_number = len(existing_files) + 1  # Next number in sequence
+                    
+                    dest_file = dest_dir / f"{file_number}.tif"
+                    shutil.copy2(source_file, dest_file)
                 
             except Exception as e:
                 self.context_error = log_error(e, f"Saving image for annotation failed")
@@ -3190,7 +3193,7 @@ class WormAnalysisApp:
 
         remove_info_icon = tk.Label(remove_button_frame, image=self.info_icon, bg=self.colors.theme["primary_background"])
         remove_info_icon.pack(side=tk.TOP, pady=(4, 0))
-        Tooltip(remove_info_icon, "Remove worms by clicking or dragging over them.", title="Info", theme="info", posx=70, posy=-80)
+        Tooltip(remove_info_icon, "Remove the worms by clicking on them or by dragging to select them. Press the E key to clear all of them.", title="Info", theme="info", posx=70, posy=-80)
         
 
         # Trigger resizing after layout completes with error handling
@@ -3202,6 +3205,10 @@ class WormAnalysisApp:
                 self._after_ids.append(after_id)
         except:
             pass
+        
+        # when e is pressed on the keyboard, apply the function self.worm_position.delete_all_worms()
+        self.main_content.focus_set()  # Make sure the frame has focus to capture key events
+        self.main_content.bind('e', lambda event: self.worms_position.delete_all_worms())
             
         # ----- IMAGE DISPLAY -----        
         self.displayed_image = self.draw_prediction_result_box()
@@ -3835,6 +3842,7 @@ class WormAnalysisApp:
         result_shortcuts = [
             "Click on the stitched image to add a worm (when in Add mode).",
             "Drag over worms to remove them (when in Remove mode)."
+            "Press 'E' to clear all detected worms from the scan."
         ]
         result_tips = [
             "Switch between Add / Remove mode using the two small rounded buttons — the active one visually highlights.",

@@ -145,6 +145,14 @@ class WormPositionManager:
         self.find_shortest_path()
 
         return True
+    
+    def delete_all_worms(self):
+        """
+        Deletes all worms from the CSV file
+        """
+        data = {col: [] for col in self.columns}
+        df = pd.DataFrame(data)
+        df.to_csv(self.csv_file_path, index=False)
 
     # Getters and Setters methods
     def get_worm_microscope_position(self, worm_id: int) -> Optional[pd.Series]:
