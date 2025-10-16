@@ -1905,6 +1905,18 @@ class WormAnalysisApp:
                 self.img_label.image = updated_img
                 self.resize_scan_content_area()
          
+    def delete_all_worms(self):
+        """
+        Deletes all recorded worm positions from the dataset and updates the image displayed.
+        """
+        self.worms_position.delete_all_worms()
+        
+        updated_img = self.draw_prediction_result_box()
+        self.displayed_image = updated_img
+        self.img_label.configure(image=updated_img)
+        self.img_label.image = updated_img  # Prevent image from being garbage collected
+        self.resize_scan_content_area()
+        
     # Assist acquisition page
     def add_worm_assist_acquisition(self):
         """
@@ -3208,7 +3220,7 @@ class WormAnalysisApp:
         
         # when e is pressed on the keyboard, apply the function self.worm_position.delete_all_worms()
         self.main_content.focus_set()  # Make sure the frame has focus to capture key events
-        self.main_content.bind('e', lambda event: self.worms_position.delete_all_worms())
+        self.main_content.bind('e', lambda event: self.delete_all_worms())
             
         # ----- IMAGE DISPLAY -----        
         self.displayed_image = self.draw_prediction_result_box()
@@ -3841,7 +3853,7 @@ class WormAnalysisApp:
         ]
         result_shortcuts = [
             "Click on the stitched image to add a worm (when in Add mode).",
-            "Drag over worms to remove them (when in Remove mode)."
+            "Drag over worms to remove them (when in Remove mode).",
             "Press 'E' to clear all detected worms from the scan."
         ]
         result_tips = [
