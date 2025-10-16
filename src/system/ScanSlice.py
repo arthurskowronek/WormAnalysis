@@ -6,6 +6,7 @@ from pathlib import Path
 from ultralytics import YOLO
 from tifffile import imwrite, imread
 from collections import defaultdict
+from scipy.spatial import cKDTree
 
 from config import MODELS_DIR, RESSOURCES_DIR, DATA_DIR, save_corner_positions_into_yaml_config_file, load_config_file
 
@@ -304,8 +305,31 @@ class ScanSlice:
             x = sum(tab_x) / len(tab_x)
             y = sum(tab_y) / len(tab_y)
             positions_worms.append([x, y])
-        
-        return positions_worms
+            
+    
+        # Cluster nearby points (distance < 6) using a KD-Tree
+        if positions_worms:
+            pts = np.array(positions_worms)
+            min_dist = 6
+            tree = cKDTree(pts)
+            visited = np.zeros(len(pts), dtype=bool)
+            clusters = []
+
+            for i in range(len(pts)):
+                if visited[i]:
+                    continue
+                # Find all neighbors within min_dist
+                neighbors = tree.query_ball_point(pts[i], min_dist)
+                visited[neighbors] = True
+                # Average the neighbors to form a cluster center
+                cluster_center = pts[neighbors].mean(axis=0)
+                clusters.append(cluster_center)
+
+            filtered_positions = [c.tolist() for c in clusters]
+        else:
+            filtered_positions = []
+
+        return filtered_positions
     
     # Helpers methods for bounding box processing
     def _boxes_overlap(self, box1, box2):
