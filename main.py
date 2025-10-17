@@ -8,30 +8,17 @@ import tkinter as tk
 from src.interface.WormAnalysisApp import WormAnalysisApp
 from config import set_up_environment, loadCore, start_new_session_get_statistics, log_error
 
-# Commande pour créer l'executable: 
-"""pyinstaller --onefile --windowed `
-    --icon=icon_desktop.ico `
-    --name=Worm_detection `
-    --add-data "C:/Program Files/Micro-Manager-2.0gamma;Micro-Manager-2.0gamma" `
-    --add-data "data;data" `
-    --add-data "logs;logs" `
-    --add-data "models;models" `
-    --add-data "ressources;ressources" `
-    --add-data "src;src" `
-    --add-data "user;user" `
-    main.py
-    """
-    
+# Commande pour créer l'executable:    
 # For Windows use
-"""pyinstaller --onefile --windowed ^
-    --icon=icon_desktop.ico ^
-    --name=Worm_detection ^
-    --add-data "data;data" ^
-    --add-data "logs;logs" ^
-    --add-data "models;models" ^
-    --add-data "ressources;ressources" ^
-    --add-data "Micro-Manager-2.0gamma;Micro-Manager-2.0gamma" ^
-    main.py"""
+"""pyinstaller --onefile --windowed `
+  --name=Worm_detection `
+  --icon=icon_desktop.ico `
+  --add-data "logs;logs" `
+  --add-data "models;models" `
+  --add-data "ressources;ressources" `
+  --collect-all skan `
+  --collect-all python_tsp `
+  main.py"""
     
 # For Mac use
 """pyinstaller --onedir --windowed \

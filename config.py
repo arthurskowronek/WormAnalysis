@@ -92,50 +92,6 @@ def set_up_environment():
             if file.is_file():
                 file.unlink()
 
-# Le reste du code est correct.
-
-def set_up_environment():
-    """
-    Set up the project's directory structure and clear specific subdirectories.
-
-    This function ensures that all required directories (e.g., for data, models, 
-    resources, source code, and user-specific files) exist by creating them if needed. 
-    It also clears the contents of predefined subdirectories inside the data directory 
-    (e.g., 'Unclassified', 'Mutant_prediction', etc.) by deleting all files within them.
-    
-    Directories are created with `parents=True` and `exist_ok=True` to handle nested 
-    paths and avoid errors if they already exist.
-    """
-    # Create root-level directories
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-    for directory in [DATA_DIR, USER_DIR]:
-        directory.mkdir(parents=True, exist_ok=True)
-
-    # List of subdirectories to create in DATA_DIR
-    data_subdirs = [
-        "Dataset_pkl",
-        "Mutant",
-        "Mutant_prediction",
-        "Scan",
-        "Scan_modified",
-        "Unclassified",
-        "WT",
-        "WT_prediction"
-    ]
-    
-    # Create all subdirectories in DATA_DIR
-    for subdir in data_subdirs:
-        subdir_path = DATA_DIR / subdir
-        subdir_path.mkdir(parents=True, exist_ok=True)
-
-    # Clear specific subdirectories 
-    dirs_to_clear = ["Unclassified", "Mutant_prediction", "WT_prediction"]
-    for subdir in dirs_to_clear:
-        directory = DATA_DIR / subdir
-        for file in directory.iterdir():
-            if file.is_file():
-                file.unlink()
-
 def clear_scan_directory():
     dirs_to_clear = ["Scan", "Scan_modified"]
     for subdir in dirs_to_clear:

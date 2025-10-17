@@ -240,77 +240,99 @@ class ScanSlice:
         
         return image, self.list_bounding_boxes
 
+    def _normalize_boxes(self):
+        """
+        Ensure each bounding box has x1<=x2 and y1<=y2.
+        Modifies self.list_bounding_boxes in-place.
+        """
+        normalized = []
+        for box in self.list_bounding_boxes:
+            img_id, x1, y1, x2, y2 = box
+            nx1, nx2 = (x1, x2) if x1 <= x2 else (x2, x1)
+            ny1, ny2 = (y1, y2) if y1 <= y2 else (y2, y1)
+            normalized.append([img_id, nx1, ny1, nx2, ny2])
+        self.list_bounding_boxes = normalized
+
     def get_worms_position(self):
         """
         Consolidates overlapping bounding boxes to determine unique worm positions.
-
-        This method handles cases where a single worm appears in multiple
-        overlapping images. It groups overlapping bounding boxes and calculates
-        the average center position for each group, effectively removing redundant
-        detections.
-
-        Returns:
-            List[List[float]]: A list of unique worm positions, each represented as a
-                               list of `[x_microscope, y_microscope]` coordinates.
         """
+        # 0) Normalize coordinates to guarantee x1<=x2 and y1<=y2
+        self._normalize_boxes()
+
+        # 1) First apply per-image NMS (this expects normalized boxes)
         self._apply_nms(iou_threshold=0.8)
-        
-        overlapping_pairs = []
-        best_matches = defaultdict(dict)  # {idx1: {id2: (idx2, iou)}}
-        
-        for i in range(len(self.list_bounding_boxes)):
+
+        # 2) Build best match overlap map across different images
+        best_matches = defaultdict(dict)  # {i: {image_id_other: (j, iou)}}
+        n = len(self.list_bounding_boxes)
+        for i in range(n):
             id_1 = self.list_bounding_boxes[i][0]
-            for j in range(i + 1, len(self.list_bounding_boxes)):
+            for j in range(i + 1, n):
                 id_2 = self.list_bounding_boxes[j][0]
-                
+                # Only compare boxes from different images (as you intended)
                 if id_1 != id_2:
                     if self._boxes_overlap(self.list_bounding_boxes[i], self.list_bounding_boxes[j]):
                         iou = self._compute_iou(self.list_bounding_boxes[i], self.list_bounding_boxes[j])
-                        
-                        # Save best match for i with picture id_2
+
+                        # Save best match per image pair (keep the highest IoU)
                         if id_2 not in best_matches[i] or iou > best_matches[i][id_2][1]:
                             best_matches[i][id_2] = (j, iou)
-                        
-                        # And best match for j with picture id_1
                         if id_1 not in best_matches[j] or iou > best_matches[j][id_1][1]:
                             best_matches[j][id_1] = (i, iou)
-        
-        # Build final list of best overlaps (ensure mutual best match)
+
+        # 3) Keep only mutual best matches (i <-> j)
         added_pairs = set()
         for i, matches in best_matches.items():
             for id_other, (j, _) in matches.items():
-                # Only keep if mutual best match
-                if best_matches[j].get(self.list_bounding_boxes[i][0], (None, -1))[0] == i:
+                # mutual best match check (ensure index j has best for i's image id)
+                if best_matches.get(j, {}).get(self.list_bounding_boxes[i][0], (None, -1))[0] == i:
                     pair = tuple(sorted((i, j)))
                     added_pairs.add(pair)
-        
+
         overlapping_pairs = list(added_pairs)
         overlapping_boxes = self._merge_overlapping_sublists(overlapping_pairs)
-        
-        # Add non-overlapping boxes
-        flat_overlapping_boxes = [item for sublist in overlapping_boxes for item in sublist]
-        values_overlapping_boxes = np.unique(np.array(flat_overlapping_boxes))
-        for i in range(len(self.list_bounding_boxes)):
+
+        # 4) Add non-overlapping singletons
+        flat_overlapping_indices = [idx for sub in overlapping_boxes for idx in sub]
+        values_overlapping_boxes = set(int(x) for x in flat_overlapping_indices)  # set of int indices
+        for i in range(n):
             if i not in values_overlapping_boxes:
                 overlapping_boxes.append([i])
-        
-        # Get centers
+
+        # 5) Compute centers of each group
         positions_worms = []
         for sublist in overlapping_boxes:
             tab_x, tab_y = [], []
             for idx in sublist:
                 _, x1, y1, x2, y2 = self.list_bounding_boxes[idx]
-                tab_x.append((x1 + x2) / 2)
-                tab_y.append((y1 + y2) / 2)
+                tab_x.append((x1 + x2) / 2.0)
+                tab_y.append((y1 + y2) / 2.0)
             x = sum(tab_x) / len(tab_x)
             y = sum(tab_y) / len(tab_y)
             positions_worms.append([x, y])
-            
-    
-        # Cluster nearby points (distance < 6) using a KD-Tree
+
+        # 6) Cluster nearby centers using KD-Tree
+        filtered_positions = []
         if positions_worms:
             pts = np.array(positions_worms)
-            min_dist = 6
+
+            # choose min_dist sensibly:
+            # - either a fixed value in the same coordinate units (e.g. 50),
+            # - or derive from average bbox size to be scale-adaptive.
+            # Here we compute an adaptive distance from median bbox size:
+            widths = []
+            heights = []
+            for _, x1, y1, x2, y2 in self.list_bounding_boxes:
+                widths.append(abs(x2 - x1))
+                heights.append(abs(y2 - y1))
+            if widths and heights:
+                median_size = float(np.median(widths) + np.median(heights)) / 2.0
+                min_dist = max(10.0, median_size * 0.6)  # e.g. 60% of median bbox size
+            else:
+                min_dist = 50.0
+
+            from scipy.spatial import cKDTree
             tree = cKDTree(pts)
             visited = np.zeros(len(pts), dtype=bool)
             clusters = []
@@ -318,19 +340,15 @@ class ScanSlice:
             for i in range(len(pts)):
                 if visited[i]:
                     continue
-                # Find all neighbors within min_dist
                 neighbors = tree.query_ball_point(pts[i], min_dist)
                 visited[neighbors] = True
-                # Average the neighbors to form a cluster center
                 cluster_center = pts[neighbors].mean(axis=0)
                 clusters.append(cluster_center)
 
             filtered_positions = [c.tolist() for c in clusters]
-        else:
-            filtered_positions = []
 
         return filtered_positions
-    
+
     # Helpers methods for bounding box processing
     def _boxes_overlap(self, box1, box2):
         """
@@ -456,9 +474,6 @@ class ScanSlice:
         # 2. Appliquer NMS pour chaque image
         for image_id, boxes_with_indices in boxes_by_image.items():
             
-            # Trier les boîtes (si vous avez un score de confiance)
-            # Puisque vous n'avez pas de score, vous pouvez les traiter dans l'ordre actuel
-            
             keep = set(range(len(boxes_with_indices))) # Indices à conserver dans le groupe
             
             for i in range(len(boxes_with_indices)):
@@ -480,7 +495,6 @@ class ScanSlice:
                     iou = self._compute_iou(box1, box2)
                     
                     if iou >= iou_threshold:
-                        # Supprimer la boîte j
                         keep.remove(j)
             
             # 3. Ajouter les boîtes conservées à la nouvelle liste

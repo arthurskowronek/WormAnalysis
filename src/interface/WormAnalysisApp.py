@@ -1555,6 +1555,26 @@ class WormAnalysisApp:
                 self.img_label.configure(image=photo)
         except Exception as e:
             self.context_error = log_error(e, f"Resize scan content area failed")
+     
+    def resize_automatic_live_image(self, event):
+        """
+        Keeps the live image label a centered square inside the wrapper frame.
+        event.width/event.height are the wrapper's inner size.
+        """
+        try:
+            w = event.width
+            h = event.height
+            size = min(w, h)
+            x = (w - size) // 2
+            y = (h - size) // 2
+            # Avoid negative sizes
+            if size <= 0:
+                size = 0
+            if hasattr(self, "automatic_live_image_label") and self.automatic_live_image_label.winfo_exists():
+                self.automatic_live_image_label.place(x=x, y=y, width=size, height=size)
+        except Exception:
+            # don't let UI break on odd races during teardown
+            pass
         
     def resize_live_image(self, event):
         """
@@ -2304,18 +2324,42 @@ class WormAnalysisApp:
         self._live_running = True
         self.update_live_image()
         
+        # ensure histogram redraw immediately for live mode
+        try:
+            self.last_hist_update_time = 0
+            self.update_image_and_histogram(live_mode=True)
+        except Exception:
+            pass
+        
     def snap_image(self):
         """
-        Snaps a single image from the microscope
+        Snaps a single image from the microscope and returns it as a numpy array (float32).
         """
         try:
+            print("[snap] set exposure ->", int(self.exposure_time.get()))
             self.CORE.setExposure(int(self.exposure_time.get()))
             self.CORE.snapImage()
             img = self.CORE.getImage()
             self.CORE.setExposure(EXPOSURE_TIME_LIVE)
-            return img
+
+            # Normalize returned type to numpy float32 (raw values)
+            if isinstance(img, np.ndarray):
+                arr = img.astype(np.float32)
+                print(f"[snap] got ndarray shape={arr.shape} dtype={arr.dtype}")
+            else:
+                try:
+                    pil = Image.fromarray(img) if not isinstance(img, Image.Image) else img
+                    arr = np.array(pil, dtype=np.float32)
+                    print(f"[snap] converted from PIL-like to ndarray shape={arr.shape}")
+                except Exception as e:
+                    print("[snap] conversion failed:", e)
+                    arr = np.array(img, dtype=np.float32)
+                    print(f"[snap] coerced to ndarray shape={arr.shape}")
+
+            return arr
         except Exception as e:
             self.context_error = log_error(e, f"Snap image failed")
+            print("[snap] error:", e)
             return None
 
     def snap_image_mode(self):
@@ -2334,6 +2378,19 @@ class WormAnalysisApp:
             self._live_after_id = None
 
         self.snap_img = self.snap_image()
+        print("[snap_mode] snap_img type:", type(self.snap_img))
+
+        # store a raw copy for histogram / contrast logic
+        if isinstance(self.snap_img, np.ndarray):
+            self.original_snap_array = self.snap_img.copy().astype(np.float32)
+            print("[snap_mode] original_snap_array saved shape", self.original_snap_array.shape)
+        else:
+            try:
+                self.original_snap_array = np.array(self.snap_img, dtype=np.float32)
+                print("[snap_mode] coerced original_snap_array shape", self.original_snap_array.shape)
+            except Exception as e:
+                print("[snap_mode] failed to set original_snap_array:", e)
+                self.original_snap_array = np.zeros((256,256), dtype=np.float32)
 
         # Now show the page, which creates the display widgets
         self.show_load_position_page()
@@ -2345,24 +2402,38 @@ class WormAnalysisApp:
             pass
         self.open_contrast_histogram_window()
         
+        # ensure histogram redraw immediately for snapshot
+        try:
+            # allow immediate histogram draw
+            self.last_hist_update_time = 0
+            # prefer to pass the snapshot explicitly
+            self.update_image_and_histogram(img_array=getattr(self, "original_snap_array", None), live_mode=False)
+        except Exception:
+            pass
+        
     def update_live_image(self):
         """
         Live update loop (safe). Keeps original behavior but:
         - saves raw frame into self.last_live_frame (float32 / original range),
         - if contrast controls exist, delegates display + throttled histogram to
-        update_image_and_histogram(img_array=..., live_mode=True),
+            update_image_and_histogram(img_array=..., live_mode=True),
         - otherwise falls back to original 16->8bit conversion & display.
+        Additionally: updates self.automatic_live_image_label (if present) with
+        a square live preview centered in its container.
         """
         try:
             # stop quickly if requested or if root was destroyed
             if not getattr(self, "_live_running", False) or not self.root.winfo_exists():
                 return
 
-            # only try to update if label exists
-            if not (hasattr(self, "live_image_label") and self.live_image_label.winfo_exists()):
-                # label gone — stop the loop to avoid repeated errors
+            # only try to update if at least one live-preview label exists
+            live_label_ok = hasattr(self, "live_image_label") and self.live_image_label.winfo_exists()
+            auto_label_ok = hasattr(self, "automatic_live_image_label") and self.automatic_live_image_label.winfo_exists()
+            if not (live_label_ok or auto_label_ok):
+                # no preview targets remain — stop the loop to avoid repeated errors
                 self._live_running = False
                 return
+
 
             # Safe camera acquisition (guard for CORE missing/failing)
             image_data = None
@@ -2382,7 +2453,7 @@ class WormAnalysisApp:
             if image_data is not None:
                 try:
                     # image_data might already be a numpy array or some other type.
-                    # convert to numpy uint16 preserving original dynamic range.
+                    # convert to numpy float32 preserving original dynamic range.
                     if isinstance(image_data, np.ndarray):
                         arr = image_data.astype(np.float32)  # keep original values (float32)
                     else:
@@ -2393,48 +2464,85 @@ class WormAnalysisApp:
                     # store raw frame for histogram/contrast code
                     self.last_live_frame = arr.copy()
 
-                    # If contrast controls are present (user opened contrast window),
-                    # delegate display + histogram drawing to update_image_and_histogram.
-                    # We check for vmin/vmax vars OR hist_canvas to decide.
-                    if getattr(self, "vmin_var", None) is not None or getattr(self, "hist_canvas", None) is not None:
-                        # update_image_and_histogram should accept (img_array=..., live_mode=True)
-                        # — you've implemented that helper earlier.
-                        try:
-                            # prefer passing the raw array (not scaled to 8-bit)
-                            if not getattr(self, "_contrast_slider_active", False):
-                                self.update_image_and_histogram(img_array=self.last_live_frame, live_mode=True)
-                        except TypeError:
-                            # If your update_image_and_histogram signature hasn't been changed
-                            # to accept arguments, call without args and let it use self.last_live_frame
-                            self.update_image_and_histogram()
-                    else:
-                        # No contrast UI: fall back to your original 16->8bit display path
-                        arr_16 = arr  # original values (assumed 0..65535 or similar)
-                        # safe normalization to 8-bit: divide by 256 if max>255, else scale
-                        max_val = arr_16.max() if arr_16.size else 255.0
-                        if max_val > 255:
-                            arr_8bit = (arr_16 / 256.0).clip(0, 255).astype(np.uint8)
+                    if self.current_page == "load_position":
+                        # If contrast controls are present (user opened contrast window),
+                        # delegate display + histogram drawing to update_image_and_histogram.
+                        if getattr(self, "vmin_var", None) is not None or getattr(self, "hist_canvas", None) is not None:
+                            try:
+                                # prefer passing the raw array (not scaled to 8-bit)
+                                if not getattr(self, "_contrast_slider_active", False):
+                                    self.update_image_and_histogram(img_array=self.last_live_frame, live_mode=True)
+                            except TypeError:
+                                # If your update_image_and_histogram signature hasn't been changed
+                                # to accept arguments, call without args and let it use self.last_live_frame
+                                self.update_image_and_histogram()
                         else:
-                            # scale to 0..255
-                            min_val = arr_16.min() if arr_16.size else 0.0
-                            denom = (max_val - min_val) if (max_val - min_val) != 0 else 1.0
-                            arr_8bit = (((arr_16 - min_val) / denom) * 255.0).clip(0, 255).astype(np.uint8)
+                            # No contrast UI: fall back to your original 16->8bit display path
+                            arr_16 = arr  # original values (assumed 0..65535 or similar)
+                            # safe normalization to 8-bit: divide by 256 if max>255, else scale
+                            max_val = arr_16.max() if arr_16.size else 255.0
+                            if max_val > 255:
+                                arr_8bit = (arr_16 / 256.0).clip(0, 255).astype(np.uint8)
+                            else:
+                                # scale to 0..255
+                                min_val = arr_16.min() if arr_16.size else 0.0
+                                denom = (max_val - min_val) if (max_val - min_val) != 0 else 1.0
+                                arr_8bit = (((arr_16 - min_val) / denom) * 255.0).clip(0, 255).astype(np.uint8)
 
-                        image = Image.fromarray(arr_8bit.astype(np.uint8), mode="L")
+                            image = Image.fromarray(arr_8bit.astype(np.uint8), mode="L")
 
-                        # resize to label size if available
-                        try:
-                            label_width = self.live_image_label.winfo_width()
-                            label_height = self.live_image_label.winfo_height()
-                            if label_width > 0 and label_height > 0:
-                                image = image.resize((label_width, label_height), Image.Resampling.LANCZOS)
-                        except Exception:
-                            pass
+                            # resize to label size if available (for the main analysis page)
+                            try:
+                                label_width = self.live_image_label.winfo_width()
+                                label_height = self.live_image_label.winfo_height()
+                                if label_width > 0 and label_height > 0:
+                                    image = image.resize((label_width, label_height), Image.Resampling.LANCZOS)
+                            except Exception:
+                                pass
 
-                        tk_image = ImageTk.PhotoImage(image)
-                        # keep reference to avoid GC
-                        self.live_image_label.image = tk_image
-                        self.live_image_label.config(image=tk_image)
+                            tk_image = ImageTk.PhotoImage(image)
+                            # keep reference to avoid GC
+                            self.live_image_label.image = tk_image
+                            self.live_image_label.config(image=tk_image)
+
+                    # ----------------------------
+                    # Update the automatic live preview (square) if present
+                    # ----------------------------
+                    if self.current_page == "automatic_scan":
+                        if hasattr(self, "automatic_live_image_label") and self.automatic_live_image_label.winfo_exists():
+                            try:
+                                # Use self.last_live_frame (float32) to create a 8-bit PIL image
+                                arr_auto = getattr(self, "last_live_frame", None)
+                                if arr_auto is not None and arr_auto.size:
+                                    # replicate same normalization logic as above
+                                    max_val_a = arr_auto.max()
+                                    if max_val_a > 255:
+                                        arr_auto_8 = (arr_auto / 256.0).clip(0, 255).astype(np.uint8)
+                                    else:
+                                        min_val_a = arr_auto.min()
+                                        denom_a = (max_val_a - min_val_a) if (max_val_a - min_val_a) != 0 else 1.0
+                                        arr_auto_8 = (((arr_auto - min_val_a) / denom_a) * 255.0).clip(0, 255).astype(np.uint8)
+
+                                    pil_auto = Image.fromarray(arr_auto_8.astype(np.uint8), mode="L")
+
+                                    # determine square size from the placed label geometry
+                                    try:
+                                        aw = self.automatic_live_image_label.winfo_width()
+                                        ah = self.automatic_live_image_label.winfo_height()
+                                        size = int(min(max(aw, 0), max(ah, 0)))
+                                    except Exception:
+                                        size = None
+
+                                    if size and size > 0:
+                                        pil_auto = pil_auto.resize((size, size), Image.Resampling.LANCZOS)
+
+                                    tk_auto = ImageTk.PhotoImage(pil_auto)
+                                    # keep reference to avoid GC
+                                    self.automatic_live_image_label.image = tk_auto
+                                    self.automatic_live_image_label.config(image=tk_auto)
+                            except Exception:
+                                # don't break the loop for the automatic preview
+                                pass
 
                 except Exception as e:
                     # conversion/display error should not break the loop
@@ -2464,7 +2572,7 @@ class WormAnalysisApp:
                     self._after_ids.append(self._live_after_id)
             except Exception:
                 pass
-
+    
     def open_contrast_histogram_window(self):
         """
         Opens a separate window for adjusting the brightness and contrast of an image.
@@ -2536,6 +2644,18 @@ class WormAnalysisApp:
             slider_frame = tk.Frame(self.contrast_win)
             slider_frame.pack(pady=10)
 
+            # Cadre pour les boutons (Auto/Full)
+            button_frame = tk.Frame(self.contrast_win)
+            button_frame.pack(pady=5)
+            
+            # Bouton "Auto" pour l'Autostretch
+            auto_btn = tk.Button(button_frame, text="Auto", command=self.auto_adjust_contrast)
+            auto_btn.pack(side=tk.LEFT, padx=10)
+            
+            # Bouton "Full" (similaire à votre initialisation min/max)
+            full_btn = tk.Button(button_frame, text="Full", command=self.full_range_contrast)
+            full_btn.pack(side=tk.LEFT, padx=10)
+
             vmin_label = tk.Label(slider_frame, text="vmin")
             vmin_label.grid(row=0, column=0, padx=5)
             # Use command for continuous updates (it receives a string value)
@@ -2563,11 +2683,17 @@ class WormAnalysisApp:
                 
             def _on_slider_release(event):
                 self._contrast_slider_active = False
-                # Determine which image source to use
-                if self.live_image:
-                    self.update_image_and_histogram(img_array=self.last_live_frame, live_mode=False)
-                else:
-                    self.update_image_and_histogram()
+                try:
+                    if self.live_image:
+                        # update using live frame
+                        self.last_hist_update_time = 0
+                        self.update_image_and_histogram(img_array=getattr(self, "last_live_frame", None), live_mode=True)
+                    else:
+                        # update using snap frame
+                        self.last_hist_update_time = 0
+                        self.update_image_and_histogram(img_array=getattr(self, "original_snap_array", None), live_mode=False)
+                except Exception:
+                    pass
 
             # bind to both sliders
             self.vmin_slider.bind("<ButtonPress-1>", _on_slider_press)
@@ -2579,8 +2705,12 @@ class WormAnalysisApp:
             # vmin_slider.bind("<ButtonRelease-1>", lambda e: self.update_image_and_histogram())
             # vmax_slider.bind("<ButtonRelease-1>", lambda e: self.update_image_and_histogram())
 
-            # Initial draw
-            self.update_image_and_histogram()   # draws histogram and updates image once
+            # Initial draw using the correct mode (snapshot or live)
+            mode = bool(getattr(self, "live_image", False))
+            print(f"[hist_open] open contrast window, live_image={mode}")
+            self.update_image_and_histogram(live_mode=mode)
+
+
         except Exception as e:
             self.context_error = log_error(e, f"Open contrast histogram window failed")
 
@@ -2598,19 +2728,21 @@ class WormAnalysisApp:
                 self.open_contrast_histogram_window()
         except Exception as e:
             self.context_error = log_error(e, f"Error when trying to open the histogram window")
-
+                        
     def on_contrast_slider_change(self):
         """
-        Called continuously when sliders move (via Scale command=).
-        Updates the displayed image immediately and throttles histogram redraws.
+        Called continuously when sliders move.
+        Use live_mode according to current self.live_image so sliders affect the right image.
         """
         try:
-            # Update live/snap display immediately
-            self.update_image_and_histogram(live_mode=True)
-
-            # Histogram update throttled in update_image_and_histogram
+            mode = bool(getattr(self, "live_image", False))
+            print("[slider] change detected, live_mode=", mode,
+                "vmin=", getattr(self, "vmin_var", None) and self.vmin_var.get(),
+                "vmax=", getattr(self, "vmax_var", None) and self.vmax_var.get())
+            self.update_image_and_histogram(live_mode=mode)
         except Exception as e:
             self.context_error = log_error(e, f"Slider change handler failed")
+            print("[slider] exception:", e)
 
     def _maybe_update_slider_range(self, img_min, img_max, expand_ratio=0.05):
         """
@@ -2670,21 +2802,37 @@ class WormAnalysisApp:
                     if None and live_mode True, uses self.last_live_frame.
             live_mode: if True behaves with throttled histogram update suitable for live mode.
         """
+        if not hasattr(self, "last_hist_update_time"):
+            self.last_hist_update_time = 0.0
+
         # Add lock to prevent simultaneous updates
         if getattr(self, '_image_update_lock', False):
+            print("[update_img_hist] lock active -> returning")
             return
         
+        print("[update_img_hist] called live_mode=", live_mode, "img_array is None?", img_array is None)
         self._image_update_lock = True
         try:
             # Choose source image
             if img_array is None:
                 if live_mode:
                     img_array = getattr(self, "last_live_frame", None)
+                    print("[update_img_hist] using last_live_frame:", type(img_array))
                 else:
                     img_array = getattr(self, "original_snap_array", None)
+                    print("[update_img_hist] using original_snap_array:", type(img_array))
 
             if img_array is None:
+                print("[update_img_hist] ERROR: source img_array is None -> nothing to update")
                 return
+
+            # diagnostics: type/shape/statistics
+            try:
+                print("[update_img_hist] img_array dtype:", getattr(img_array, "dtype", None),
+                    "shape:", getattr(img_array, "shape", None),
+                    "min/max:", np.min(img_array), np.max(img_array))
+            except Exception as e:
+                print("[update_img_hist] stats error:", e)
 
             # get current vmin/vmax (if not set, compute from array)
             if getattr(self, "vmin_var", None) is None or getattr(self, "vmax_var", None) is None:
@@ -2753,8 +2901,91 @@ class WormAnalysisApp:
             if self.context_error != "Update image histogram failed":
                 self.context_error = log_error(e, f"Update image histogram failed")
         finally:
-            self._image_update_lock = False 
+            self._image_update_lock = False
+            print("[update_img_hist] finished (unlock)")
 
+    def auto_adjust_contrast(self, percentile_low=0.5, percentile_high=99.5):
+        """
+        Calcule et applique automatiquement le vmin/vmax en utilisant les percentiles 
+        pour ignorer le bruit (similaire à la fonction 'Auto' de Micro-Manager).
+
+        Args:
+            percentile_low (float): Pourcentage des pixels les plus sombres à ignorer (ex: 0.1%).
+            percentile_high (float): Pourcentage des pixels les plus clairs à ignorer (ex: 99.9%).
+        """
+        print("[auto_adjust] called, snap exists?", hasattr(self,"snap_img"), "last_live_frame exists?", hasattr(self, "last_live_frame"))
+
+        try:
+            # 1. Déterminer l'image source (snap ou live)
+            img_array = None
+            if hasattr(self, "snap_img") and isinstance(self.snap_img, np.ndarray):
+                img_array = self.snap_img.copy()
+            else:
+                img_array = getattr(self, "last_live_frame", None)
+            
+            if img_array is None:
+                print("[auto_adjust] no img_array -> aborting")
+                # Fallback si aucune image n'est disponible
+                return
+
+            # 2. Calculer vmin et vmax basés sur les percentiles (la fonction Autostretch)
+            # Utiliser ravel() pour avoir une liste 1D des intensités de pixels
+            if img_array.size == 0:
+                v_auto_min = 0
+                v_auto_max = 255 # Ou la max_possible
+            else:
+                v_auto_min = np.percentile(img_array.ravel(), percentile_low)
+                v_auto_max = np.percentile(img_array.ravel(), percentile_high)
+
+            # S'assurer que vmin < vmax
+            if v_auto_max <= v_auto_min:
+                v_auto_max = v_auto_min + 1
+
+            # 3. Mettre à jour les variables (ce qui met à jour les curseurs)
+            if hasattr(self, "vmin_var"):
+                self.vmin_var.set(v_auto_min)
+            if hasattr(self, "vmax_var"):
+                self.vmax_var.set(v_auto_max)
+                
+            # 4. Forcer la mise à jour de l'affichage avec les nouvelles valeurs
+            # Nous utilisons live_mode=False pour que l'histogramme soit mis à jour 
+            # immédiatement et non throttled
+            self.update_image_and_histogram(img_array=img_array, live_mode=False)
+
+        except Exception as e:
+            self.context_error = log_error(e, f"Auto contrast adjustment failed")
+
+    def full_range_contrast(self):
+        """
+        Définit vmin/vmax à la plage complète de l'image (min absolu à max absolu).
+        """
+        try:
+            # 1. Déterminer l'image source (snap ou live)
+            img_array = None
+            if hasattr(self, "snap_img") and isinstance(self.snap_img, np.ndarray):
+                img_array = self.snap_img.copy()
+            else:
+                img_array = getattr(self, "last_live_frame", None)
+            
+            if img_array is None:
+                return
+
+            # 2. Calculer min/max absolus
+            v_full_min = float(np.min(img_array))
+            v_full_max = float(np.max(img_array))
+            
+            # 3. Mettre à jour les variables
+            if hasattr(self, "vmin_var"):
+                self.vmin_var.set(v_full_min)
+            if hasattr(self, "vmax_var"):
+                self.vmax_var.set(v_full_max)
+                
+            # 4. Forcer la mise à jour de l'affichage
+            self.update_image_and_histogram(img_array=img_array, live_mode=False)
+
+        except Exception as e:
+            self.context_error = log_error(e, f"Full range contrast adjustment failed")
+            
     def display_snap_image(self):
         """
         Displays the most recently snapped image.
@@ -2764,10 +2995,21 @@ class WormAnalysisApp:
         it to a Tkinter-compatible format, and displays it in the `live_image_label`.
         """
         try:
-            if isinstance(self.snap_img, np.ndarray): 
+            print("[display_snap] called, snap_img type:", type(getattr(self, "snap_img", None)))
+            if isinstance(self.snap_img, np.ndarray):
+                # store raw values (float32)
+                self.original_snap_array = self.snap_img.copy().astype(np.float32)
+                print("[display_snap] original_snap_array shape:", self.original_snap_array.shape)
+
+                # produce displayable normalized image
                 img = self.snap_img.copy().astype(np.float32)
-                img = (img - img.min()) / (img.max() - img.min()) * 255
-                img = img.astype(np.uint8)
+                mn, mx = img.min(), img.max()
+                if mx == mn:
+                    print("[display_snap] warning: snap image constant value", mn)
+                    img = np.zeros_like(img, dtype=np.uint8)
+                else:
+                    img = (img - mn) / (mx - mn + 1e-12) * 255.0
+                    img = img.astype(np.uint8)
 
                 image = Image.fromarray(img)
                 label_width = self.live_image_label.winfo_width()
@@ -2778,8 +3020,20 @@ class WormAnalysisApp:
                 tk_image = ImageTk.PhotoImage(image)
                 self.live_image_label.image = tk_image
                 self.live_image_label.config(image=tk_image)
+                print("[display_snap] displayed snap in live_image_label")
+            else:
+                print("[display_snap] no ndarray snap_img -> nothing displayed")
         except Exception as e:
             self.context_error = log_error(e, f"Display snap image failed")
+            print("[display_snap] exception:", e)
+
+        # Force histogram window to update using snapshot as source
+        try:
+            if getattr(self, "hist_canvas", None) is not None:
+                print("[display_snap] forcing histogram update using original_snap_array")
+                self.update_image_and_histogram(img_array=getattr(self, "original_snap_array", None), live_mode=False)
+        except Exception as e:
+            print("[display_snap] histogram update failed:", e)
      
     def save_snap_image(self):
         """
@@ -2988,6 +3242,35 @@ class WormAnalysisApp:
         content_area = tk.Frame(middle_container, bg=self.colors.theme["secondary_background"], relief=tk.RAISED, bd=1)
         content_area.place(x=0, y=0, width=0, height=0)  # Temporary, real size set later
         self.content_area_ref = content_area
+        
+        self.automatic_image_wrapper = tk.Frame(content_area, bg=self.colors.theme["secondary_background"])
+        self.automatic_image_wrapper.pack(expand=True, fill=tk.BOTH, padx=12, pady=12)
+
+        # Bind configure so that when the wrapper resizes we keep a centered square
+        self.automatic_image_wrapper.bind("<Configure>", self.resize_automatic_live_image)
+           
+        # The label that will display the live image. We use place() so we can
+        # set exact x,y,width,height to maintain a square.
+        if not hasattr(self, "automatic_live_image_label") or not self.automatic_live_image_label.winfo_exists():
+            self.automatic_live_image_label = tk.Label(self.automatic_image_wrapper, bg="black")
+            # start with small zero geometry; resize handler will place it correctly
+            self.automatic_live_image_label.place(x=0, y=0, width=0, height=0)
+            # reuse same click handler you already have for the live image page
+            try:
+                self.automatic_live_image_label.bind("<Button-1>", self.on_live_image_click)
+            except Exception:
+                pass        
+            
+        # ensure the live loop is running so the automatic preview is updated
+        # prefer calling your start_live() function if it handles camera startup, otherwise:
+        try:
+            if not getattr(self, "_live_running", False):
+                # if you have a start_live() that does extra setup, call it instead:
+                # self.start_live()
+                self._live_running = True
+                self.update_live_image()
+        except Exception:
+            pass
 
         # Bottom section with launch button
         bottom_frame = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
@@ -3048,7 +3331,7 @@ class WormAnalysisApp:
         info_label.pack(side=tk.LEFT, padx=(5, 0))  # small gap between text and icon
 
         # Tooltip on hover
-        Tooltip(info_label, "Be sure to have the objective in the lower right corner and to use the L camera.", posx=70, posy=-70)
+        Tooltip(info_label, "Be sure to have the objective in the lower right corner and to use the L camera, and to focus the microscope.", posx=70, posy=-70)
 
         # Trigger resizing after layout completes with error handling
         try:
