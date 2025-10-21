@@ -2,8 +2,11 @@
 Dataset management.
 """
 import os
-import pathlib
+import math
 import joblib
+import shutil
+import random
+import pathlib
 import numpy as np
 import pandas as pd
 import networkx as nx
@@ -22,7 +25,7 @@ from src.system.classifiers import ClassifierFactory, evaluate_models_with_scale
 from src.system.outlier import MahalanobisOutlierDetector
 from src.system.features import FeatureExtractor
 
-from config import DATA_DIR, IMAGE_SIZE, DEFAULT_PKL_NAME, MODELS_DIR, DATE_FORMAT
+from config import DATA_DIR, TRAINING_DIR, IMAGE_SIZE, DEFAULT_PKL_NAME, MODELS_DIR, DATE_FORMAT
 
 class Dataset_Manager:
     """
@@ -57,37 +60,29 @@ class Dataset_Manager:
         self.data.append(data_item)
         
     def load_images(self, 
-                   compute: bool = True, 
-                   test_mode: bool = False,
-                   visualize: bool = False,
-                   training: bool = False,
-                   validation: bool = False,
-                   name_dataset: str = DEFAULT_PKL_NAME) -> 'Dataset_Manager':
+                compute: bool = True, 
+                test_mode: bool = False,
+                model_name = None,
+                visualize: bool = False,
+                training: bool = False,
+                validation: bool = False,
+                name_dataset: str = DEFAULT_PKL_NAME) -> 'Dataset_Manager':
         """
         Loads and preprocesses images from the specified data directories.
 
-        This method can either load a cached version of the dataset or process
-        images from scratch, performing segmentation, feature extraction, and
-        coiled worm detection.
-
-        Args:
-            compute (bool): If True, forces the reloading of images from disk
-                            and ignores any cached versions. Defaults to True.
-            test_mode (bool): If True, loads a minimal subset of images for
-                              testing purposes (e.g., one mutant, one wild type).
-                              Defaults to False.
-            visualize (bool): If True, displays a visualization of the
-                              preprocessing results for a few images. Defaults to False.
-            training (bool): If True, loads data from 'Mutant' and 'WT'
-                             directories. If False, loads data from the
-                             'Unclassified' directory. Defaults to False.
-            validation (bool): If True, loads data from the 'validation' directory
-            name_dataset (str): The name of the dataset to be loaded or saved.
-                                Defaults to DEFAULT_PKL_NAME.
-            
-        Returns:
-            Dataset_Manager: The dataset instance with the loaded data.
+        - If model_name is None: behave exactly as before (use self.data_dir and existing logic).
+        - If model_name is not None and corresponds to a folder inside TRAINING_DIR (or self.TRAINING_DIR
+        if present), use that folder as the base. That folder should contain 'Mutant' and 'WT'.
+        In that case, the function will ensure a 'validation' subfolder exists inside the model folder
+        and populate it by copying a deterministic subset of images from 'Mutant' and 'WT' (20% by default,
+        at least 1 per class). After that the loading logic is the same (it will read Mutant/WT or validation
+        depending on the flags).
+        - If the named model folder does not exist or is invalid, the function falls back to the original
+        behavior and prints a warning.
         """
+        moved_from_mutant: List[str] = []
+        moved_from_wt: List[str] = []
+    
         pkl_path = self.dataset_pkl_dir / (name_dataset + ".pkl")
         
         # Attempt to load cached data unless 'compute' is forced to True.
@@ -103,12 +98,101 @@ class Dataset_Manager:
                 name_dataset = DEFAULT_PKL_NAME
                 pkl_path = self.dataset_pkl_dir / (name_dataset + ".pkl")
         else:
-            if training: 
-                print("No cached data found, proceeding with fresh data loading...") 
+            if training:
+                print("No cached data found, proceeding with fresh data loading...")
             compute = True
             name_dataset = DEFAULT_PKL_NAME
             pkl_path = self.dataset_pkl_dir / (name_dataset + ".pkl")
-        
+
+        # Decide base directory depending on model_name
+        use_model_folder = False
+        model_base_dir = None
+        if model_name is not None:
+            candidate = TRAINING_DIR / str(model_name)
+            if candidate.exists() and candidate.is_dir():
+                if (candidate / "Mutant").exists() and (candidate / "WT").exists():
+                    use_model_folder = True
+                    model_base_dir = candidate
+                    validation_dir = model_base_dir / "validation"
+                    try:
+                        if not validation_dir.exists():
+                            validation_dir.mkdir(parents=True, exist_ok=True)
+                            VAL_FRACTION = 0.2
+                            SEED = 42
+                            rng = random.Random(SEED)
+                            for cls in ("Mutant", "WT"):
+                                src_dir = model_base_dir / cls
+                                if not src_dir.exists():
+                                    continue
+                                files = sorted([p for p in src_dir.glob("*.tif")])
+                                if not files:
+                                    continue
+                                k = max(1, math.ceil(len(files) * VAL_FRACTION))
+                                if k >= len(files):
+                                    k = max(1, len(files) // 2)
+                                chosen = rng.sample(files, k) if len(files) > k else files[:k]
+                                for src in chosen:
+                                    dst = validation_dir / src.name
+                                    try:
+                                        # if destination doesn't exist -> move and record
+                                        if not dst.exists():
+                                            shutil.move(src, dst)
+                                            if cls == "Mutant":
+                                                moved_from_mutant.append(dst.name)
+                                            else:
+                                                moved_from_wt.append(dst.name)
+                                        else:
+                                            # destination already exists -> still record it
+                                            if cls == "Mutant":
+                                                moved_from_mutant.append(dst.name)
+                                            else:
+                                                moved_from_wt.append(dst.name)
+                                    except Exception as e:
+                                        print(f"Warning: could not copy {src} -> {dst}: {e}")
+                            print(f"Created validation folder and populated it at {validation_dir}")
+                        else:
+                            # validation exists: ensure it's not empty; if empty, populate similarly
+                            existing = list((validation_dir).glob("*.tif"))
+                            if len(existing) == 0:
+                                VAL_FRACTION = 0.2
+                                SEED = 42
+                                rng = random.Random(SEED)
+                                for cls in ("Mutant", "WT"):
+                                    src_dir = model_base_dir / cls
+                                    if not src_dir.exists():
+                                        continue
+                                    files = sorted([p for p in src_dir.glob("*.tif")])
+                                    if not files:
+                                        continue
+                                    k = max(1, math.ceil(len(files) * VAL_FRACTION))
+                                    if k >= len(files):
+                                        k = max(1, len(files) // 2)
+                                    chosen = rng.sample(files, k) if len(files) > k else files[:k]
+                                    for src in chosen:
+                                        dst = validation_dir / src.name
+                                        try:
+                                            if not dst.exists():
+                                                shutil.move(src, dst)
+                                                if cls == "Mutant":
+                                                    moved_from_mutant.append(dst.name)
+                                                else:
+                                                    moved_from_wt.append(dst.name)
+                                            else:
+                                                # destination already exists -> still record it
+                                                if cls == "Mutant":
+                                                    moved_from_mutant.append(dst.name)
+                                                else:
+                                                    moved_from_wt.append(dst.name)
+                                        except Exception as e:
+                                            print(f"Warning: could not copy {src} -> {dst}: {e}")
+                                print(f"Populated existing empty validation folder at {validation_dir}")
+                    except Exception as e:
+                        print(f"Warning: error while preparing validation folder under {candidate}: {e}")
+                else:
+                    print(f"Warning: model folder {candidate} found but missing 'Mutant' or 'WT' subfolders. Falling back.")
+
+
+
         if compute:
             print("Acquiring data...")
             # Define which directories to process based on 'training' mode.
@@ -118,13 +202,17 @@ class Dataset_Manager:
                 label_dirs = ['Mutant', 'WT']
             if validation:
                 label_dirs = ['validation']
-            
+
+            # choose the base directory to look into: either model_base_dir (if used) or self.data_dir
+            base_dir = model_base_dir if use_model_folder and model_base_dir is not None else Path(self.data_dir)
+
             for label_dir in label_dirs:
-                dir_path = self.data_dir / label_dir
+                dir_path = base_dir / label_dir
 
                 if not dir_path.exists():
+                    # skip missing directories (preserves previous behavior)
                     continue
-                    
+
                 # Iterate through all .tif images in the directory.
                 for img_path in dir_path.glob('*.tif'):
                     print(f"Processing image: {img_path}")
@@ -136,7 +224,7 @@ class Dataset_Manager:
 
                         # Get worm mask
                         worm_mask = preprocessing.worm_segmentation(img)
-                        
+
                         # Skip coiled worms if requested
                         if preprocessing.is_coiled_worm(worm_mask):
                             print(f"Skipping coiled worm in {img_path}")
@@ -153,15 +241,22 @@ class Dataset_Manager:
                             coiled = False
                             maxima, graph, median_width, diff_slice, diff_segment, NUMBER_OF_CORDS = preprocessing.get_synapse_using_graph(img, worm_mask)
 
-                        if validation: 
-                            label_dir = 'Mutant' if 'Mut' in img_path.name else 'WT'
+                        if validation:
+                            # When reading from validation directory, attempt to infer label from filename:
+                            # fall back to the label_dir if inference fails.
+                            inferred_label = 'Mutant' if 'Mut' in img_path.name else 'WT'
+                            label_for_data = inferred_label if inferred_label in ('Mutant', 'WT') else label_dir
+                        else:
+                            label_for_data = label_dir
+
                         # Create a new Data object and populate its attributes.
                         new_data = Data()
-                        new_data.label = label_dir
+                        new_data.label = label_for_data
                         new_data.filename = img_path.name
                         new_data.original_image = img
                         if new_data.label == "Mutant":
-                            # Extract mutant type from the filename.
+                            # Extract mutant type from the filename (preserve original behaviour).
+                            # keep the same slice indices as before
                             new_data.mutant_type = img_path.name[5:9]
                         new_data.worm_mask = worm_mask
                         new_data.maxima = maxima
@@ -172,21 +267,20 @@ class Dataset_Manager:
                         new_data.coiled = coiled
                         new_data.number_of_cords = NUMBER_OF_CORDS
                         self.add_data(new_data)
-                        
-                        
+
                         if test_mode and len(self.data) >= 2:
                             break
-                            
+
                     except Exception as e:
                         print(f"Error loading {img_path}: {e}")
-                        
+
         # Save processed dataset to a pickle file for caching.
         if not test_mode and training and compute:
             try:
                 joblib.dump(self.data, pkl_path)
             except Exception as e:
                 print(f"Error saving dataset: {e}")
-            
+
         # Visualize preprocessing results if requested.
         if visualize:
             print("\nVisualizing preprocessing results...")
@@ -195,20 +289,20 @@ class Dataset_Manager:
                 img_name = data.filename
                 img = data.original_image
                 mask = data.worm_mask
-                max = data.maxima
+                max_data = data.maxima
                 plot_synapse_detection(
                     original_image=img,
                     worm_mask=mask,
-                    maxima=max,
+                    maxima=max_data,
                     title=f'{img_name}'
                 )
                 count += 1
                 if count >= 3:
                     break    
-            
+
         print("Data acquired successfully.")
-        return self
-    
+        return self, moved_from_mutant, moved_from_wt
+
     def get_data(self) -> Tuple[np.ndarray, np.ndarray]:
         """
         Retrieves the original images and their corresponding labels from the dataset.
@@ -484,8 +578,10 @@ class Dataset_Manager:
                   scaler: List[str] = ['NoScaler','StandardScaler','RobustScaler','MinMaxScaler','MaxAbsScaler','Normalizer','QuantileTransformer'],
                   optimizing: bool = False,
                   verbose: bool = False,
+                  verbose_plot = True,
                   shap_analysis: bool = False,
-                  feature_selection_method: str = 'lasso'):
+                  feature_selection_method: str = 'lasso',
+                  model_name = None):
         """
         Trains or loads a machine learning model.
 
@@ -558,8 +654,12 @@ class Dataset_Manager:
 
         if not compute:
             try:
-                model = joblib.load(MODELS_DIR / "model_prediction.pkl")
-                print("Loaded cached model from", MODELS_DIR / "model_prediction.pkl")
+                if model_name is not None:
+                    model = joblib.load(MODELS_DIR / f"model_prediction_{model_name}.pkl")
+                    print("Loaded cached model from", MODELS_DIR / f"model_prediction_{model_name}.pkl")
+                else:
+                    model = joblib.load(MODELS_DIR / f"model_prediction.pkl")
+                    print("Loaded cached model from", MODELS_DIR / f"model_prediction.pkl")
                 return model
             except Exception as e:
                 print(f"Error loading cached model: {e}")
@@ -587,8 +687,11 @@ class Dataset_Manager:
                     feature_selection_method=feature_selection_method,
                     random_state=42
                 )
-                joblib.dump(model, MODELS_DIR / "model_prediction.pkl") # TODO : pas toujours sauvegarder, voir la fin de la fonction
-                
+                if model_name is not None:
+                    joblib.dump(model, MODELS_DIR / f"model_prediction_{model_name}.pkl") 
+                else:
+                    joblib.dump(model, MODELS_DIR / f"model_prediction.pkl") 
+                    
                 # --- Sauvegarde des features sélectionnées (si pas "none") ---
                 if feature_selection_method != 'none':
                     selector = model.named_steps.get('selector', None)
@@ -607,7 +710,7 @@ class Dataset_Manager:
 
                 
                 # Visualize results with a heatmap if multiple models or scalers were tested.
-                if len(classifier_type) > 1 or len(scaler) > 1:
+                if (len(classifier_type) > 1 or len(scaler) > 1) and verbose_plot == True:
                     plot_heatmap(results_df)
             elif model_type == 'outlier':
                 # Handle outlier detection models.
@@ -657,7 +760,7 @@ class Dataset_Manager:
                 except Exception as e:
                     print(f"Error saving model: {e}")
             
-            return model
+            return model, best_score
        
     def get_y_without_coiled_worm(self) -> np.ndarray:
         """

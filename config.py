@@ -37,6 +37,7 @@ SRC_DIR = PROJECT_ROOT / "src"
 # Chemins EXTERNES (NON inclus dans l'EXE) : LECTURE et ÉCRITURE
 DATA_DIR = EXECUTION_PATH / "data"
 USER_DIR = EXECUTION_PATH / "user"
+TRAINING_DIR = EXECUTION_PATH / "training"
 MM_DIR = EXECUTION_PATH / "Micro-Manager-2.0gamma"
 
 # Path to the parameters file

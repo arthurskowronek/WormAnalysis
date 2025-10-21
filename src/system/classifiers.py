@@ -822,9 +822,6 @@ def evaluate_models_with_scalers(
         if shap_analysis:
             print("Launching SHAP analysis for the best model...")
             plot_shap_summary(best_pipeline, X)
-
-    
-    
     
     # Return DataFrame results, trained pipeline (scaler+selector+clf), best scaler/model names and score
     return pd.DataFrame(results), best_pipeline, best_scaler_name, best_model_type, best_score

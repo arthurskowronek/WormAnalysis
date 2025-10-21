@@ -1,6 +1,8 @@
 import os
 import cv2
+import sys
 import yaml
+import glob
 import time
 import shutil
 import datetime
@@ -13,9 +15,10 @@ from tifffile import imwrite
 from ultralytics import YOLO
 import matplotlib.pyplot as plt
 from PIL import Image, ImageTk, ImageColor
+from tkinter.scrolledtext import ScrolledText
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-
-from config import RESSOURCES_DIR, DATA_DIR, MODELS_DIR, USER_DIR, LOG_DIR, PARAMETERS_FILE, DATE_FORMAT, EXPOSURE_TIME_LIVE, NAME_CAMERA, load_config_file, log_error, increment_user_statistics, update_user_statistics, clear_scan_directory
+        
+from config import RESSOURCES_DIR, DATA_DIR, MODELS_DIR, USER_DIR, LOG_DIR, TRAINING_DIR, PARAMETERS_FILE, DATE_FORMAT, EXPOSURE_TIME_LIVE, NAME_CAMERA, load_config_file, log_error, increment_user_statistics, update_user_statistics, clear_scan_directory
 
 from src.interface.Tooltip import Tooltip
 from src.system.ScanSlice import ScanSlice
@@ -78,7 +81,7 @@ class WormAnalysisApp:
         self.bounding_box_size = 15 # Size of the bounding box around worms in pixels
         self.loaded_params = load_config_file()
         self.set_parameters()
-        self.enable_parameters_buttons = ["exposure_time","binning","shutter","dual_view","display_mode","scan_objective","fluo_objective","scan_shape"]
+        self.enable_parameters_buttons = ["exposure_time","binning","shutter","dual_view","display_mode","scan_objective","fluo_objective","scan_shape", "model_name"]
         self.list_files_to_annotate = []
 
         self.contrast_win = None
@@ -117,6 +120,8 @@ class WormAnalysisApp:
             self.show_documentation_page()
         elif self.current_page == "configuration":
             self.show_machine_configuration_page()
+        elif self.current_page == "training":
+            self.show_training_model_page()
         elif self.current_page == "loading_page":
             self.show_loading_page()
     
@@ -244,6 +249,9 @@ class WormAnalysisApp:
         self.user_directory = tk.StringVar(value=self.loaded_params.get("user_directory", 'Arthur_2025_07_24'))
         self.user_directory.trace_add("write", lambda *args: self.save_parameters())
         
+        self.name_model = tk.StringVar(value=self.loaded_params.get("name_model"))
+        self.name_model.trace_add("write", lambda *args: self.save_parameters())
+        
         # machine parameters
         self.machine_has_dual_view = tk.BooleanVar(value=self.loaded_params.get("machine_has_dual_view", True))
         self.machine_has_dual_view.trace_add("write", lambda *args: self.save_parameters())
@@ -296,6 +304,7 @@ class WormAnalysisApp:
             "fluo_objective": self.fluo_objective.get(),
             "shape": self.shape.get(),
             "user_directory": self.user_directory.get(),
+            "name_model": self.name_model.get(),
             "machine_has_dual_view": self.machine_has_dual_view.get(),
             "scan_width": self.scan_width.get(),
             "scan_height": self.scan_height.get(),
@@ -509,6 +518,11 @@ class WormAnalysisApp:
         question_path = Path(RESSOURCES_DIR) / "icon" / "question.png" 
         self.question_icon = self.flatten_and_resize_icon(question_path, 18, 18, self.colors.theme["primary_background"], self.colors.theme["icon"])
         self.question_icon_hover = self.flatten_and_resize_icon(question_path, 18, 18, self.colors.theme["secondary_background"], self.colors.theme["icon"])
+        
+        # Process training_model_icon.png
+        training_model_path = Path(RESSOURCES_DIR) / "icon" / "training_model.png" 
+        self.training_model_icon = self.flatten_and_resize_icon(training_model_path, 18, 18, self.colors.theme["primary_background"], self.colors.theme["icon"])
+        self.training_model_icon_hover = self.flatten_and_resize_icon(training_model_path, 18, 18, self.colors.theme["secondary_background"], self.colors.theme["icon"])
         
         # Process quit.png
         quit_path = Path(RESSOURCES_DIR) / "icon" / "quit.png" 
@@ -754,7 +768,8 @@ class WormAnalysisApp:
         ])
         
         self.create_menu_section("Analysis", [
-            ("Analyse worms", "load_position", self.loading_icon, self.loading_icon_hover)
+            ("Analyse worms", "load_position", self.loading_icon, self.loading_icon_hover),
+            ("Training model", "training", self.training_model_icon, self.training_model_icon_hover)
         ])
         
         self.create_menu_section("Help", [
@@ -933,6 +948,14 @@ class WormAnalysisApp:
         tk.Label(self.params_content_frame, text="Scan shape", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
         _, self.scan_shape_dropdown = self.create_rounded_dropdown(
             self.params_content_frame, ["Square", "Rectangle"], self.shape, bg
+        )
+        
+        # Model name
+        list_model = [d.name.replace("model_prediction_", "").replace(".pkl", "") for d in MODELS_DIR.iterdir() if "model_prediction_" in d.name]
+        bg = "parameters_button_background" if "model_name" in self.enable_parameters_buttons else "parameters_button_disabled_background"
+        tk.Label(self.params_content_frame, text="Model name", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
+        _, self.model_name_dropdown = self.create_rounded_dropdown(
+            self.params_content_frame, list_model, self.name_model, bg
         )
     
     # --- Button ---
@@ -1405,7 +1428,8 @@ class WormAnalysisApp:
             #"display_mode": self.display_mode_dropdown,
             "scan_objective": self.scan_objective_dropdown,
             "fluo_objective": self.fluo_objective_dropdown,
-            "scan_shape": self.scan_shape_dropdown
+            "scan_shape": self.scan_shape_dropdown,
+            "model_name": self.model_name_dropdown
         }
         
         for key, widget in all_widgets.items():
@@ -2267,7 +2291,7 @@ class WormAnalysisApp:
             self.prediction_label_2.configure(text=f"with a probability of : set features...")
             self.root.update() # tester avec self.root.update() vs self.root.update_idletasks()
 
-            model = dataset.get_model()
+            model,_ = dataset.get_model(model_name = str(self.name_model.get()))
             pred = model.predict(dataset.get_features_selected()[0])[0]
             print(f"Model-derived prediction : {pred:.2f}")
             
@@ -3358,9 +3382,9 @@ class WormAnalysisApp:
             widget.destroy()
             
         # Disable some paramaters buttons 
-        self.update_parameter_widgets_state(disabled_widgets=["exposure_time","binning","shutter","dual_view","display_mode","scan_objective","fluo_objective","scan_shape"]) 
+        self.update_parameter_widgets_state(disabled_widgets=["exposure_time","binning","shutter","dual_view","display_mode","scan_objective","fluo_objective","scan_shape", "model_name"]) 
         self.refresh_parameters_interface()
-        self.update_parameter_widgets_state(disabled_widgets=["exposure_time","binning","shutter","dual_view","display_mode","scan_objective","fluo_objective","scan_shape"])
+        self.update_parameter_widgets_state(disabled_widgets=["exposure_time","binning","shutter","dual_view","display_mode","scan_objective","fluo_objective","scan_shape", "model_name"])
         
         # Middle container that will hold the content_area and expand to max space
         middle_result_container = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
@@ -3944,7 +3968,336 @@ class WormAnalysisApp:
                 self._live_running = True
                 self.update_live_image()
             self.root.after(300, self._try_open_histogram)
+    
+    def show_training_model_page(self):
+        """
+        Page: Training a model
+        """
+
+        # --- helpers ---
+        def refresh_model_list(): 
+            """Scan base dir for subdirectories and populate dropdown."""
+            base = TRAINING_DIR
+            os.makedirs(base, exist_ok=True)
+            # list only directories
+            dirs = sorted([d for d in os.listdir(base) if os.path.isdir(os.path.join(base, d))])
+            # put into combobox values
+            self.model_combobox['values'] = dirs
+            # if there is at least one and none selected, set first
+            if dirs and not self.selected_model_var.get():
+                self.selected_model_var.set(dirs[0])
+            update_instruction_label()
+
+        def create_model_directory():  
+            """Create model folder and the Mutant / WT subfolders from entry content."""
+            name = new_model_var.get().strip()
+            if not name:
+                append_status("❗ Please enter a model name to create.")
+                return
+            base = TRAINING_DIR
+            model_dir = os.path.join(base, name)
+            try:
+                os.makedirs(os.path.join(model_dir, "Mutant"), exist_ok=True)
+                os.makedirs(os.path.join(model_dir, "WT"), exist_ok=True)
+                append_status(f"✅ Created model directory: {model_dir} (Mutant/ and WT/).")
+            except Exception as e:
+                append_status(f"❌ Failed to create directories: {e}")
+                return
+            # refresh dropdown and select new model
+            refresh_model_list()
+            self.selected_model_var.set(name)
+
+        def get_selected_model_name(): 
+            """Take priority: entry (if non-empty) when creating; otherwise combobox selection."""
+            sel = self.selected_model_var.get().strip()
+            return sel
+
+        def update_instruction_label(*_): 
+            """Update the text instructing where to put images according to the selected model."""
+            model = get_selected_model_name()
+            if not model:
+                text = 'Select a model or create a new one to see the directories.'
+            else:
+                text = f'Add your images to the directories: "{model}/Mutant" and "{model}/WT"'
+            self.instruction_label.config(text=text)
+
+        def count_images_in_dir(folder): 
+            """Count image files in folder; looks for common image extensions (non-recursive)."""
+            if not os.path.isdir(folder):
+                return 0
+            exts = ("*.png", "*.jpg", "*.jpeg", "*.tif", "*.tiff", "*.bmp")
+            count = 0
+            for e in exts:
+                count += len(glob.glob(os.path.join(folder, e)))
+            return count
+
+        def append_status(text): 
+            """Append a line to the status box."""
+            self.status_text.configure(state='normal')
+            self.status_text.insert("end", text + "\n")
+            self.status_text.see("end")
+            self.status_text.configure(state='disabled')
+            self.status_text.update_idletasks()
+
+        def clear_status(): 
+            self.status_text.configure(state='normal')
+            self.status_text.delete("1.0", "end")
+            self.status_text.configure(state='disabled')
+
+        def on_train_clicked():
+            """Validate folders & images, then either call a real train function or show placeholder status."""
+            clear_status()
+            model = get_selected_model_name()
+            if not model:
+                append_status("❗ No model selected. Please select a model from the dropdown.")
+                return
+            base = TRAINING_DIR
+            model_dir = os.path.join(base, model)
+            mutant_dir = os.path.join(model_dir, "Mutant")
+            wt_dir = os.path.join(model_dir, "WT")
+
+            # Check directories
+            if not os.path.isdir(model_dir):
+                append_status(f"❗ Model directory not found: {model_dir}")
+                append_status("You can create it by typing a name in the 'New model name' box and pressing 'Create directory'.")
+                return
+
+            mutant_count = count_images_in_dir(mutant_dir)
+            wt_count = count_images_in_dir(wt_dir)
+
+            append_status(f"Model: {model}")
+            append_status(f"Found {mutant_count} image(s) in: {mutant_dir}")
+            append_status(f"Found {wt_count} image(s) in: {wt_dir}")
+
+            if mutant_count == 0 and wt_count == 0:
+                append_status("⚠️ No images found in either directory. Please add images and try again.")
+                return
+            if mutant_count == 0:
+                append_status("⚠️ No images found in Mutant. Please add images to proceed.")
+                return
+            if wt_count == 0:
+                append_status("⚠️ No images found in WT. Please add images to proceed.")
+                return
+
+            # At this point, the minimal checks are passed.
+            append_status("🚀 Starting training")
+
+            dataset_training = Dataset_Manager()
+            append_status("Load images... (~2s/image)")
+            model = get_selected_model_name()
+            _, mutants_filename, wt_filename = dataset_training.load_images(training = True, model_name = str(model))
+            print(mutants_filename, wt_filename)
+            append_status("✅ Images loaded")
+            
+            append_status("Compute features... (~1.5s/image)")
+            dataset_training.set_features()
+            append_status("✅ Features computed")
+
+            append_status("Compute model...")
+            _, score = dataset_training.get_model(compute = True, verbose_plot = False, model_name = str(model))
+            append_status("✅ Model computed")
+            append_status("The accuracy score for this model is {:.2f}%".format(score*100))
+            append_status("You can now choose to use this model when analysing a worm")
+            
+            # for all files in TRAINING_DIR/model_name/validation, move them to TRAINING_DIR/model_name/Mutant or WT based on mutants_filename and wt_filename
+            validation_dir = os.path.join(TRAINING_DIR, model, "validation")
+            if os.path.isdir(validation_dir):
+                for file in os.listdir(validation_dir):
+                    file_path = os.path.join(validation_dir, file)
+                    if file in mutants_filename:
+                        dest_path = os.path.join(mutant_dir, file)
+                    elif file in wt_filename:
+                        dest_path = os.path.join(wt_dir, file)
+                    else:
+                        continue
+                    shutil.move(file_path, dest_path)
+                    
+            # remove validation directory if empty
+            if os.path.isdir(validation_dir) and not os.listdir(validation_dir):
+                os.rmdir(validation_dir)
+
+        # --- Clear previous widgets in main_content ---
+        for widget in self.main_content.winfo_children():
+            widget.destroy()
+
+        # Layout configuration: provide rows for title + steps + 3 parts
+        self.main_content.grid_columnconfigure(0, weight=1) 
+        self.main_content.grid_rowconfigure(0, weight=0) # title
+        self.main_content.grid_rowconfigure(1, weight=0) # step 1
+        self.main_content.grid_rowconfigure(2, weight=0) # part 1
+        self.main_content.grid_rowconfigure(3, weight=0) # step 2
+        self.main_content.grid_rowconfigure(4, weight=0) # part 2
+        self.main_content.grid_rowconfigure(5, weight=0) # step 3
+        self.main_content.grid_rowconfigure(6, weight=0) # part 3
+
+        # Title (centered)
+        title_label = tk.Label(
+            self.main_content,
+            text="Training a model",
+            bg=self.colors.theme["primary_background"],
+            fg=self.colors.theme["primary_text"],
+            font=(self.font, 18, "bold"),
+            justify="center",
+            anchor="center"
+        )
+        title_label.grid(row=0, column=0, pady=(20, 40))
+
+        # Steps text (centered, small)
+        steps_label_1 = tk.Label(
+            self.main_content,
+            text="Step 1 : Choose or create a model",
+            bg=self.colors.theme["primary_background"],
+            fg=self.colors.theme["secondary_text"],
+            font=(self.font, 16),
+            justify="center",
+            anchor="center"
+        )
+        steps_label_1.grid(row=1, column=0, pady=(0, 12))
+
+        # --- PART 1: Model selection / creation (centered contents) ---
+        part1 = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
+        part1.grid(row=2, column=0, padx=20, pady=(0, 10))  # removed sticky to avoid full-width stretching
+
+        # Inner centered container for part1
+        inner1 = tk.Frame(part1, bg=self.colors.theme["primary_background"])
+        inner1.pack(anchor="center")
+
+        # Existing models label + combobox
+        tk.Label(inner1, text="Select existing model:", bg=self.colors.theme["primary_background"],
+                fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor="center", pady=(0, 4))
+
+        self.selected_model_var = tk.StringVar()
+        self.model_combobox = ttk.Combobox(inner1, textvariable=self.selected_model_var, state="readonly")
+        # make combobox shorter and centered text
+        self.model_combobox.config(width=30)
+        self.model_combobox.pack(anchor="center", pady=(0, 8))
+
+        self.model_combobox.bind("<<ComboboxSelected>>", lambda e: update_instruction_label())
+
+        # New model entry + create directory button
+        tk.Label(inner1, text="New model name:", bg=self.colors.theme["primary_background"],
+                fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor="center", pady=(6, 4))
+
+        new_model_var = tk.StringVar()
+        entry_new = tk.Entry(inner1, textvariable=new_model_var)
+        entry_new.config(width=30, justify='center')  # shorter entry
+        entry_new.pack(anchor="center", pady=(0, 8))
+
+        # Create directory button (centered)
+        create_btn_container = tk.Frame(inner1, bg=self.colors.theme["primary_background"])
+        create_btn_container.pack(anchor="center", pady=(4, 0))
+        self.create_rounded_button(
+            parent=create_btn_container,
+            text="Create directory",
+            command=create_model_directory,
+            bg_color=self.colors.theme["primary_background"],
+            text_color=self.colors.theme["primary_text"],
+            hover_color=self.colors.theme["tertiary_background"],
+            font=(self.font, 10),
+            width_pixels=160,
+            height_pixels=36,
+            corner_radius=12,
+            side=tk.TOP,
+            padx_text=0,
+            border_width=2,
+            border_color=self.colors.theme["stroke_button"]
+        )
+
+        # Steps text (centered, small)
+        steps_label_2 = tk.Label(
+            self.main_content,
+            text="Step 2 : Add images",
+            bg=self.colors.theme["primary_background"],
+            fg=self.colors.theme["secondary_text"],
+            font=(self.font, 16),
+            justify="center",
+            anchor="center"
+        )
+        steps_label_2.grid(row=3, column=0, pady=(60, 12))
         
+        # --- PART 2: Instruction text for where to add images (centered) ---
+        part2 = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
+        part2.grid(row=4, column=0, padx=20, pady=(6, 10))
+
+        self.instruction_label = tk.Label(
+            part2,
+            text="",  # will be set by update_instruction_label()
+            bg=self.colors.theme["primary_background"],
+            fg=self.colors.theme["secondary_text"],
+            font=(self.font, 10),
+            wraplength=600,
+            justify="center",
+            anchor="center"
+        )
+        self.instruction_label.pack(anchor="center")
+
+        # Update as soon as the page is shown
+        refresh_model_list()
+
+
+        # Steps text (centered, small)
+        steps_label_3 = tk.Label(
+            self.main_content,
+            text="Step 3 : Train the model",
+            bg=self.colors.theme["primary_background"],
+            fg=self.colors.theme["secondary_text"],
+            font=(self.font, 16),
+            justify="center",
+            anchor="center"
+        )
+        steps_label_3.grid(row=5, column=0, pady=(60, 12))
+        
+        # --- PART 3: Train button + status area (centered) ---
+        part3 = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
+        part3.grid(row=6, column=0, padx=20, pady=(10, 20))  # removed sticky; bottom area
+
+        inner3 = tk.Frame(part3, bg=self.colors.theme["primary_background"])
+        inner3.pack(anchor="center")
+
+        # Train button (centered)
+        train_btn_container = tk.Frame(inner3, bg=self.colors.theme["primary_background"])
+        train_btn_container.pack(anchor="center", pady=(0, 8))
+        self.create_rounded_button(
+            parent=train_btn_container,
+            text="Train model",
+            command=on_train_clicked,
+            bg_color=self.colors.theme["primary_background"],
+            text_color=self.colors.theme["primary_text"],
+            hover_color=self.colors.theme["secondary_background"],
+            font=(self.font, 14),
+            width_pixels=220,
+            height_pixels=48,
+            corner_radius=12,
+            side=tk.TOP,
+            padx_text=0,
+            border_width=2,
+            border_color=self.colors.theme["stroke_button"]
+        )
+
+        # Status / message area (Text, no scrollbar, same background as page)
+        self.status_text = tk.Text(
+            inner3,
+            height=16,
+            state='disabled',
+            wrap='word',
+            bg=self.colors.theme["primary_background"],  # same bg as page
+            fg=self.colors.theme["primary_text"],
+            font=(self.font, 10),
+            bd=0,
+            relief='flat',
+            highlightthickness=0,
+            insertbackground=self.colors.theme["primary_text"]
+        )
+        self.status_text.pack(anchor="center", fill="x", padx=40, pady=(6, 0))
+
+        # focus and key binds (optional)
+        self.main_content.focus_set()
+
+        # Ensure instruction label updates when combobox changes or when entry changes
+        new_model_var.trace_add("write", lambda *args: None)  # no-op; entry reserved for create action
+        self.model_combobox.bind("<<ComboboxSelected>>", update_instruction_label)
+        update_instruction_label()
+
     def show_documentation_page(self):
         """
         Constructs the UI for a Documentation page that explains the three main pages:
