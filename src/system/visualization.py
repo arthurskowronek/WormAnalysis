@@ -4,6 +4,8 @@ Visualization utilities for images and results.
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from PIL import Image
+from io import BytesIO
 import matplotlib.pyplot as plt
 from typing import List, Optional, Tuple
 from sklearn.metrics import ConfusionMatrixDisplay
@@ -12,7 +14,8 @@ def plot_synapse_detection(
                             original_image: np.ndarray,
                             worm_mask: np.ndarray,
                             maxima: List[Tuple[int, int]],
-                            title: str = 'Synapse Detection Results'
+                            title: str = 'Synapse Detection Results',
+                            display: bool = True
                         ) -> None:
     """
     Plot synapse detection results, including the original image, worm mask, and detected synapses.
@@ -30,26 +33,36 @@ def plot_synapse_detection(
     fig, axes = plt.subplots(1, 3, figsize=(12, 8))
     fig.suptitle(title, fontsize=16)
     
-    # Plot original image
     axes[0].imshow(original_image, cmap='gray')
     axes[0].set_title(f'Original Image : {title}')
     axes[0].axis('off')
-    
-    # Plot worm mask
+
     axes[1].imshow(worm_mask, cmap='gray')
     axes[1].set_title('Worm Segmentation')
     axes[1].axis('off')
-    
-    # Plot maxima on original image
+
     axes[2].imshow(original_image, cmap='gray')
     if maxima:
         maxima = np.array(maxima)
-        axes[2].scatter(maxima[:, 1], maxima[:, 0], c='red', s=3) 
+        axes[2].scatter(maxima[:, 1], maxima[:, 0], c='red', s=3)
     axes[2].set_title('Detected Synapses')
     axes[2].axis('off')
-    
+
     plt.tight_layout()
-    plt.show()
+
+    # Save the plot to an in-memory bytes buffer
+    buf = BytesIO()
+    fig.savefig(buf, format='png', dpi=100)
+    buf.seek(0)
+    plt.close(fig)  # Close the figure to free memory
+    
+    # Convert buffer to PIL image
+    image = Image.open(buf)
+    
+    if display:
+        plt.show()
+        
+    return image
 
 def plot_images(images: List[np.ndarray], 
                 titles: Optional[List[str]] = None,

@@ -1,6 +1,5 @@
 import os
 import cv2
-import sys
 import yaml
 import glob
 import time
@@ -2286,7 +2285,7 @@ class WormAnalysisApp:
         # Step 2: Try to predict with model, fallback to random
         try:
             dataset = Dataset_Manager()
-            dataset.load_images()
+            _, _, _, enhanced_img = dataset.load_images()
             dataset.set_features()
             self.prediction_label_2.configure(text=f"with a probability of : set features...")
             self.root.update() # tester avec self.root.update() vs self.root.update_idletasks()
@@ -2360,7 +2359,6 @@ class WormAnalysisApp:
         Snaps a single image from the microscope and returns it as a numpy array (float32).
         """
         try:
-            print("[snap] set exposure ->", int(self.exposure_time.get()))
             self.CORE.setExposure(int(self.exposure_time.get()))
             self.CORE.snapImage()
             img = self.CORE.getImage()
@@ -2369,21 +2367,16 @@ class WormAnalysisApp:
             # Normalize returned type to numpy float32 (raw values)
             if isinstance(img, np.ndarray):
                 arr = img.astype(np.float32)
-                print(f"[snap] got ndarray shape={arr.shape} dtype={arr.dtype}")
             else:
                 try:
                     pil = Image.fromarray(img) if not isinstance(img, Image.Image) else img
                     arr = np.array(pil, dtype=np.float32)
-                    print(f"[snap] converted from PIL-like to ndarray shape={arr.shape}")
                 except Exception as e:
-                    print("[snap] conversion failed:", e)
                     arr = np.array(img, dtype=np.float32)
-                    print(f"[snap] coerced to ndarray shape={arr.shape}")
 
             return arr
         except Exception as e:
             self.context_error = log_error(e, f"Snap image failed")
-            print("[snap] error:", e)
             return None
 
     def snap_image_mode(self):
@@ -2402,18 +2395,14 @@ class WormAnalysisApp:
             self._live_after_id = None
 
         self.snap_img = self.snap_image()
-        print("[snap_mode] snap_img type:", type(self.snap_img))
 
         # store a raw copy for histogram / contrast logic
         if isinstance(self.snap_img, np.ndarray):
             self.original_snap_array = self.snap_img.copy().astype(np.float32)
-            print("[snap_mode] original_snap_array saved shape", self.original_snap_array.shape)
         else:
             try:
                 self.original_snap_array = np.array(self.snap_img, dtype=np.float32)
-                print("[snap_mode] coerced original_snap_array shape", self.original_snap_array.shape)
             except Exception as e:
-                print("[snap_mode] failed to set original_snap_array:", e)
                 self.original_snap_array = np.zeros((256,256), dtype=np.float32)
 
         # Now show the page, which creates the display widgets
@@ -2612,37 +2601,50 @@ class WormAnalysisApp:
                 self.contrast_win.lift()
                 return
 
-            # If we have a snap image, use it; otherwise try to use the last live frame if available
-            if hasattr(self, "snap_img") and isinstance(self.snap_img, np.ndarray):
-                img_array = self.snap_img.copy()
+            # Decide mode and pick the image used for the histogram/initial slider range.
+            mode = bool(getattr(self, "live_image", False))
+            if not mode:
+                # Snapshot mode: prefer the preprocessed original snap array
+                img_array = getattr(self, "original_snap_array", None) or getattr(self, "snap_img", None)
             else:
-                # try to read a last frame attribute or fallback to a black image
+                # Live mode: use last_live_frame
                 img_array = getattr(self, "last_live_frame", None)
-                if img_array is None:
-                    img_array = np.zeros((256,256), dtype=np.uint8)
 
-            if hasattr(self, "snap_img") and isinstance(self.snap_img, np.ndarray):
-                img_array = self.snap_img.copy()
-            else:
-                img_array = getattr(self, "last_live_frame", None)
-                if img_array is None:
-                    img_array = np.zeros((256,256), dtype=np.uint8)
+            # Fallback to a small black image if none available
+            if img_array is None:
+                img_array = np.zeros((256, 256), dtype=np.float32)
 
-            # Default vmin/vmax if not set
-            vmin = float(np.min(img_array))
-            vmax = float(np.max(img_array))
+            # Ensure numpy array with float dtype for percentile/min/max calculations
+            try:
+                img_array = np.array(img_array, dtype=np.float32)
+            except Exception:
+                img_array = img_array.copy().astype(np.float32)
 
-            # If vars already exist keep them, else create
+            # Compute sensible bounds
+            img_min = float(np.min(img_array))
+            img_max = float(np.max(img_array))
+            if img_max == img_min:
+                img_max = img_min + 1.0  # avoid identical bounds
+
+            # Create or update vmin/vmax variables.
+            # If user is currently dragging sliders (_contrast_slider_active), preserve their values.
             if not getattr(self, "vmin_var", None):
-                self.vmin_var = tk.DoubleVar(value=vmin)
+                self.vmin_var = tk.DoubleVar(value=img_min)
+            else:
+                if not getattr(self, "_contrast_slider_active", False):
+                    self.vmin_var.set(img_min)
+
             if not getattr(self, "vmax_var", None):
-                self.vmax_var = tk.DoubleVar(value=vmax)
+                self.vmax_var = tk.DoubleVar(value=img_max)
+            else:
+                if not getattr(self, "_contrast_slider_active", False):
+                    self.vmax_var.set(img_max)
 
             # Create window
             self.contrast_win = tk.Toplevel()
             self.contrast_win.title("Adjust Brightness / Contrast")
             self.contrast_win.geometry("+1100+450")
-            
+
             def close_histogram_window():
                 try:
                     if hasattr(self, "hist_fig"):
@@ -2668,24 +2670,25 @@ class WormAnalysisApp:
             slider_frame = tk.Frame(self.contrast_win)
             slider_frame.pack(pady=10)
 
-            # Cadre pour les boutons (Auto/Full)
+            # Buttons (Auto / Full)
             button_frame = tk.Frame(self.contrast_win)
             button_frame.pack(pady=5)
-            
-            # Bouton "Auto" pour l'Autostretch
+
             auto_btn = tk.Button(button_frame, text="Auto", command=self.auto_adjust_contrast)
             auto_btn.pack(side=tk.LEFT, padx=10)
-            
-            # Bouton "Full" (similaire à votre initialisation min/max)
+
             full_btn = tk.Button(button_frame, text="Full", command=self.full_range_contrast)
             full_btn.pack(side=tk.LEFT, padx=10)
 
+            # Labels and scales: set from_/to to the image's integer bounds
             vmin_label = tk.Label(slider_frame, text="vmin")
             vmin_label.grid(row=0, column=0, padx=5)
-            # Use command for continuous updates (it receives a string value)
-            # --- vmin slider ---
+
+            from_val = int(np.floor(img_min))
+            to_val = int(np.ceil(img_max))
+
             self.vmin_slider = tk.Scale(
-                slider_frame, from_=vmin, to=vmax, variable=self.vmin_var,
+                slider_frame, from_=from_val, to=to_val, variable=self.vmin_var,
                 orient=tk.HORIZONTAL, length=400, resolution=1,
                 command=lambda val: self.on_contrast_slider_change()
             )
@@ -2693,47 +2696,48 @@ class WormAnalysisApp:
 
             vmax_label = tk.Label(slider_frame, text="vmax")
             vmax_label.grid(row=1, column=0, padx=5, pady=(10, 0))
-            # --- vmax slider ---
+
             self.vmax_slider = tk.Scale(
-                slider_frame, from_=vmin, to=vmax, variable=self.vmax_var,
+                slider_frame, from_=from_val, to=to_val, variable=self.vmax_var,
                 orient=tk.HORIZONTAL, length=400, resolution=1,
                 command=lambda val: self.on_contrast_slider_change()
             )
-            self.vmax_slider.grid(row=1, column=1, padx=5, pady=(10,0))
-            
+            self.vmax_slider.grid(row=1, column=1, padx=5, pady=(10, 0))
+
+            # Ensure the visual slider positions match the variable values
+            try:
+                self.vmin_slider.set(int(round(float(self.vmin_var.get()))))
+                self.vmax_slider.set(int(round(float(self.vmax_var.get()))))
+            except Exception:
+                pass
+
             # Prevent overwriting user changes while they drag the slider
             def _on_slider_press(event):
                 self._contrast_slider_active = True
-                
+
             def _on_slider_release(event):
                 self._contrast_slider_active = False
                 try:
-                    if self.live_image:
-                        # update using live frame
+                    # choose the correct source image for update after release
+                    if getattr(self, "live_image", False):
+                        src = getattr(self, "last_live_frame", None)
                         self.last_hist_update_time = 0
-                        self.update_image_and_histogram(img_array=getattr(self, "last_live_frame", None), live_mode=True)
+                        self.update_image_and_histogram(img_array=src, live_mode=True)
                     else:
-                        # update using snap frame
+                        src = getattr(self, "original_snap_array", None) or getattr(self, "snap_img", None)
                         self.last_hist_update_time = 0
-                        self.update_image_and_histogram(img_array=getattr(self, "original_snap_array", None), live_mode=False)
+                        self.update_image_and_histogram(img_array=src, live_mode=False)
                 except Exception:
                     pass
 
-            # bind to both sliders
+            # bind press/release to both sliders
             self.vmin_slider.bind("<ButtonPress-1>", _on_slider_press)
             self.vmin_slider.bind("<ButtonRelease-1>", _on_slider_release)
             self.vmax_slider.bind("<ButtonPress-1>", _on_slider_press)
             self.vmax_slider.bind("<ButtonRelease-1>", _on_slider_release)
 
-            # If you prefer to update only on release for heavy displays, bind release:
-            # vmin_slider.bind("<ButtonRelease-1>", lambda e: self.update_image_and_histogram())
-            # vmax_slider.bind("<ButtonRelease-1>", lambda e: self.update_image_and_histogram())
-
-            # Initial draw using the correct mode (snapshot or live)
-            mode = bool(getattr(self, "live_image", False))
-            print(f"[hist_open] open contrast window, live_image={mode}")
-            self.update_image_and_histogram(live_mode=mode)
-
+            # Initial draw using the selected mode (pass the explicit img_array)
+            self.update_image_and_histogram(img_array=img_array, live_mode=mode)
 
         except Exception as e:
             self.context_error = log_error(e, f"Open contrast histogram window failed")
@@ -2760,13 +2764,9 @@ class WormAnalysisApp:
         """
         try:
             mode = bool(getattr(self, "live_image", False))
-            print("[slider] change detected, live_mode=", mode,
-                "vmin=", getattr(self, "vmin_var", None) and self.vmin_var.get(),
-                "vmax=", getattr(self, "vmax_var", None) and self.vmax_var.get())
             self.update_image_and_histogram(live_mode=mode)
         except Exception as e:
             self.context_error = log_error(e, f"Slider change handler failed")
-            print("[slider] exception:", e)
 
     def _maybe_update_slider_range(self, img_min, img_max, expand_ratio=0.05):
         """
@@ -2831,32 +2831,19 @@ class WormAnalysisApp:
 
         # Add lock to prevent simultaneous updates
         if getattr(self, '_image_update_lock', False):
-            print("[update_img_hist] lock active -> returning")
             return
         
-        print("[update_img_hist] called live_mode=", live_mode, "img_array is None?", img_array is None)
         self._image_update_lock = True
         try:
             # Choose source image
             if img_array is None:
                 if live_mode:
                     img_array = getattr(self, "last_live_frame", None)
-                    print("[update_img_hist] using last_live_frame:", type(img_array))
                 else:
                     img_array = getattr(self, "original_snap_array", None)
-                    print("[update_img_hist] using original_snap_array:", type(img_array))
 
             if img_array is None:
-                print("[update_img_hist] ERROR: source img_array is None -> nothing to update")
                 return
-
-            # diagnostics: type/shape/statistics
-            try:
-                print("[update_img_hist] img_array dtype:", getattr(img_array, "dtype", None),
-                    "shape:", getattr(img_array, "shape", None),
-                    "min/max:", np.min(img_array), np.max(img_array))
-            except Exception as e:
-                print("[update_img_hist] stats error:", e)
 
             # get current vmin/vmax (if not set, compute from array)
             if getattr(self, "vmin_var", None) is None or getattr(self, "vmax_var", None) is None:
@@ -2877,7 +2864,6 @@ class WormAnalysisApp:
             img_max = float(np.max(img_array))
             # Update slider range if needed
             self._maybe_update_slider_range(img_min, img_max)
-
 
             # Clip and scale to 0..255
             clipped = np.clip(img_array, vmin_val, vmax_val)
@@ -2926,90 +2912,119 @@ class WormAnalysisApp:
                 self.context_error = log_error(e, f"Update image histogram failed")
         finally:
             self._image_update_lock = False
-            print("[update_img_hist] finished (unlock)")
 
     def auto_adjust_contrast(self, percentile_low=0.5, percentile_high=99.5):
         """
-        Calcule et applique automatiquement le vmin/vmax en utilisant les percentiles 
-        pour ignorer le bruit (similaire à la fonction 'Auto' de Micro-Manager).
-
-        Args:
-            percentile_low (float): Pourcentage des pixels les plus sombres à ignorer (ex: 0.1%).
-            percentile_high (float): Pourcentage des pixels les plus clairs à ignorer (ex: 99.9%).
+        Compute percentile-based vmin/vmax, update sliders and refresh display.
         """
-        print("[auto_adjust] called, snap exists?", hasattr(self,"snap_img"), "last_live_frame exists?", hasattr(self, "last_live_frame"))
-
         try:
-            # 1. Déterminer l'image source (snap ou live)
-            img_array = None
-            if hasattr(self, "snap_img") and isinstance(self.snap_img, np.ndarray):
-                img_array = self.snap_img.copy()
-            else:
-                img_array = getattr(self, "last_live_frame", None)
-            
-            if img_array is None:
-                print("[auto_adjust] no img_array -> aborting")
-                # Fallback si aucune image n'est disponible
+            # pick image depending on current live flag
+            img = self._get_contrast_image(live_mode=bool(getattr(self, "live_image", False)))
+            if img is None:
                 return
 
-            # 2. Calculer vmin et vmax basés sur les percentiles (la fonction Autostretch)
-            # Utiliser ravel() pour avoir une liste 1D des intensités de pixels
-            if img_array.size == 0:
-                v_auto_min = 0
-                v_auto_max = 255 # Ou la max_possible
-            else:
-                v_auto_min = np.percentile(img_array.ravel(), percentile_low)
-                v_auto_max = np.percentile(img_array.ravel(), percentile_high)
+            img = np.array(img, dtype=np.float32)  # ensure numpy float
+            if img.size == 0:
+                return
 
-            # S'assurer que vmin < vmax
+            v_auto_min = float(np.percentile(img.ravel(), percentile_low))
+            v_auto_max = float(np.percentile(img.ravel(), percentile_high))
             if v_auto_max <= v_auto_min:
-                v_auto_max = v_auto_min + 1
+                v_auto_max = v_auto_min + 1.0
 
-            # 3. Mettre à jour les variables (ce qui met à jour les curseurs)
-            if hasattr(self, "vmin_var"):
-                self.vmin_var.set(v_auto_min)
-            if hasattr(self, "vmax_var"):
-                self.vmax_var.set(v_auto_max)
-                
-            # 4. Forcer la mise à jour de l'affichage avec les nouvelles valeurs
-            # Nous utilisons live_mode=False pour que l'histogramme soit mis à jour 
-            # immédiatement et non throttled
-            self.update_image_and_histogram(img_array=img_array, live_mode=False)
+            # ensure slider ranges contain the new values (expand if needed)
+            try:
+                # compute image min/max for slider bounds update
+                img_min, img_max = float(np.min(img)), float(np.max(img))
+                # Try to update the sliders' from_/to so widget accepts the set values
+                if getattr(self, "vmin_slider", None) and getattr(self, "vmax_slider", None):
+                    new_from = int(np.floor(img_min))
+                    new_to   = int(np.ceil(img_max))
+                    # prevent degenerate ranges
+                    if new_to == new_from:
+                        new_to = new_from + 1
+                    self.vmin_slider.config(from_=new_from, to=new_to)
+                    self.vmax_slider.config(from_=new_from, to=new_to)
+            except Exception as e:
+                print("[auto_adjust] failed to adjust slider bounds:", e)
+
+            # Set variables and force the Scale widgets to move
+            try:
+                if getattr(self, "vmin_var", None):
+                    self.vmin_var.set(v_auto_min)
+                if getattr(self, "vmax_var", None):
+                    self.vmax_var.set(v_auto_max)
+                if getattr(self, "vmin_slider", None):
+                    self.vmin_slider.set(int(round(v_auto_min)))
+                if getattr(self, "vmax_slider", None):
+                    self.vmax_slider.set(int(round(v_auto_max)))
+            except Exception as e:
+                print("[auto_adjust] failed to set sliders/vars:", e)
+
+            # Force update/hist redraw (use non-throttled update)
+            try:
+                self.last_hist_update_time = 0
+                self.update_image_and_histogram(img_array=img, live_mode=False)
+            except Exception as e:
+                print("[auto_adjust] update_image_and_histogram failed:", e)
 
         except Exception as e:
-            self.context_error = log_error(e, f"Auto contrast adjustment failed")
+            print("[auto_adjust] unexpected error:", e)
 
     def full_range_contrast(self):
         """
-        Définit vmin/vmax à la plage complète de l'image (min absolu à max absolu).
+        Set vmin/vmax to the full image range and update display.
         """
         try:
-            # 1. Déterminer l'image source (snap ou live)
-            img_array = None
-            if hasattr(self, "snap_img") and isinstance(self.snap_img, np.ndarray):
-                img_array = self.snap_img.copy()
-            else:
-                img_array = getattr(self, "last_live_frame", None)
-            
-            if img_array is None:
+            img = self._get_contrast_image(live_mode=bool(getattr(self, "live_image", False)))
+            if img is None:
                 return
 
-            # 2. Calculer min/max absolus
-            v_full_min = float(np.min(img_array))
-            v_full_max = float(np.max(img_array))
-            
-            # 3. Mettre à jour les variables
-            if hasattr(self, "vmin_var"):
-                self.vmin_var.set(v_full_min)
-            if hasattr(self, "vmax_var"):
-                self.vmax_var.set(v_full_max)
-                
-            # 4. Forcer la mise à jour de l'affichage
-            self.update_image_and_histogram(img_array=img_array, live_mode=False)
+            img = np.array(img, dtype=np.float32)
+            if img.size == 0:
+                return
+
+            v_full_min = float(np.min(img))
+            v_full_max = float(np.max(img))
+            if v_full_max == v_full_min:
+                v_full_max = v_full_min + 1.0
+
+            # Update slider bounds first so values fit
+            try:
+                new_from = int(np.floor(v_full_min))
+                new_to   = int(np.ceil(v_full_max))
+                if new_to == new_from:
+                    new_to = new_from + 1
+                if getattr(self, "vmin_slider", None) and getattr(self, "vmax_slider", None):
+                    self.vmin_slider.config(from_=new_from, to=new_to)
+                    self.vmax_slider.config(from_=new_from, to=new_to)
+            except Exception as e:
+                print("[full_range] failed to set slider bounds:", e)
+
+            # Set the vars and force the Scale thumbs to move
+            try:
+                if getattr(self, "vmin_var", None):
+                    self.vmin_var.set(v_full_min)
+                if getattr(self, "vmax_var", None):
+                    self.vmax_var.set(v_full_max)
+                if getattr(self, "vmin_slider", None):
+                    self.vmin_slider.set(int(round(v_full_min)))
+                if getattr(self, "vmax_slider", None):
+                    self.vmax_slider.set(int(round(v_full_max)))
+            except Exception as e:
+                print("[full_range] failed to set sliders/vars:", e)
+
+            # Force update/hist redraw
+            try:
+                self.last_hist_update_time = 0
+                self.update_image_and_histogram(img_array=img, live_mode=False)
+            except Exception as e:
+                print("[full_range] update_image_and_histogram failed:", e)
+
 
         except Exception as e:
-            self.context_error = log_error(e, f"Full range contrast adjustment failed")
-            
+            print("[full_range] unexpected error:", e)
+        
     def display_snap_image(self):
         """
         Displays the most recently snapped image.
@@ -3019,17 +3034,14 @@ class WormAnalysisApp:
         it to a Tkinter-compatible format, and displays it in the `live_image_label`.
         """
         try:
-            print("[display_snap] called, snap_img type:", type(getattr(self, "snap_img", None)))
             if isinstance(self.snap_img, np.ndarray):
                 # store raw values (float32)
                 self.original_snap_array = self.snap_img.copy().astype(np.float32)
-                print("[display_snap] original_snap_array shape:", self.original_snap_array.shape)
 
                 # produce displayable normalized image
                 img = self.snap_img.copy().astype(np.float32)
                 mn, mx = img.min(), img.max()
                 if mx == mn:
-                    print("[display_snap] warning: snap image constant value", mn)
                     img = np.zeros_like(img, dtype=np.uint8)
                 else:
                     img = (img - mn) / (mx - mn + 1e-12) * 255.0
@@ -3044,17 +3056,12 @@ class WormAnalysisApp:
                 tk_image = ImageTk.PhotoImage(image)
                 self.live_image_label.image = tk_image
                 self.live_image_label.config(image=tk_image)
-                print("[display_snap] displayed snap in live_image_label")
-            else:
-                print("[display_snap] no ndarray snap_img -> nothing displayed")
         except Exception as e:
             self.context_error = log_error(e, f"Display snap image failed")
-            print("[display_snap] exception:", e)
 
         # Force histogram window to update using snapshot as source
         try:
             if getattr(self, "hist_canvas", None) is not None:
-                print("[display_snap] forcing histogram update using original_snap_array")
                 self.update_image_and_histogram(img_array=getattr(self, "original_snap_array", None), live_mode=False)
         except Exception as e:
             print("[display_snap] histogram update failed:", e)
@@ -3088,7 +3095,25 @@ class WormAnalysisApp:
                 self.root.after(2000, lambda: self.save_button_label_ref.configure(text=""))
         except Exception as e:
             self.context_error = log_error(e, f"Save snap image failed")
-              
+          
+    def _get_contrast_image(self, live_mode):
+        """
+        Return the numpy array to use for histogram/contrast depending on mode.
+        Prefer original_snap_array for snap mode and last_live_frame for live.
+        """
+        if live_mode:
+            return getattr(self, "last_live_frame", None)
+        
+        img_1 = getattr(self, "original_snap_array", None)
+        if img_1 is not None:
+            return img_1
+        
+        img_2 = getattr(self, "snap_img", None)
+        if img_2 is not None:
+            return img_2
+
+        return None
+    
     # --- Pages ---  
     def show_assist_acquisition_page(self): # UNUSED and DEPRECATED
         """
@@ -4085,8 +4110,7 @@ class WormAnalysisApp:
             dataset_training = Dataset_Manager()
             append_status("Load images... (~2s/image)")
             model = get_selected_model_name()
-            _, mutants_filename, wt_filename = dataset_training.load_images(training = True, model_name = str(model))
-            print(mutants_filename, wt_filename)
+            _, mutants_filename, wt_filename, _ = dataset_training.load_images(training = True, model_name = str(model))
             append_status("✅ Images loaded")
             
             append_status("Compute features... (~1.5s/image)")

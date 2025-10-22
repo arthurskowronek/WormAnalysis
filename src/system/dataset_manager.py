@@ -290,18 +290,19 @@ class Dataset_Manager:
                 img = data.original_image
                 mask = data.worm_mask
                 max_data = data.maxima
-                plot_synapse_detection(
+                enhanced_img = plot_synapse_detection(
                     original_image=img,
                     worm_mask=mask,
                     maxima=max_data,
-                    title=f'{img_name}'
+                    title=f'{img_name}',
+                    display=True
                 )
                 count += 1
                 if count >= 3:
                     break    
 
         print("Data acquired successfully.")
-        return self, moved_from_mutant, moved_from_wt
+        return self, moved_from_mutant, moved_from_wt, enhanced_img
 
     def get_data(self) -> Tuple[np.ndarray, np.ndarray]:
         """
