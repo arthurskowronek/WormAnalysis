@@ -891,6 +891,31 @@ class WormAnalysisApp:
 
         Each parameter respects its enabled/disabled state and visual design.
         """
+        # Scan Objective
+        list_scan_objective = [
+            str(self.loaded_params.get(f"microscope_objective_size_{i}")) + "x"
+            for i in range(1, 7)
+            if str(self.loaded_params.get(f"microscope_objective_size_{i}")) != ""
+        ]
+        bg = "parameters_button_background" if "scan_objective" in self.enable_parameters_buttons else "parameters_button_disabled_background"
+        tk.Label(self.params_content_frame, text="Scan Objective", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
+        _, self.scan_objective_dropdown = self.create_rounded_dropdown(
+            self.params_content_frame, list_scan_objective, self.scan_objective, bg
+        )
+        
+        # Scan shape
+        bg = "parameters_button_background" if "scan_shape" in self.enable_parameters_buttons else "parameters_button_disabled_background"
+        tk.Label(self.params_content_frame, text="Scan shape", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
+        _, self.scan_shape_dropdown = self.create_rounded_dropdown(
+            self.params_content_frame, ["Square", "Rectangle"], self.shape, bg
+        )
+        
+        # Dual view
+        if self.machine_has_dual_view.get():
+            self.dual_view_toggle = self.create_custom_toggle(self.params_content_frame, "Dual view", self.dual_view)
+        else:
+            self.dual_view_toggle = None
+        
         # Exposure time
         bg = "parameters_button_background" if "exposure_time" in self.enable_parameters_buttons else "parameters_button_disabled_background"
         icon = self.clock_icon if "exposure_time" in self.enable_parameters_buttons else self.clock_icon_disabled
@@ -910,43 +935,18 @@ class WormAnalysisApp:
         # Shutter toggle
         #self.shutter_toggle = self.create_custom_toggle(self.params_content_frame, "Shutter", self.shutter)
 
-        # Dual view
-        if self.machine_has_dual_view.get():
-            self.dual_view_toggle = self.create_custom_toggle(self.params_content_frame, "Dual view", self.dual_view)
-        else:
-            self.dual_view_toggle = None
-
         # Display mode
         """bg = "parameters_button_background" if "display_mode" in self.enable_parameters_buttons else "parameters_button_disabled_background"
         tk.Label(self.params_content_frame, text="Display mode", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
         _, self.display_mode_dropdown = self.create_rounded_dropdown(
             self.params_content_frame, ["Grayscale"], self.display_mode, bg
         )"""
-        
-        # Scan Objective
-        list_scan_objective = [
-            str(self.loaded_params.get(f"microscope_objective_size_{i}")) + "x"
-            for i in range(1, 7)
-            if str(self.loaded_params.get(f"microscope_objective_size_{i}")) != ""
-        ]
-        bg = "parameters_button_background" if "scan_objective" in self.enable_parameters_buttons else "parameters_button_disabled_background"
-        tk.Label(self.params_content_frame, text="Scan Objective", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
-        _, self.scan_objective_dropdown = self.create_rounded_dropdown(
-            self.params_content_frame, list_scan_objective, self.scan_objective, bg
-        )
 
         # Fluo objective
         bg = "parameters_button_background" if "fluo_objective" in self.enable_parameters_buttons else "parameters_button_disabled_background"
         tk.Label(self.params_content_frame, text="Fluo objective", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
         _, self.fluo_objective_dropdown = self.create_rounded_dropdown(
             self.params_content_frame, list_scan_objective, self.fluo_objective, bg
-        )
-
-        # Scan shape
-        bg = "parameters_button_background" if "scan_shape" in self.enable_parameters_buttons else "parameters_button_disabled_background"
-        tk.Label(self.params_content_frame, text="Scan shape", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
-        _, self.scan_shape_dropdown = self.create_rounded_dropdown(
-            self.params_content_frame, ["Square", "Rectangle"], self.shape, bg
         )
         
         # Model name
