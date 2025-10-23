@@ -3082,11 +3082,20 @@ class WormAnalysisApp:
                 
                 CURRENT_DATE = datetime.datetime.now().strftime(DATE_FORMAT) 
                 filename = f"{CURRENT_DATE}.tif"
-                user_directory = Path(USER_DIR) / str(self.user_directory.get())
+                desktop_path = Path.home() / "Desktop"
+                user_directory = desktop_path / str(self.user_directory.get())
                 path = user_directory / filename
                 if not user_directory.exists():
                     user_directory.mkdir(parents=True, exist_ok=True)
-                imwrite(str(path), self.snap_img) 
+                
+                img_to_save = getattr(self, "original_snap_array", None)
+                if img_to_save is None:
+                    print("Is None")
+                    img_to_save = self.snap_img
+
+                img_to_save = np.clip(img_to_save, 0, 65535).astype(np.uint16)
+
+                imwrite(str(path), img_to_save) 
                 
                 self.root.after(2000, lambda: self.save_button_label_ref.configure(text=""))
             else:

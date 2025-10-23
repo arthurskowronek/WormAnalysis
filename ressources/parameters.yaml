@@ -4,11 +4,11 @@ dual_view: false
 exposure_time: '100'
 scan_objective: 4x
 shape: Square
-user_directory: Arthur_2025_08_25
-start_x: -5259.89990234375
-start_y: 42.300048828125
-end_x: 18462.60009765625
-end_y: 23764.800048828125
+user_directory: Arthur_2025_10_23
+start_x: -12634.900390625
+start_y: -11722.599609375
+end_x: 11087.599609375
+end_y: 11999.900390625
 scan_width: '8'
 scan_height: '8'
 machine_has_dual_view: false
