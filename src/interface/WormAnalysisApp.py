@@ -1,10 +1,12 @@
 import os
+import sys
 import cv2
 import yaml
 import glob
 import time
 import shutil
 import datetime
+import subprocess
 import numpy as np
 import pandas as pd
 import tkinter as tk
@@ -4246,7 +4248,7 @@ class WormAnalysisApp:
             justify="center",
             anchor="center"
         )
-        steps_label_2.grid(row=3, column=0, pady=(60, 12))
+        steps_label_2.grid(row=3, column=0, pady=(40, 12))
         
         # --- PART 2: Instruction text for where to add images (centered) ---
         part2 = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
@@ -4266,6 +4268,130 @@ class WormAnalysisApp:
 
         # Update as soon as the page is shown
         refresh_model_list()
+        
+        # ---- add AFTER: self.instruction_label.pack(anchor="center") ----
+
+        # frame for the two "Open folder" buttons and counters
+        folders_frame = tk.Frame(part2, bg=self.colors.theme["primary_background"])
+        folders_frame.pack(anchor="center", pady=(12, 0))
+
+        # small vars to display counts
+        mutant_count_var = tk.StringVar(value="Mutant: 0 images")
+        wt_count_var = tk.StringVar(value="WT: 0 images")
+        
+        def open_folder_in_explorer(path):
+            """Create folder if missing and open it in file explorer (Windows primary)."""
+            try:
+                os.makedirs(path, exist_ok=True)
+            except Exception as e:
+                append_status(f"❌ Could not create folder {path}: {e}")
+                return
+            try:
+                if sys.platform.startswith("win"):
+                    os.startfile(path)      # Windows
+                elif sys.platform == "darwin":
+                    subprocess.Popen(["open", path])
+                else:
+                    subprocess.Popen(["xdg-open", path])
+                append_status(f"📁 Opened: {path}")
+            except Exception as e:
+                append_status(f"❌ Failed to open folder {path}: {e}")
+
+        def open_mutant_folder():
+            model = get_selected_model_name()
+            if not model:
+                append_status("❗ No model selected. Please select or create a model first.")
+                return
+            mutant_dir = os.path.join(TRAINING_DIR, model, "Mutant")
+            open_folder_in_explorer(mutant_dir)
+            update_counts()
+
+        def open_wt_folder():
+            model = get_selected_model_name()
+            if not model:
+                append_status("❗ No model selected. Please select or create a model first.")
+                return
+            wt_dir = os.path.join(TRAINING_DIR, model, "WT")
+            open_folder_in_explorer(wt_dir)
+            update_counts()
+
+        def update_counts(*_):
+            """Refresh the small labels showing how many images are in each folder."""
+            model = get_selected_model_name()
+            if not model:
+                mutant_count_var.set("Mutant: -")
+                wt_count_var.set("WT: -")
+                return
+            base = os.path.join(TRAINING_DIR, model)
+            mutant_count = count_images_in_dir(os.path.join(base, "Mutant"))
+            wt_count = count_images_in_dir(os.path.join(base, "WT"))
+            mutant_count_var.set(f"Mutant: {mutant_count} image(s)")
+            wt_count_var.set(f"WT: {wt_count} image(s)")
+
+        # Buttons and counters layout (centered)
+        btns_container = tk.Frame(folders_frame, bg=self.colors.theme["primary_background"])
+        btns_container.pack(anchor="center")
+
+        # Mutant button + counter
+        mutant_container = tk.Frame(btns_container, bg=self.colors.theme["primary_background"])
+        mutant_container.grid(row=0, column=0, padx=10)
+        self.create_rounded_button(
+            parent=mutant_container,
+            text="Open Mutant folder",
+            command=open_mutant_folder,
+            bg_color=self.colors.theme["primary_background"],
+            text_color=self.colors.theme["primary_text"],
+            hover_color=self.colors.theme["tertiary_background"],
+            font=(self.font, 10),
+            width_pixels=160,
+            height_pixels=36,
+            corner_radius=12,
+            side=tk.TOP,
+            padx_text=0,
+            border_width=2,
+            border_color=self.colors.theme["stroke_button"]
+        )
+        tk.Label(mutant_container, textvariable=mutant_count_var,
+                bg=self.colors.theme["primary_background"],
+                fg=self.colors.theme["secondary_text"],
+                font=(self.font, 9)).pack(anchor="center", pady=(6,0))
+
+        # WT button + counter
+        wt_container = tk.Frame(btns_container, bg=self.colors.theme["primary_background"])
+        wt_container.grid(row=0, column=1, padx=10)
+        self.create_rounded_button(
+            parent=wt_container,
+            text="Open WT folder",
+            command=open_wt_folder,
+            bg_color=self.colors.theme["primary_background"],
+            text_color=self.colors.theme["primary_text"],
+            hover_color=self.colors.theme["tertiary_background"],
+            font=(self.font, 10),
+            width_pixels=160,
+            height_pixels=36,
+            corner_radius=12,
+            side=tk.TOP,
+            padx_text=0,
+            border_width=2,
+            border_color=self.colors.theme["stroke_button"]
+        )
+        tk.Label(wt_container, textvariable=wt_count_var,
+                bg=self.colors.theme["primary_background"],
+                fg=self.colors.theme["secondary_text"],
+                font=(self.font, 9)).pack(anchor="center", pady=(6,0))
+
+        # Make sure counts update when model selection changes
+        self.model_combobox.bind("<<ComboboxSelected>>", lambda e: update_counts())
+        # Also update right away
+        update_counts()
+
+        # ----------------------------------------------------------------
+
+        
+        
+        
+        
+        
 
 
         # Steps text (centered, small)
@@ -4278,7 +4404,7 @@ class WormAnalysisApp:
             justify="center",
             anchor="center"
         )
-        steps_label_3.grid(row=5, column=0, pady=(60, 12))
+        steps_label_3.grid(row=5, column=0, pady=(40, 12))
         
         # --- PART 3: Train button + status area (centered) ---
         part3 = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])

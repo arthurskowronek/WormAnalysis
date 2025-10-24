@@ -282,6 +282,7 @@ class Dataset_Manager:
                 print(f"Error saving dataset: {e}")
 
         # Visualize preprocessing results if requested.
+        enhanced_img = None
         if visualize:
             print("\nVisualizing preprocessing results...")
             count = 0
