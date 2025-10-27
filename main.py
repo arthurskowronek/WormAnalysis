@@ -18,6 +18,22 @@ from config import set_up_environment, loadCore, start_new_session_get_statistic
   --add-data "ressources;ressources" `
   --collect-all skan `
   --collect-all python_tsp `
+  --collect-all sklearn `
+  --collect-all numpy `
+  --collect-all scipy `
+  main.py"""
+
+"""pyinstaller --onefile `
+  --name=Worm_detection `
+  --icon=icon_desktop.ico `
+  --add-data "logs;logs" `
+  --add-data "models;models" `
+  --add-data "ressources;ressources" `
+  --collect-all skan `
+  --collect-all python_tsp `
+  --collect-all sklearn `
+  --collect-all numpy `
+  --collect-all scipy `
   main.py"""
     
 # For Mac use

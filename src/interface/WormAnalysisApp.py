@@ -75,7 +75,7 @@ class WormAnalysisApp:
         self.current_page = first_page if self.CORE is not None else "loading_page"
         self.dark_mode = initial_dark_mode
         self.worms_position = None
-        self.prediction = 85
+        self.prediction = "--"
         self.id_worm_seen = initial_id_worm_seen
         self.add_worm_scan_result = True
         self.live_image = initial_live_image
@@ -2287,12 +2287,12 @@ class WormAnalysisApp:
         # Step 2: Try to predict with model, fallback to random
         try:
             dataset = Dataset_Manager()
-            _, _, _, enhanced_img = dataset.load_images()
+            _, _, _, enhanced_img = dataset.load_images(visualize=True)
             dataset.set_features()
             self.prediction_label_2.configure(text=f"with a probability of : set features...")
             self.root.update() # tester avec self.root.update() vs self.root.update_idletasks()
 
-            model,_ = dataset.get_model(model_name = str(self.name_model.get()))
+            model, _ = dataset.get_model(model_name = str(self.name_model.get()))
             pred = model.predict(dataset.get_features_selected()[0])[0]
             print(f"Model-derived prediction : {pred:.2f}")
             
@@ -2302,7 +2302,7 @@ class WormAnalysisApp:
 
             # Step 3: Update prediction in worm database
             self.worms_position.update_worm_prediction(id, pred)
-            self.prediction = int(100*pred)
+            self.prediction = str(int(100*pred))
             self.prediction_label_2.configure(text=f"with a probability of {self.prediction}%")
             self.root.update() # tester avec self.root.update() vs self.root.update_idletasks()
         except Exception as e:
@@ -4114,25 +4114,37 @@ class WormAnalysisApp:
             if wt_count == 0:
                 append_status("⚠️ No images found in WT. Please add images to proceed.")
                 return
+            if mutant_count < 50 or wt_count < 50:
+                append_status("⚠️ Warning: You must have at least 50 images in each category to train a new model.")
+                return
 
             # At this point, the minimal checks are passed.
             append_status("🚀 Starting training")
 
-            dataset_training = Dataset_Manager()
-            append_status("Load images... (~2s/image)")
-            model = get_selected_model_name()
-            _, mutants_filename, wt_filename, _ = dataset_training.load_images(training = True, model_name = str(model))
-            append_status("✅ Images loaded")
+            try:
+                dataset_training = Dataset_Manager()
+                append_status("Load images... (~2s/image)")
+                model = get_selected_model_name()
+                _, mutants_filename, wt_filename, _ = dataset_training.load_images(training = True, model_name = str(model))
+                append_status("✅ Images loaded")
+            except Exception as e:
+                self.context_error = log_error(e, f"[TRAINING MODEL] - Loading Images")
             
-            append_status("Compute features... (~1.5s/image)")
-            dataset_training.set_features()
-            append_status("✅ Features computed")
+            try:
+                append_status("Compute features... (~1.5s/image)")
+                dataset_training.set_features()
+                append_status("✅ Features computed")
+            except Exception as e:
+                self.context_error = log_error(e, f"[TRAINING MODEL] - Compute Features")
 
-            append_status("Compute model...")
-            _, score = dataset_training.get_model(compute = True, verbose_plot = False, model_name = str(model))
-            append_status("✅ Model computed")
-            append_status("The accuracy score for this model is {:.2f}%".format(score*100))
-            append_status("You can now choose to use this model when analysing a worm")
+            try:
+                append_status("Compute model...")
+                _, score = dataset_training.get_model(compute = True, verbose_plot = False, model_name = str(model))
+                append_status("✅ Model computed")
+                append_status("The accuracy score for this model is {:.2f}%".format(score*100))
+                append_status("You can now choose to use this model when analysing a worm")
+            except Exception as e:
+                self.context_error = log_error(e, f"[TRAINING MODEL] - Compute Model")
             
             # for all files in TRAINING_DIR/model_name/validation, move them to TRAINING_DIR/model_name/Mutant or WT based on mutants_filename and wt_filename
             validation_dir = os.path.join(TRAINING_DIR, model, "validation")
@@ -4680,6 +4692,31 @@ class WormAnalysisApp:
         load_warning = "⚠️ Don't use the joystick to move between worms; use the provided buttons or keyboard arrows."
 
 
+        # ----------------- Training Model Page -----------------
+        training_content = [
+                "Purpose: Create a new model directory, add Mutant/WT images, run checks and train a classification model.",
+                "Folder structure: TRAINING_DIR/<model_name>/Mutant/ and TRAINING_DIR/<model_name>/WT/ (optional validation/ will be moved automatically).",
+                "Supported images: .tiff (non-recursive).",
+                "Minimum dataset: At least 50 images in each category (Mutant and WT) — otherwise training will warn/abort.",
+                "Training flow: validates folders → loads images (~2s/image) → computes features (~1.5s/image) → computes model and returns accuracy.",
+                "After training: any files in TRAINING_DIR/<model>/validation/ that match known filenames are moved to Mutant/ or WT/ and validation/ is removed if empty.",
+                "Status messages appear in the status box and errors are logged to the app's error handler."
+            ]
+        training_shortcuts = [
+                "Create new model: Type name in 'New model name' and press 'Create directory'.",
+                "Open folders: Use 'Open Mutant folder' / 'Open WT folder' to drop images in the OS file manager."
+            ]
+        training_tips = [
+                "Use simple model names (no special characters or spaces) to avoid OS issues.",
+                "Back up your images before running training — files from validation/ may be moved.",
+                "Populate both Mutant and WT with at least 50 images to proceed."
+            ]
+        training_warning = (
+                "⚠️ Training may be time-consuming and CPU intensive. "
+                "Ensure sufficient disk space and do not interrupt the application while file moves or training are in progress. "
+                "The app will move files from the 'validation' folder into Mutant/ or WT/ automatically — keep backups if necessary."
+            )
+
         # Create sections with quick navigation buttons that try to call your page switcher
         make_section(
             "Automatic Scan",
@@ -4700,6 +4737,13 @@ class WormAnalysisApp:
             load_content,
             quick_action={"label": "Open Worm Analysis", "command": lambda: self.switch_page("load_position")},
             shortcuts=load_shortcuts, tips=load_tips, warning=load_warning
+        )
+        
+        make_section(
+            "Training a model",
+            training_content,
+            quick_action={"label": "Open Training Page", "command": lambda: self.switch_page("training_model")},
+            shortcuts=training_shortcuts, tips=training_tips, warning=training_warning
         )
 
         # Footer: general notes and close/back button

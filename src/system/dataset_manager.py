@@ -651,7 +651,7 @@ class Dataset_Manager:
             if len(y) <= max_len_y and not retrain:
                 print("Dataset has not changed significantly. No need to retrain the model.")
                 model = joblib.load(MODELS_DIR / "model_prediction.pkl")
-                return model
+                return model, 0
     
 
         if not compute:
@@ -662,10 +662,10 @@ class Dataset_Manager:
                 else:
                     model = joblib.load(MODELS_DIR / f"model_prediction.pkl")
                     print("Loaded cached model from", MODELS_DIR / f"model_prediction.pkl")
-                return model
+                return model, 0
             except Exception as e:
                 print(f"Error loading cached model: {e}")
-                return None
+                return None, 0
         else:
             if model_type == 'classifier':
                 print("Training classifier...")

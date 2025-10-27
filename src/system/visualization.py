@@ -52,7 +52,7 @@ def plot_synapse_detection(
 
     # Save the plot to an in-memory bytes buffer
     buf = BytesIO()
-    fig.savefig(buf, format='png', dpi=100)
+    fig.savefig(buf, format='png', dpi=100, bbox_inches='tight')
     buf.seek(0)
     plt.close(fig)  # Close the figure to free memory
     
@@ -60,7 +60,7 @@ def plot_synapse_detection(
     image = Image.open(buf)
     
     if display:
-        plt.show()
+        image.show()
         
     return image
 

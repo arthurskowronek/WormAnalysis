@@ -6,6 +6,7 @@ import optuna
 import numpy as np
 import pandas as pd
 from sklearn.svm import SVC
+from joblib import parallel_backend
 from typing import Dict, Any, Optional, Tuple
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier, HistGradientBoostingClassifier as SKHistGradientBoostingClassifier
@@ -74,7 +75,8 @@ class BaseClassifier(BaseModel):
             params = self._get_trial_params(trial)
             self.set_params(**params)
             kf = StratifiedKFold(n_splits=cv, shuffle=True, random_state=self.random_state)
-            scores = cross_val_score(self.model, X, y, cv=kf, scoring=scoring, n_jobs=-1)
+            with parallel_backend("threading", n_jobs=1):
+                scores = cross_val_score(self.model, X, y, cv=kf, scoring=scoring, n_jobs=-1)
             return np.mean(scores)
 
         # Create a study aiming to maximize accuracy
@@ -767,7 +769,8 @@ def evaluate_models_with_scalers(
 
             kf = StratifiedKFold(n_splits=cv, shuffle=True, random_state=random_state)
             try:
-                scores = cross_val_score(pipe, X, y, cv=kf, scoring=scorer, n_jobs=-1)
+                with parallel_backend("threading", n_jobs=1):
+                    scores = cross_val_score(pipe, X, y, cv=kf, scoring=scorer, n_jobs=-1)
                 mean_score = scores.mean()
             except Exception as e:
                 print(f"[ERROR] cross_val_score failed for {model_type} with {scaler_name}: {e}")

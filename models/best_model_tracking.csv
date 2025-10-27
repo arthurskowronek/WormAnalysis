@@ -43,3 +43,4 @@ date,best_scaler_name,best_model_name,best_score,len_y
 20251021_152409,MaxAbsScaler,random_forest,0.7304761904761905,74
 20251021_154300,Normalizer,knn,0.7571428571428571,74
 20251021_162559,MaxAbsScaler,random_forest,0.7695238095238095,74
+20251024_095534,RobustScaler,hist_gradient_boosting,0.6666666666666666,12
