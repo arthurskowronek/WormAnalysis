@@ -296,7 +296,7 @@ class Dataset_Manager:
                     worm_mask=mask,
                     maxima=max_data,
                     title=f'{img_name}',
-                    display=True
+                    display=False
                 )
                 count += 1
                 if count >= 3:

@@ -1523,6 +1523,7 @@ class WormAnalysisApp:
         try:
             self.current_page = page_id
             self.refresh_ui()
+            self._show_enhanced_preview = False
             self.root.update_idletasks()
         except Exception as e:
             self.context_error = log_error(e, f"Switch page {page_id} failed")
@@ -1985,6 +1986,8 @@ class WormAnalysisApp:
             event (tk.Event): The event object from the click, containing
                             the `x` and `y` coordinates of the click.
         """
+        self.clear_enhanced_preview()
+        
         # Get clicked coordinates in displayed image
         x_display, y_display = event.x, event.y
 
@@ -2019,6 +2022,7 @@ class WormAnalysisApp:
         the microscope stage to move to the new worm's coordinates.
         """
         try:
+            self.clear_enhanced_preview()
             self.worms_position.go_to_newt_worm() # set "seen" to True to the next worm
             self.id_worm_seen = self.worms_position.get_id_path_worm_seen() # get the id of the newt worm
             self.id_worm_seen_label.config(text=f"{self.id_worm_seen+1}/{self.worms_position.get_number_of_worms()}")
@@ -2044,6 +2048,7 @@ class WormAnalysisApp:
         useful for reviewing or re-analyzing a previously seen worm.
         """
         try:
+            self.clear_enhanced_preview()
             self.worms_position.go_to_last_worm() # set "seen" to True to the last worm
             self.id_worm_seen = self.worms_position.get_id_path_worm_seen() # get the id of the newt worm
             self.id_worm_seen_label.config(text=f"{self.id_worm_seen+1}/{self.worms_position.get_number_of_worms()}")
@@ -2287,7 +2292,7 @@ class WormAnalysisApp:
         # Step 2: Try to predict with model, fallback to random
         try:
             dataset = Dataset_Manager()
-            _, _, _, enhanced_img = dataset.load_images(visualize=True)
+            _, _, _, self.enhanced_img = dataset.load_images(visualize=True)
             dataset.set_features()
             self.prediction_label_2.configure(text=f"with a probability of : set features...")
             self.root.update() # tester avec self.root.update() vs self.root.update_idletasks()
@@ -2318,7 +2323,32 @@ class WormAnalysisApp:
         id = len(list(directory.glob("*")))
         classified_path = directory / f"{id}.tif" 
         shutil.move(str(unclassified_path), str(classified_path))
-          
+        
+        
+        # Step 5 : Display enhanced image after prediction
+        self._show_enhanced_preview = True
+        
+        # ensure we are on the load_position page / that live label exists
+        try:
+            self.show_load_position_page()
+            # give widgets a short time to exist, then display enhanced image
+            try:
+                # immediate attempt (if widgets ready)
+                self.display_enhanced_image()
+            except Exception:
+                # schedule a short delay if widgets are still being created
+                self.root.after(100, self.display_enhanced_image)
+        except Exception:
+            # fallback: try direct display
+            try:
+                self.display_enhanced_image()
+            except Exception:
+                pass
+            
+        self._show_enhanced_preview = True
+        self.display_enhanced_image()
+        self._show_enhanced_return_button()
+                
     def start_live(self):
         """
         Starts the live image acquisition loop.
@@ -2326,6 +2356,8 @@ class WormAnalysisApp:
         This function sets the `live_image` flag to True, switches the UI to the
         `load_position` page, and begins the continuous `update_live_image` loop.
         """
+        self._show_enhanced_preview = False
+        self._hide_enhanced_return_button()
         self.live_image = True
         self.show_load_position_page()
 
@@ -2391,6 +2423,7 @@ class WormAnalysisApp:
         """
         self.live_image = False
         self._live_running = False
+        self.clear_enhanced_preview()
 
         if hasattr(self, "_live_after_id") and self._live_after_id:
             self.root.after_cancel(self._live_after_id)
@@ -2448,6 +2481,52 @@ class WormAnalysisApp:
                 # no preview targets remain — stop the loop to avoid repeated errors
                 self._live_running = False
                 return
+            
+            # --- handle enhanced preview override: display enhanced_image instead of acquiring camera ---
+            if getattr(self, "_show_enhanced_preview", False):
+                try:
+                    # Just display the enhanced image and skip camera acquisition
+                    if hasattr(self, "live_image_label") and self.live_image_label.winfo_exists():
+                        self.display_enhanced_image()
+
+                    # also update automatic preview if present (optional)
+                    if getattr(self, "automatic_live_image_label", None) and self.automatic_live_image_label.winfo_exists():
+                        try:
+                            # create small square preview from enhanced image
+                            en_img = self.enhanced_image
+                            en_pil = en_img if isinstance(en_img, Image.Image) else Image.fromarray(np.array(en_img))
+                            aw = self.automatic_live_image_label.winfo_width()
+                            ah = self.automatic_live_image_label.winfo_height()
+                            size = int(min(max(aw, 0), max(ah, 0))) or None
+                            if size:
+                                mini = en_pil.resize((size, size), Image.Resampling.LANCZOS)
+                                tk_auto = ImageTk.PhotoImage(mini)
+                                self.automatic_live_image_label.image = tk_auto
+                                self.automatic_live_image_label.config(image=tk_auto)
+                        except Exception:
+                            pass
+
+                    # schedule next iteration (keep loop alive so user can toggle back)
+                    try:
+                        if getattr(self, "_live_running", False) and self.root.winfo_exists():
+                            if hasattr(self, "_live_after_id"):
+                                try:
+                                    self.root.after_cancel(self._live_after_id)
+                                except Exception:
+                                    pass
+                            self._live_after_id = self.root.after(200, self.update_live_image)
+                            if not hasattr(self, "_after_ids"):
+                                self._after_ids = []
+                            self._after_ids.append(self._live_after_id)
+                    except Exception:
+                        pass
+
+                    return  # skip the normal camera acquisition/display
+                except Exception as e:
+                    # If enhanced display fails, log and fall back to camera logic below
+                    if self.context_error != "Update live image failed (enhanced preview)":
+                        self.context_error = log_error(e, "Update live image failed (enhanced preview)")
+
 
 
             # Safe camera acquisition (guard for CORE missing/failing)
@@ -3125,6 +3204,177 @@ class WormAnalysisApp:
 
         return None
     
+    def display_enhanced_image(self):
+        """
+        Display self.enhanced_image in the main live preview label (self.live_image_label).
+        Handles PIL Image or numpy array inputs and resizes to the label.
+        """
+        try:
+            if getattr(self, "enhanced_image", None) is None:
+                return
+
+            # Convert to PIL if needed
+            img = self.enhanced_image
+            if not isinstance(img, Image.Image):
+                try:
+                    img = Image.fromarray(np.array(img))
+                except Exception:
+                    # fallback: try to coerce to uint8 first
+                    arr = np.array(img, dtype=np.uint8)
+                    img = Image.fromarray(arr)
+
+            # Resize to label geometry if available
+            try:
+                if hasattr(self, "live_image_label") and self.live_image_label.winfo_exists():
+                    w = self.live_image_label.winfo_width()
+                    h = self.live_image_label.winfo_height()
+                    if w > 0 and h > 0:
+                        img = img.resize((w, h), Image.Resampling.LANCZOS)
+            except Exception:
+                pass
+
+            tk_img = ImageTk.PhotoImage(img)
+            # keep reference to avoid GC
+            self.live_image_label.image = tk_img
+            self.live_image_label.config(image=tk_img)
+        except Exception as e:
+            # Use your existing logging helper
+            self.context_error = log_error(e, "Display enhanced image failed")
+
+    def clear_enhanced_preview(self):
+        """
+        Disable enhanced preview and clear enhanced_image reference if desired.
+        """
+        self._show_enhanced_preview = False
+        self._hide_enhanced_return_button()
+        del self.enhanced_image  
+
+    def _create_enhanced_return_button(self):
+        """
+        Create the 'Return to Live' button if it doesn't exist.
+        We don't pack it here — packing is handled by show/hide functions.
+        """
+        if hasattr(self, "enhanced_return_live_button") and self.enhanced_return_live_button.winfo_exists():
+            return
+
+        # parent: try to put it inside the bottom buttons container if exists, else inside live container
+        parent = getattr(self, "left_live_analysis_container_ref", None) or getattr(self, "live_analysis_container_ref", None) or self.main_content
+
+        # create a small frame for proper placement if needed
+        try:
+            self._enhanced_button_container = tk.Frame(parent, bg=self.colors.theme["primary_background"])
+            # place it at bottom-right of the live container using place() or pack/grid depending on layout
+            # here we will use place to overlay it on the live image container
+            # but if you'd rather place it in the button row, insert it there instead.
+        except Exception:
+            self._enhanced_button_container = parent
+
+        self.enhanced_return_live_button = self.create_rounded_button(
+            parent=self._enhanced_button_container,
+            text="Return to Live",
+            icon=None,
+            icon_hover=None,
+            command=lambda: self._on_enhanced_return_clicked(),
+            bg_color=self.colors.theme["tertiary_background"],
+            text_color=self.colors.theme["primary_text"],
+            hover_color=self.colors.theme["secondary_background"],
+            font=(self.font, 10),
+            width_pixels=160,
+            height_pixels=36,
+            corner_radius=12,
+            side=tk.TOP,
+            pady=6,
+            padx_text=0,
+            border_width=1,
+            border_color=self.colors.theme["stroke_button"]
+        )
+
+    def _show_enhanced_return_button(self):
+        """Display the return button near the live image (or in the button row)."""
+        try:
+            self._create_enhanced_return_button()
+            # If we created a special container (overlay), place it at bottom-right
+            if hasattr(self, "_enhanced_button_container") and self._enhanced_button_container is not None and getattr(self, "_enhanced_button_container", None) is not self.main_content:
+                # Put container over the live area (adjust offsets as needed)
+                try:
+                    # place inside the live analysis container relative coordinates
+                    self._enhanced_button_container.place(in_=self.live_analysis_container_ref, relx=0.98, rely=0.98, anchor="se")
+                    # pack the button inside the container (create_rounded_button already packed by your helper)
+                except Exception:
+                    # fallback: pack under the live preview
+                    self._enhanced_button_container.pack(side=tk.BOTTOM, anchor="e", padx=8, pady=8)
+            else:
+                # fallback: pack into the bottom buttons area if exists
+                try:
+                    self._enhanced_button_container.pack(side=tk.BOTTOM, anchor="e", padx=8, pady=8)
+                except Exception:
+                    pass
+
+            # ensure the widget is visible
+            try:
+                self.enhanced_return_live_button.lift()
+                self.enhanced_return_live_button.update_idletasks()
+            except Exception:
+                pass
+        except Exception as e:
+            # non-fatal
+            print("Could not show enhanced return button:", e)
+
+    def _hide_enhanced_return_button(self):
+        """Hide/remove the return-to-live button."""
+        try:
+            if hasattr(self, "enhanced_return_live_button") and self.enhanced_return_live_button.winfo_exists():
+                try:
+                    self.enhanced_return_live_button.pack_forget()
+                except Exception:
+                    pass
+            if hasattr(self, "_enhanced_button_container") and getattr(self, "_enhanced_button_container", None) is not None:
+                try:
+                    self._enhanced_button_container.place_forget()
+                except Exception:
+                    try:
+                        self._enhanced_button_container.pack_forget()
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+    def _on_enhanced_return_clicked(self):
+        """
+        Called when user clicks the 'Return to Live' button.
+        Restores normal live acquisition and hides the button.
+        """
+        try:
+            # Disable the enhanced preview
+            self._show_enhanced_preview = False
+
+            # hide the button
+            self._hide_enhanced_return_button()
+
+            # ensure live flags are correct
+            self.live_image = True
+            if not getattr(self, "_live_running", False):
+                self._live_running = True
+
+            # Start or resume the live loop in a safe way
+            try:
+                # cancel previous if present
+                if hasattr(self, "_live_after_id") and self._live_after_id:
+                    try:
+                        self.root.after_cancel(self._live_after_id)
+                    except Exception:
+                        pass
+                # call update_live_image to immediately refresh
+                self.update_live_image()
+            except Exception:
+                # fallback: call start_live() which does full setup
+                try:
+                    self.start_live()
+                except Exception:
+                    pass
+        except Exception as e:
+            self.context_error = log_error(e, "_on_enhanced_return_clicked failed")
+
     # --- Pages ---  
     def show_assist_acquisition_page(self): # UNUSED and DEPRECATED
         """
