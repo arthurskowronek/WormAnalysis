@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from typing import List, Optional, Tuple
 from sklearn.metrics import ConfusionMatrixDisplay
 
-def plot_synapse_detection(
+def plot_synapse_detection_3_images(
                             original_image: np.ndarray,
                             worm_mask: np.ndarray,
                             maxima: List[Tuple[int, int]],
@@ -63,6 +63,48 @@ def plot_synapse_detection(
         image.show()
         
     return image
+
+def plot_synapse_detection(
+                            original_image: np.ndarray,
+                            worm_mask: np.ndarray, # 'worm_mask' n'est plus utilisé mais conservé dans la signature
+                            maxima: List[Tuple[int, int]],
+                            title: str = 'Synapse Detection Results',
+                            display: bool = True
+                        ) -> Image.Image: # Change la valeur de retour
+    """
+    Plot synapse detection results, displaying only the original image with detected synapses.
+    
+    Args:
+        original_image (np.ndarray): The original microscopy image, expected to be grayscale.
+        worm_mask (np.ndarray): The binary mask representing the segmented worm (kept for compatibility, but unused).
+        maxima (List[Tuple[int, int]]): A list of (row, column) coordinates for each detected synapse.
+        title (str): The main title for the entire plot. Defaults to 'Synapse Detection Results'.
+    """
+    # Création d'un seul panneau (subplot)
+    fig, ax = plt.subplots(1, 1, figsize=(6, 6))
+    
+    # Plot unique : Image originale + Maxima
+    ax.imshow(original_image, cmap='gray')
+    if maxima:
+        maxima_coords = np.array(maxima) # Renomme l'array NumPy
+        ax.scatter(maxima_coords[:, 1], maxima_coords[:, 0], c='red', s=3)
+    ax.axis('off')
+
+    plt.tight_layout()
+
+    # Sauvegarde du plot dans un buffer en mémoire
+    buf = BytesIO()
+    fig.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+    buf.seek(0)
+    plt.close(fig) # Ferme la figure pour libérer la mémoire
+    
+    # Conversion du buffer en image PIL
+    image = Image.open(buf)
+    
+    if display:
+        image.show()
+        
+    return image # Retourne l'objet Image
 
 def plot_images(images: List[np.ndarray], 
                 titles: Optional[List[str]] = None,

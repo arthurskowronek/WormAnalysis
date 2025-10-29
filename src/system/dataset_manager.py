@@ -104,94 +104,21 @@ class Dataset_Manager:
             name_dataset = DEFAULT_PKL_NAME
             pkl_path = self.dataset_pkl_dir / (name_dataset + ".pkl")
 
-        # Decide base directory depending on model_name
+        # Decide base directory depending on model_name (SIMPLE: only detect, do NOT create validation)
         use_model_folder = False
         model_base_dir = None
         if model_name is not None:
             candidate = TRAINING_DIR / str(model_name)
             if candidate.exists() and candidate.is_dir():
+                # require both classes to exist to be considered a valid model folder
                 if (candidate / "Mutant").exists() and (candidate / "WT").exists():
                     use_model_folder = True
                     model_base_dir = candidate
-                    validation_dir = model_base_dir / "validation"
-                    try:
-                        if not validation_dir.exists():
-                            validation_dir.mkdir(parents=True, exist_ok=True)
-                            VAL_FRACTION = 0.2
-                            SEED = 42
-                            rng = random.Random(SEED)
-                            for cls in ("Mutant", "WT"):
-                                src_dir = model_base_dir / cls
-                                if not src_dir.exists():
-                                    continue
-                                files = sorted([p for p in src_dir.glob("*.tif")])
-                                if not files:
-                                    continue
-                                k = max(1, math.ceil(len(files) * VAL_FRACTION))
-                                if k >= len(files):
-                                    k = max(1, len(files) // 2)
-                                chosen = rng.sample(files, k) if len(files) > k else files[:k]
-                                for src in chosen:
-                                    dst = validation_dir / src.name
-                                    try:
-                                        # if destination doesn't exist -> move and record
-                                        if not dst.exists():
-                                            shutil.move(src, dst)
-                                            if cls == "Mutant":
-                                                moved_from_mutant.append(dst.name)
-                                            else:
-                                                moved_from_wt.append(dst.name)
-                                        else:
-                                            # destination already exists -> still record it
-                                            if cls == "Mutant":
-                                                moved_from_mutant.append(dst.name)
-                                            else:
-                                                moved_from_wt.append(dst.name)
-                                    except Exception as e:
-                                        print(f"Warning: could not copy {src} -> {dst}: {e}")
-                            print(f"Created validation folder and populated it at {validation_dir}")
-                        else:
-                            # validation exists: ensure it's not empty; if empty, populate similarly
-                            existing = list((validation_dir).glob("*.tif"))
-                            if len(existing) == 0:
-                                VAL_FRACTION = 0.2
-                                SEED = 42
-                                rng = random.Random(SEED)
-                                for cls in ("Mutant", "WT"):
-                                    src_dir = model_base_dir / cls
-                                    if not src_dir.exists():
-                                        continue
-                                    files = sorted([p for p in src_dir.glob("*.tif")])
-                                    if not files:
-                                        continue
-                                    k = max(1, math.ceil(len(files) * VAL_FRACTION))
-                                    if k >= len(files):
-                                        k = max(1, len(files) // 2)
-                                    chosen = rng.sample(files, k) if len(files) > k else files[:k]
-                                    for src in chosen:
-                                        dst = validation_dir / src.name
-                                        try:
-                                            if not dst.exists():
-                                                shutil.move(src, dst)
-                                                if cls == "Mutant":
-                                                    moved_from_mutant.append(dst.name)
-                                                else:
-                                                    moved_from_wt.append(dst.name)
-                                            else:
-                                                # destination already exists -> still record it
-                                                if cls == "Mutant":
-                                                    moved_from_mutant.append(dst.name)
-                                                else:
-                                                    moved_from_wt.append(dst.name)
-                                        except Exception as e:
-                                            print(f"Warning: could not copy {src} -> {dst}: {e}")
-                                print(f"Populated existing empty validation folder at {validation_dir}")
-                    except Exception as e:
-                        print(f"Warning: error while preparing validation folder under {candidate}: {e}")
+                    print(f"Using model folder as base directory: {model_base_dir}")
                 else:
-                    print(f"Warning: model folder {candidate} found but missing 'Mutant' or 'WT' subfolders. Falling back.")
-
-
+                    print(f"Warning: model folder {candidate} found but missing 'Mutant' or 'WT' subfolders. Falling back to {self.data_dir}.")
+            else:
+                print(f"Warning: model folder {candidate} not found. Falling back to {self.data_dir}.")
 
         if compute:
             print("Acquiring data...")

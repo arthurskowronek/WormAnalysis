@@ -2292,7 +2292,7 @@ class WormAnalysisApp:
         # Step 2: Try to predict with model, fallback to random
         try:
             dataset = Dataset_Manager()
-            _, _, _, self.enhanced_img = dataset.load_images(visualize=True)
+            _, _, _, self.enhanced_image = dataset.load_images(visualize=True)
             dataset.set_features()
             self.prediction_label_2.configure(text=f"with a probability of : set features...")
             self.root.update() # tester avec self.root.update() vs self.root.update_idletasks()
@@ -3246,8 +3246,7 @@ class WormAnalysisApp:
         Disable enhanced preview and clear enhanced_image reference if desired.
         """
         self._show_enhanced_preview = False
-        self._hide_enhanced_return_button()
-        del self.enhanced_image  
+        self._hide_enhanced_return_button() 
 
     def _create_enhanced_return_button(self):
         """
@@ -4395,23 +4394,6 @@ class WormAnalysisApp:
                 append_status("You can now choose to use this model when analysing a worm")
             except Exception as e:
                 self.context_error = log_error(e, f"[TRAINING MODEL] - Compute Model")
-            
-            # for all files in TRAINING_DIR/model_name/validation, move them to TRAINING_DIR/model_name/Mutant or WT based on mutants_filename and wt_filename
-            validation_dir = os.path.join(TRAINING_DIR, model, "validation")
-            if os.path.isdir(validation_dir):
-                for file in os.listdir(validation_dir):
-                    file_path = os.path.join(validation_dir, file)
-                    if file in mutants_filename:
-                        dest_path = os.path.join(mutant_dir, file)
-                    elif file in wt_filename:
-                        dest_path = os.path.join(wt_dir, file)
-                    else:
-                        continue
-                    shutil.move(file_path, dest_path)
-                    
-            # remove validation directory if empty
-            if os.path.isdir(validation_dir) and not os.listdir(validation_dir):
-                os.rmdir(validation_dir)
 
         # --- Clear previous widgets in main_content ---
         for widget in self.main_content.winfo_children():
