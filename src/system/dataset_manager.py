@@ -12,11 +12,15 @@ import pandas as pd
 import networkx as nx
 from pathlib import Path
 from skimage.io import imread
+import matplotlib.pyplot as plt
+from sklearn.pipeline import Pipeline
 from sklearn.utils import shuffle
 from skimage.transform import resize
 from typing import Dict, List, Tuple, Optional
 from sklearn.covariance import EllipticEnvelope
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler, MaxAbsScaler, Normalizer, QuantileTransformer, FunctionTransformer
+from sklearn.feature_selection import VarianceThreshold
+from sklearn.decomposition import PCA
 
 from src.system.data import Data
 from src.system.visualization import plot_heatmap, plot_synapse_detection
@@ -498,6 +502,98 @@ class Dataset_Manager:
                 return self
             raise ValueError(f"Unknown feature selection method: {selection_method}")
   
+    def make_unsupervised_selector(self, method: str, X_fit: np.ndarray, k: int = 20, var_threshold: float = 1e-5):
+        """
+        Retourne un selector non-supervisé fit sur X_fit.
+        method: 'none', 'variance', 'pca'
+        - 'variance' : VarianceThreshold(threshold=var_threshold)
+        - 'pca'      : PCA(n_components=k)
+        """
+        method = (method or 'none').lower()
+        if method in ('none', ''):
+            return None
+        if method == 'variance':
+            sel = VarianceThreshold(threshold=var_threshold)
+            sel.fit(X_fit)
+            return sel
+        if method == 'pca':
+            n_comp = min(k, X_fit.shape[1])
+            sel = PCA(n_components=n_comp)
+            sel.fit(X_fit)
+            
+            # a) Variance expliquée par composante
+            explained_variance_ratio = sel.explained_variance_ratio_
+            # b) Variance cumulée
+            cumulative_variance = np.cumsum(explained_variance_ratio)
+            # c) Génération du graphique
+            plt.figure(figsize=(10, 6))
+            # Graphique de l'éboulis des valeurs propres (variance par composante)
+            plt.bar(range(1, len(explained_variance_ratio) + 1), explained_variance_ratio, alpha=0.6, 
+                    color='g', label='Variance expliquée individuelle')
+            # Graphique de la variance cumulée
+            plt.plot(range(1, len(explained_variance_ratio) + 1), cumulative_variance, 
+                    marker='o', linestyle='--', color='r', label='Variance expliquée cumulée')
+            plt.title('Analyse de la Variance Expliquée pour la Détermination de n_components')
+            plt.xlabel('Numéro de la Composante Principale')
+            plt.ylabel('Proportion de Variance Expliquée')
+            plt.xticks(range(1, len(explained_variance_ratio) + 1), rotation=45)
+            plt.grid(axis='y', linestyle='--')
+            plt.legend()
+            plt.tight_layout()
+            plt.show()
+            
+            return sel
+        if method == 'variance_pca':
+            # --- Définir les étapes du Pipeline ---
+            variance_step = ('variance_threshold', VarianceThreshold(threshold=var_threshold))
+            n_comp = min(k, X_fit.shape[1]) 
+            pca_step = ('pca', PCA(n_components=n_comp))
+            
+            # --- Créer et Entraîner le Pipeline ---
+            pipeline = Pipeline(steps=[
+                variance_step,
+                pca_step
+            ])
+            pipeline.fit(X_fit)
+            
+            # --- Générer le graphique ---
+            
+            # 1. Extraire l'objet PCA entraîné du pipeline
+            pca_model = pipeline.named_steps['pca']
+            
+            # 2. Récupérer les données de variance
+            explained_variance_ratio = pca_model.explained_variance_ratio_
+            cumulative_variance = np.cumsum(explained_variance_ratio)
+            
+            # 3. Génération du graphique d'éboulis
+            plt.figure(figsize=(10, 6))
+
+            # Graphique de l'éboulis des valeurs propres (variance par composante)
+            # Note : On affiche les composantes qui existent après le VarianceThreshold
+            x_axis = range(1, len(explained_variance_ratio) + 1)
+            
+            plt.bar(x_axis, explained_variance_ratio, alpha=0.6, 
+                    color='g', label='Variance expliquée individuelle')
+
+            # Graphique de la variance cumulée
+            plt.plot(x_axis, cumulative_variance, 
+                    marker='o', linestyle='--', color='r', label='Variance expliquée cumulée')
+
+            plt.title('Analyse de la Variance Expliquée (après Variance Threshold)')
+            plt.xlabel('Numéro de la Composante Principale')
+            plt.ylabel('Proportion de Variance Expliquée')
+            # Limiter les ticks si le nombre de composantes est très grand
+            if len(x_axis) <= 50:
+                plt.xticks(x_axis, rotation=45)
+            
+            plt.grid(axis='y', linestyle='--')
+            plt.legend()
+            plt.tight_layout()
+            plt.show()
+            
+            return pipeline
+        raise ValueError(f"Unknown unsupervised feature selection method: {method}")
+
     def get_model(self, 
                   compute: bool = False, 
                   retrain: bool = True,
@@ -544,41 +640,42 @@ class Dataset_Manager:
         Raises:
             ValueError: If an unknown model or outlier type is specified.
         """
+        
         if compute:
-            X, _ = self.get_features_selected()
+            X_all, _ = self.get_features_selected()
             y_labels = self.get_y_without_coiled_worm()  # strings 'Mutant'/'WT'
-            # Only when training a classifier:
-            if model_type == 'classifier':
+
+            if model_type == 'outlier':
+                mask_WT = np.array([lbl == 'WT' for lbl in y_labels])
+                X = X_all[mask_WT]  # on garde uniquement les WT pour entraîner l'outlier detector
+            else:
+                X = X_all.copy()
                 label_mapping = {'Mutant': 1, 'WT': 0}
                 y = np.array([label_mapping[label] for label in y_labels])
-            # For outlier:
-            if model_type == 'outlier':
-                X = X[np.array([lbl == 'WT' for lbl in y_labels])]
-
-
-            # Balance the dataset to prevent class imbalance issues.
-            indices_class_0 = np.where(y == 0)[0]
-            indices_class_1 = np.where(y == 1)[0]
-            min_size = min(len(indices_class_0), len(indices_class_1))
-            balanced_indices_0 = np.random.choice(indices_class_0, min_size, replace=False)
-            balanced_indices_1 = np.random.choice(indices_class_1, min_size, replace=False)
-            balanced_indices = np.concatenate([balanced_indices_0, balanced_indices_1])
-            X_balanced = X[balanced_indices]
-            y_balanced = y[balanced_indices]
-            X, y = shuffle(X_balanced, y_balanced, random_state=42)
+            
+                # Balance the dataset to prevent class imbalance issues.
+                indices_class_0 = np.where(y == 0)[0]
+                indices_class_1 = np.where(y == 1)[0]
+                min_size = min(len(indices_class_0), len(indices_class_1))
+                balanced_indices_0 = np.random.choice(indices_class_0, min_size, replace=False)
+                balanced_indices_1 = np.random.choice(indices_class_1, min_size, replace=False)
+                balanced_indices = np.concatenate([balanced_indices_0, balanced_indices_1])
+                X_balanced = X[balanced_indices]
+                y_balanced = y[balanced_indices]
+                X, y = shuffle(X_balanced, y_balanced, random_state=42)
             
             
-            # Check if the dataset has new samples to decide whether to retrain.
-            csv_path = Path(MODELS_DIR) / "best_model_tracking.csv"
-            if csv_path.exists():
-                df = pd.read_csv(csv_path)
-            else:
-                df = pd.DataFrame(columns=['date','best_scaler_name','best_model_name','best_score','len_y'])      
-            max_len_y = df['len_y'].max()
-            if len(y) <= max_len_y and not retrain:
-                print("Dataset has not changed significantly. No need to retrain the model.")
-                model = joblib.load(MODELS_DIR / "model_prediction.pkl")
-                return model, 0
+                # Check if the dataset has new samples to decide whether to retrain.
+                csv_path = Path(MODELS_DIR) / "best_model_tracking.csv"
+                if csv_path.exists():
+                    df = pd.read_csv(csv_path)
+                else:
+                    df = pd.DataFrame(columns=['date','best_scaler_name','best_model_name','best_score','len_y'])      
+                max_len_y = df['len_y'].max()
+                if len(y) <= max_len_y and not retrain:
+                    print("Dataset has not changed significantly. No need to retrain the model.")
+                    model = joblib.load(MODELS_DIR / "model_prediction.pkl")
+                    return model, 0
     
 
         if not compute:
@@ -641,32 +738,64 @@ class Dataset_Manager:
                 # Visualize results with a heatmap if multiple models or scalers were tested.
                 if (len(classifier_type) > 1 or len(scaler) > 1) and verbose_plot == True:
                     plot_heatmap(results_df)
-            elif model_type == 'outlier':
-                # Handle outlier detection models.
-                best_model_name = 'Outlier Detection'
-                best_scaler_name = 'NoScaler'
-                best_score = 0
-                if outlier_type == 'elliptic_envelope':
-                    X_WT = X[y == 'WT']
-                    detector = EllipticEnvelope(contamination=0.001) # 0.1% threshold for outliers
-                    model = detector.fit(X_WT)
 
-                elif outlier_type == 'mahalanobis_chi2':
-                    X_WT = X[y == 'WT']
-                    detector = MahalanobisOutlierDetector(contamination=0.001)
-                    model = detector.fit(X_WT)
+            elif model_type == 'outlier':
+                best_model_name = 'Outlier Detection'
+                best_score = 0
+
+                # --- non-supervised feature selection settings ---
+                fs_method = 'variance_pca'  # 'none', 'variance', 'pca', 'variance_pca'
+                pca_k = 20  # si PCA
+
+                X_WT = X  # uniquement WT pour entraînement
+
+                # Build selector
+                selector = None
+                if fs_method != 'none':
+                    if fs_method not in {'variance', 'pca', 'variance_pca'}:
+                        raise ValueError("Pour outliers non-supervisés, feature_selection_method doit être 'none', 'variance' ou 'pca'.")
+                    selector = self.make_unsupervised_selector(fs_method, X_WT, k=pca_k, var_threshold=1e-5)
+                    X_sel = selector.transform(X_WT)
+                else:
+                    X_sel = X_WT
+
+                # Scaler recommandé
+                best_scaler_name = 'RobustScaler'
+                chosen_scaler = RobustScaler()
+
+                if outlier_type == 'mahalanobis_chi2':
+                    detector = MahalanobisOutlierDetector(contamination=0.001, scaler=chosen_scaler, regularization=1e-8)
+                    # stocke le selector dans le detector
+                    detector.selector_ = selector
+                    # Fit sur features sélectionnées
+                    model = detector.fit(X_sel)
+                    joblib.dump(model, MODELS_DIR / "model_outlier_prediction.pkl")
+                elif outlier_type == 'elliptic_envelope':
+                    detector = EllipticEnvelope(contamination=0.001)
+                    # scaler + selector
+                    X_proc = chosen_scaler.fit_transform(X_sel) if chosen_scaler else X_sel
+                    detector = detector.fit(X_proc)
+                    detector.scaler_ = chosen_scaler
+                    detector.selector_ = selector
+                    model = detector
                 else:
                     raise ValueError(f"Unknown outlier detection method: {outlier_type}")
+
             else:
                 raise ValueError(f"Unknown model type: {model_type}")
 
             # Save model performance metrics to a CSV file.
+            if model_type == 'outlier':
+                saved_len = len(X)  # nombre d'exemples WT utilisés pour entraîner l'outlier detector
+            else:
+                saved_len = len(y)
+    
             new_line = {
                 'date': [pd.Timestamp.now().strftime(DATE_FORMAT)],
                 'best_scaler_name': [best_scaler_name],
                 'best_model_name': [best_model_name],
                 'best_score': [best_score],
-                'len_y': [len(y)]
+                'len_y': [saved_len]
             }
             df_new_results = pd.DataFrame(new_line)
             csv_path = Path(MODELS_DIR) / "best_model_tracking.csv"

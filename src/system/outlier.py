@@ -1,97 +1,86 @@
 """
 Outlier detection using Mahalanobis distance.
 """
-import numpy as np
+from sklearn.covariance import MinCovDet
+from sklearn.preprocessing import RobustScaler, StandardScaler
 from scipy.stats import chi2
+import numpy as np
 
 class MahalanobisOutlierDetector:
     """
-    A class for detecting outliers in a dataset using the Mahalanobis distance.
-
-    This method assumes that the data follows a multivariate Gaussian
-    distribution. Outliers are identified as points with a Mahalanobis
-    distance greater than a threshold determined by a Chi-squared distribution.
-
-    Args:
-        contamination (float): The expected proportion of outliers in the
-                               dataset, a value between 0 and 0.5. Defaults to 0.001.
+    Détecteur d'outliers basé sur la distance de Mahalanobis.
+    - contamination : proportion attendue d'outliers (ex: 0.001)
+    - scaler : un transformateur sklearn (p.ex. RobustScaler()) ou None.
     """
-    def __init__(self, contamination=0.001):
-        """
-        Initializes the MahalanobisOutlierDetector.
-
-        Args:
-            contamination (float): The expected proportion of outliers in the
-                                   dataset.
-        """
-        # The expected proportion of outliers in the training data.
+    def __init__(self, contamination=0.001, scaler = None, regularization: float = 1e-8):
         self.contamination = contamination
-        # The mean of the training data.
+        self.scaler = scaler  # instance d'un scaler sklearn (fit/transform)
         self.mean_ = None
-        # The inverse of the covariance matrix of the training data.
         self.inv_cov_ = None
-        # The threshold for the Mahalanobis distance, derived from the Chi-squared distribution.
         self.threshold_ = None
-        # The degrees of freedom for the Chi-squared distribution, equal to the number of features.
         self.df_ = None
+        self.regularization = regularization
+        self.selector_ = None
+        self.scaler_ = None
 
     def fit(self, X: np.ndarray):
         """
-        Fits the model to the training data.
-
-        This method calculates the mean and inverse covariance matrix of the
-        training data and determines the Mahalanobis distance threshold for
-        outlier detection.
-
-        Args:
-            X (np.ndarray): The training data, with shape (n_samples, n_features).
-
-        Returns:
-            MahalanobisOutlierDetector: The fitted instance of the detector.
+        Fit du détecteur sur X (pré-supposé être les WT).
+        Stocke le scaler si fourni, calcule covariance (MinCovDet si possible),
+        calcule l'inverse régularisé et le seuil basé sur chi2.
         """
-        # Calculate the mean of the training data.
-        self.mean_ = np.mean(X, axis=0)
-        # Calculate the covariance matrix.
-        cov = np.cov(X, rowvar=False)
-        # Calculate the pseudo-inverse of the covariance matrix.
+        # Appliquer / fitter le scaler si demandé
+        if self.scaler is not None:
+            self.scaler_ = self.scaler.fit(X)
+            X_proc = self.scaler_.transform(X)
+        else:
+            X_proc = X.copy()
+
+        # Estimation robuste de la covariance si possible
+        try:
+            mcd = MinCovDet().fit(X_proc)
+            cov = mcd.covariance_
+            self.mean_ = mcd.location_
+        except Exception:
+            # fallback : estimateur classique
+            self.mean_ = np.mean(X_proc, axis=0)
+            cov = np.cov(X_proc, rowvar=False)
+
+        # régularisation numérique et pseudo-inverse
+        cov += self.regularization * np.eye(cov.shape[0])
         self.inv_cov_ = np.linalg.pinv(cov)
-        # The degrees of freedom is the number of features.
-        self.df_ = X.shape[1]
-        # Calculate the threshold based on the Chi-squared distribution and contamination level.
-        self.threshold_ = np.sqrt(chi2.ppf(1 - self.contamination, df=self.df_))
+
+        self.df_ = X_proc.shape[1]
+        print(f"Degrees of freedom for chi2 threshold: {self.df_}")
+
+        # Seuil : on calcule le quantile du chi2 pour la distance^2,
+        #     puis on prend la racine si on travaille avec distances (sqrt).
+        chi2_q = chi2.ppf(1 - self.contamination, df=self.df_)
+        self.threshold_ = np.sqrt(chi2_q)
+        print(f"Threshold : {self.threshold_}")
+
         return self
 
     def decision_function(self, X: np.ndarray) -> np.ndarray:
-        """
-        Calculates the Mahalanobis distance for each sample in X.
+        # 1) apply selector if exists (selector may be PCA or VarianceThreshold)
+        if getattr(self, "selector_", None) is not None:
+            X_proc = self.selector_.transform(X)
+        elif getattr(self, "selected_indices_", None) is not None:
+            X_proc = X[:, self.selected_indices_]
+        else:
+            X_proc = X
 
-        Args:
-            X (np.ndarray): The data to compute the Mahalanobis distance for,
-                            with shape (n_samples, n_features).
+        # 2) apply scaler_ if fitted (fit done inside fit())
+        if getattr(self, "scaler_", None) is not None:
+            X_proc = self.scaler_.transform(X_proc)
 
-        Returns:
-            np.ndarray: An array of Mahalanobis distances, one for each sample.
-        """
-        # Calculate the difference of each sample from the mean.
-        diffs = X - self.mean_
-        # Efficiently compute the Mahalanobis distance using numpy's einsum.
+        # 3) compute Mahalanobis distance
+        diffs = X_proc - self.mean_
         dists = np.sqrt(np.einsum('ij,jk,ik->i', diffs, self.inv_cov_, diffs))
         return dists
 
     def predict(self, X: np.ndarray) -> np.ndarray:
-        """
-        Predicts whether each sample in X is an inlier or an outlier.
-
-        Samples with a Mahalanobis distance greater than the threshold are
-        classified as outliers.
-
-        Args:
-            X (np.ndarray): The data to predict on, with shape (n_samples, n_features).
-
-        Returns:
-            np.ndarray: A numpy array of predictions. -1 for outliers and 1 for inliers.
-        """
-        # Get the Mahalanobis distances for the new data.
         dists = self.decision_function(X)
-        # Classify based on the threshold.
-        return np.where(dists > self.threshold_, -1, 1)  # -1: outlier, 1: inlier
+        is_outlier = dists > self.threshold_
+        return is_outlier.astype(int)  # 1 = outlier (Mutant), 0 = inlier (WT)
+

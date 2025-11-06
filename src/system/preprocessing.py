@@ -156,11 +156,19 @@ class Preprocessing():
         """
         try:
             # Preprocess image
-            img, local_max = self.find_local_maxima(image)
+            gamma = 10
+            len_maxima = 0
+            for g in [10, 30, 50, 70]:
+                img, local_max = self.find_local_maxima(image, g)
+                maxima, G, median_width, diff_slice, diff_segment, NUMBER_OF_CORDS = get_synapses_graph(worm_mask, local_max)
+                maxima = list(map(tuple, maxima))
+                
+                if len(maxima) > len_maxima:
+                    len_maxima = len(maxima)
+                    gamma = g 
             
-            # Get synapses graph
+            img, local_max = self.find_local_maxima(image, g)
             maxima, G, median_width, diff_slice, diff_segment, NUMBER_OF_CORDS = get_synapses_graph(worm_mask, local_max)
-
             maxima = list(map(tuple, maxima))
 
             return maxima, G, median_width, diff_slice, diff_segment, NUMBER_OF_CORDS
@@ -171,7 +179,7 @@ class Preprocessing():
             return [], empty_graph, 0, 0, 0, 0
 
     # Utils for get_synapse_using_graph
-    def find_local_maxima(self, img: np.ndarray) -> tuple:
+    def find_local_maxima(self, img: np.ndarray, var_gamma = 70) -> tuple:
         """
         Preprocesses an image to identify potential synapse locations by finding
         local maxima after applying a Frangi filter.
@@ -193,9 +201,9 @@ class Preprocessing():
             img,
             black_ridges=False,
             sigmas=range(1, 3, 1),
-            alpha=0.5,
+            alpha=0.8,
             beta=0.5,
-            gamma=70
+            gamma=var_gamma
         )
         frangi_response = ski.filters.apply_hysteresis_threshold(frangi_response, 0.01, 0.2)
         

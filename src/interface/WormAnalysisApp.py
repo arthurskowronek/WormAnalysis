@@ -19,7 +19,7 @@ from PIL import Image, ImageTk, ImageColor
 from tkinter.scrolledtext import ScrolledText
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
         
-from config import RESSOURCES_DIR, DATA_DIR, MODELS_DIR, USER_DIR, LOG_DIR, TRAINING_DIR, PARAMETERS_FILE, DATE_FORMAT, EXPOSURE_TIME_LIVE, NAME_CAMERA, load_config_file, log_error, increment_user_statistics, update_user_statistics, clear_scan_directory
+from config import RESSOURCES_DIR, DATA_DIR, MODELS_DIR, USER_DIR, LOG_DIR, TRAINING_DIR, PARAMETERS_FILE, DATE_FORMAT, EXPOSURE_TIME_LIVE, NAME_CAMERA, EXPOSURE_TIME_ANALYSIS, load_config_file, log_error, increment_user_statistics, update_user_statistics, clear_scan_directory
 
 from src.interface.Tooltip import Tooltip
 from src.system.ScanSlice import ScanSlice
@@ -2281,7 +2281,7 @@ class WormAnalysisApp:
         self.root.update() # tester avec self.root.update() vs self.root.update_idletasks()
         
         # Step 1: Segment the image and save it
-        img = self.snap_image()
+        img = self.snap_image(analysis_mode=True)
         img = self.find_worm_segmentation(img) 
         id = self.worms_position.get_id_worm_seen()
         unclassified_path = Path(DATA_DIR) / "Unclassified" / f"{id}.tif"
@@ -2388,12 +2388,15 @@ class WormAnalysisApp:
         except Exception:
             pass
         
-    def snap_image(self):
+    def snap_image(self, analysis_mode = False):
         """
         Snaps a single image from the microscope and returns it as a numpy array (float32).
         """
         try:
-            self.CORE.setExposure(int(self.exposure_time.get()))
+            if analysis_mode:
+                self.CORE.setExposure(EXPOSURE_TIME_ANALYSIS)
+            else:
+                self.CORE.setExposure(int(self.exposure_time.get()))
             self.CORE.snapImage()
             img = self.CORE.getImage()
             self.CORE.setExposure(EXPOSURE_TIME_LIVE)

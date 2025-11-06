@@ -177,6 +177,19 @@ class RFClassifier(BaseClassifier):
         """
         return self.model.predict(X)
 
+    def predict_proba(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predict class probabilities for the input samples.
+
+        Args:
+            X (np.ndarray): Feature matrix of shape (n_samples, n_features).
+
+        Returns:
+            np.ndarray: Predicted class probabilities (n_samples, n_classes).
+        """
+        # Appel de la méthode predict_proba du modèle RandomForestClassifier sous-jacent
+        return self.model.predict_proba(X)
+
     def get_params(self, deep=True) -> Dict[str, Any]:
         """
         Get current hyperparameters of the underlying Random Forest model.
@@ -297,6 +310,18 @@ class SVMClassifier(BaseClassifier):
         """
         return self.model.predict(X)
 
+    def predict_proba(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predict class probabilities for the input samples.
+
+        Args:
+            X (np.ndarray): Feature matrix of shape (n_samples, n_features).
+
+        Returns:
+            np.ndarray: Predicted class probabilities (n_samples, n_classes).
+        """
+        return self.model.predict_proba(X)
+
     def get_params(self, deep=True) -> Dict[str, Any]:
         """
         Get the current hyperparameters of the SVM model.
@@ -412,6 +437,19 @@ class KNNClassifier(BaseClassifier):
         """
         return self.model.get_params(deep=deep)
 
+    def predict_proba(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predict class probabilities for the input samples.
+
+        Args:
+            X (np.ndarray): Feature matrix of shape (n_samples, n_features).
+
+        Returns:
+            np.ndarray: Predicted class probabilities (n_samples, n_classes).
+        """
+        # Appel de la méthode predict_proba du modèle KNeighborsClassifier sous-jacent
+        return self.model.predict_proba(X)
+
     def set_params(self, **params) -> 'KNNClassifier':
         """
         Set new hyperparameters for the KNN model.
@@ -505,6 +543,18 @@ class MLPClassifier(BaseClassifier):
             np.ndarray: Predicted class labels.
         """
         return self.model.predict(X)
+
+    def predict_proba(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predict class probabilities for the input samples.
+
+        Args:
+            X (np.ndarray): Input features of shape (n_samples, n_features).
+
+        Returns:
+            np.ndarray: Predicted class probabilities.
+        """
+        return self.model.predict_proba(X)
 
     def get_params(self, deep=True) -> Dict[str, Any]:
         """
@@ -621,6 +671,18 @@ class HistGradientBoostingClassifier(BaseClassifier):
             np.ndarray: Predicted class labels.
         """
         return self.model.predict(X)
+
+    def predict_proba(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predict class probabilities for the input samples.
+
+        Args:
+            X (np.ndarray): The input samples.
+
+        Returns:
+            np.ndarray: Predicted class probabilities (n_samples, n_classes).
+        """
+        return self.model.predict_proba(X)
 
     def get_params(self, deep=True) -> Dict[str, Any]:
         """

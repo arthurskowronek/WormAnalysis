@@ -60,6 +60,7 @@ DEFAULT_CV_FOLDS = 5  # Number of cross-validation folds
 
 # Microscope parameters
 EXPOSURE_TIME_LIVE = 50  # Default exposure time for live mode in milliseconds
+EXPOSURE_TIME_ANALYSIS = 100 # Exposure time for analysis mode in milliseconds
 NAME_CAMERA = "Camera-1" # TODO : name of the camera
 
 def set_up_environment():

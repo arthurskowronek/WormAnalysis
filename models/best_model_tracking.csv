@@ -44,3 +44,30 @@ date,best_scaler_name,best_model_name,best_score,len_y
 20251021_154300,Normalizer,knn,0.7571428571428571,74
 20251021_162559,MaxAbsScaler,random_forest,0.7695238095238095,74
 20251024_095534,RobustScaler,hist_gradient_boosting,0.6666666666666666,12
+20251104_120131,QuantileTransformer,svm,0.7063157894736841,96
+20251104_120756,MinMaxScaler,svm,0.74,96
+20251104_121607,NoScaler,mlp,0.7594736842105263,96
+20251104_133715,QuantileTransformer,svm,0.7284210526315789,96
+20251104_134335,Normalizer,knn,0.76,96
+20251104_134946,MaxAbsScaler,svm,0.73,96
+20251105_094600,RobustScaler,Outlier Detection,0.0,52
+20251105_095042,RobustScaler,Outlier Detection,0.0,52
+20251105_100226,RobustScaler,Outlier Detection,0.0,52
+20251105_102841,RobustScaler,Outlier Detection,0.0,52
+20251105_103131,RobustScaler,Outlier Detection,0.0,52
+20251105_104318,RobustScaler,Outlier Detection,0.0,52
+20251105_115815,RobustScaler,Outlier Detection,0.0,52
+20251105_120002,RobustScaler,Outlier Detection,0.0,52
+20251105_125705,RobustScaler,Outlier Detection,0.0,52
+20251105_133053,RobustScaler,Outlier Detection,0.0,52
+20251105_133102,RobustScaler,Outlier Detection,0.0,52
+20251105_134239,RobustScaler,Outlier Detection,0.0,52
+20251105_141044,RobustScaler,Outlier Detection,0.0,52
+20251105_145459,RobustScaler,Outlier Detection,0.0,52
+20251105_151450,RobustScaler,Outlier Detection,0.0,62
+20251105_153903,MaxAbsScaler,mlp,0.7896666666666667,124
+20251105_160939,Normalizer,random_forest,0.7983333333333333,124
+20251106_121345,NoScaler,random_forest,0.798,124
+20251106_122921,NoScaler,knn,0.766,124
+20251106_134701,QuantileTransformer,random_forest,0.7973333333333332,124
+20251106_141013,NoScaler,mlp,0.7663333333333333,124

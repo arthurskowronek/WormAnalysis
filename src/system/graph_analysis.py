@@ -547,9 +547,9 @@ def _order_skeleton_points_skan(skeleton):
     
     # Get the summary with branch information
     try:
-        summary = skan.summarize(skel_obj) 
-    except:
         summary = skan.summarize(skel_obj, separator='-') 
+    except:
+        summary = skan.summarize(skel_obj) 
     
     # Create a flat list of all points from all paths
     all_points = []
