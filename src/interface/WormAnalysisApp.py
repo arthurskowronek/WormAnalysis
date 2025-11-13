@@ -77,7 +77,7 @@ class WormAnalysisApp:
         self.worms_position = None
         self.prediction = "--"
         self.id_worm_seen = initial_id_worm_seen
-        self.add_worm_scan_result = True
+        self.worm_scan_result_mode = "add"
         self.live_image = initial_live_image
         self.bounding_box_size = 15 # Size of the bounding box around worms in pixels
         self.loaded_params = load_config_file()
@@ -97,6 +97,9 @@ class WormAnalysisApp:
         self._sensor_min_possible = 0
         self._sensor_max_possible = 65535
         self._image_update_lock = False
+
+        self._dragging_worm_id = None            # id du ver en cours de déplacement
+        self._drag_offset_prop = (0.0, 0.0)      # offset entre le centre de la box et le point cliqué (en proportions)
 
 
         # Theme (color, font, icon)
@@ -579,6 +582,11 @@ class WormAnalysisApp:
         add_worm_path = Path(RESSOURCES_DIR) / "icon" / "add_worm.png" 
         self.add_worm_icon = self.flatten_and_resize_icon(add_worm_path, 20, 20, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
         self.add_worm_icon_hover = self.flatten_and_resize_icon(add_worm_path, 20, 20, self.colors.theme["tertiary_background"], self.colors.theme["stroke_button"])
+        
+        # Process move_worm.png
+        move_worm_path = Path(RESSOURCES_DIR) / "icon" / "move.png" 
+        self.move_worm_icon = self.flatten_and_resize_icon(move_worm_path, 20, 20, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
+        self.move_worm_icon_hover = self.flatten_and_resize_icon(move_worm_path, 20, 20, self.colors.theme["tertiary_background"], self.colors.theme["stroke_button"])
         
         # Process remove_worm.png
         remove_worm_path = Path(RESSOURCES_DIR) / "icon" / "remove_worm.png" 
@@ -1495,7 +1503,7 @@ class WormAnalysisApp:
         except Exception as e:
             self.context_error = log_error(e, "Toggle parameters panel failed")
     
-    def toggle_add_worm_scan_result(self):
+    def toggle_mode_worm_scan_result(self, mode):
         """
         Toggles the state for adding a new worm scan result and refreshes the
         scan result page.
@@ -1505,11 +1513,16 @@ class WormAnalysisApp:
         update the UI.
         """
         try:
-            self.add_worm_scan_result = not self.add_worm_scan_result   
+            if mode == "add":
+                self.worm_scan_result_mode = "add"
+            elif mode == "delete":
+                self.worm_scan_result_mode = "delete"
+            elif mode == "move":
+                self.worm_scan_result_mode = "move"
             self.show_result_scan_page()
         except Exception as e:
             self.context_error = log_error(e, f"Toggle add worm scan result failed")
-    
+
     def switch_page(self, page_id):
         """
         Switches the application to a new page.
@@ -1835,7 +1848,7 @@ class WormAnalysisApp:
         existing worm or add a new one.
 
         This function determines if a click falls within a worm's bounding box
-        and, depending on the `add_worm_scan_result` flag, either deletes that
+        and, depending on the `worm_scan_result_mode` flag, either deletes that
         worm's data or adds a new worm at the clicked location. It then redraws
         the image to reflect the changes.
 
@@ -1857,7 +1870,7 @@ class WormAnalysisApp:
         y_bounding_box_proportion = float(self.bounding_box_size / display_height)
         
         # Get scan image associated for a futur annotation and improvement of the model
-        if self.add_worm_scan_result:
+        if self.worm_scan_result_mode == "add":
             try:
                 for i in range(int(self.scan_width.get()) + 1):
                     if i/int(self.scan_width.get()) > x_mouse:
@@ -1893,14 +1906,14 @@ class WormAnalysisApp:
                 self.context_error = log_error(e, f"Saving image for annotation failed")
 
         # Check if click is inside any bounding box
-        if not self.add_worm_scan_result:
+        if self.worm_scan_result_mode == "delete":
             for _, (id, x, y) in enumerate(self.worms_position.get_all_worm_proportion_position()):
                 if x-x_bounding_box_proportion <= x_mouse <= x+x_bounding_box_proportion and y-y_bounding_box_proportion <= y_mouse <= y+y_bounding_box_proportion:
                     # Remove the worm
                     self.worms_position.delete_worm(id)
                     increment_user_statistics('nb_false_positives')
                     break
-        else:
+        elif self.worm_scan_result_mode == "add":
             # Add a new worm
             x_microscope, y_microscope = self.worms_position.transform_proportion_into_microscope_positions(x_mouse, y_mouse)
             self.worms_position.add_worm_microscope_position(x_microscope, y_microscope)
@@ -1912,6 +1925,36 @@ class WormAnalysisApp:
         self.img_label.configure(image=updated_img)
         self.img_label.image = updated_img  # Prevent image from being garbage collected
         self.resize_scan_content_area()
+    
+    def on_stitching_image_press_or_click(self, event):
+        """
+        Distingue un clic simple (add/delete) d'un début de drag en mode 'move'.
+        Si mode move et click sur une box => on lance le drag.
+        Sinon on appelle le comportement existant on_stitching_image_click.
+        """
+        if self.worm_scan_result_mode == "move":
+            # coordonnées relatives sur l'image
+            display_w = self.img_label.winfo_width()
+            display_h = self.img_label.winfo_height()
+            x_mouse = float(event.x / display_w) if display_w else 0.0
+            y_mouse = float(event.y / display_h) if display_h else 0.0
+            x_box_prop = float(self.bounding_box_size / display_w) if display_w else 0.0
+            y_box_prop = float(self.bounding_box_size / display_h) if display_h else 0.0
+
+            # cherche la box sous le curseur
+            for _, (wid, x_prop, y_prop) in enumerate(self.worms_position.get_all_worm_proportion_position()):
+                if x_prop - x_box_prop <= x_mouse <= x_prop + x_box_prop and \
+                y_prop - y_box_prop <= y_mouse <= y_prop + y_box_prop:
+                    # commence un drag
+                    self._dragging_worm_id = wid
+                    # offset = position du curseur - centre de la box (en proportions)
+                    self._drag_offset_prop = (x_mouse - x_prop, y_mouse - y_prop)
+                    return  # on ne fait pas le clic "add" / "delete"
+            # si on n'a pas trouvé de box sous le curseur, on ne fait rien de spécial (pas de déplacement)
+            return
+        else:
+            # pas en mode move -> comportement click existant (ajout / suppression)
+            self.on_stitching_image_click(event)
 
     def on_stitching_image_drag(self, event):
         """
@@ -1920,19 +1963,63 @@ class WormAnalysisApp:
         This function is similar to `on_stitching_image_click` but is triggered
         by a drag event. It is designed to remove a worm if the drag starts
         within its bounding box. This functionality is only enabled when not
-        in `add_worm_scan_result` mode.
+        in `worm_scan_result_mode == add` mode.
 
         Args:
             event (tk.Event): The event object from the drag, containing
                             the `x` and `y` coordinates.
         """
-        if not self.add_worm_scan_result:
-            x_display, y_display = event.x, event.y
-            display_width = self.img_label.winfo_width()
-            display_height = self.img_label.winfo_height()
+        display_width = self.img_label.winfo_width()
+        display_height = self.img_label.winfo_height()
+        if display_width == 0 or display_height == 0:
+            return
 
-            x_mouse = float(x_display / display_width)
-            y_mouse = float(y_display / display_height)
+        x_mouse = float(event.x / display_width)
+        y_mouse = float(event.y / display_height)
+
+        if self.worm_scan_result_mode == "move" and self._dragging_worm_id is not None:
+            # nouveau centre = position du curseur - offset
+            new_x_prop = x_mouse - self._drag_offset_prop[0]
+            new_y_prop = y_mouse - self._drag_offset_prop[1]
+
+            # clamp entre 0 et 1
+            new_x_prop = max(0.0, min(1.0, new_x_prop))
+            new_y_prop = max(0.0, min(1.0, new_y_prop))
+
+            # petit guard pour éviter jitter
+            min_move = 1e-5
+            # récupère position actuelle (proportions)
+            cur_x_prop = cur_y_prop = None
+            for _, (wid, cx, cy) in enumerate(self.worms_position.get_all_worm_proportion_position()):
+                if wid == self._dragging_worm_id:
+                    cur_x_prop, cur_y_prop = float(cx), float(cy)
+                    break
+            if cur_x_prop is None:
+                # id introuvable : abandonne le drag proprement
+                self._dragging_worm_id = None
+                return
+
+            if abs(new_x_prop - cur_x_prop) < min_move and abs(new_y_prop - cur_y_prop) < min_move:
+                return  # movement trop petit -> ignore
+
+            # Convert to microscope coords and update in-place via update_worm_position (existant)
+            x_mic, y_mic = self.worms_position.transform_proportion_into_microscope_positions(new_x_prop, new_y_prop)
+            ok = self.worms_position.update_worm_position(self._dragging_worm_id, x_mic, y_mic)
+            if not ok:
+                # si l'update échoue pour une raison quelconque, stoppe le drag (mais sans delete)
+                self._dragging_worm_id = None
+                return
+
+            # redraw chaque déplacement
+            updated_img = self.draw_prediction_result_box()
+            self.displayed_image = updated_img
+            self.img_label.configure(image=updated_img)
+            self.img_label.image = updated_img
+            self.resize_scan_content_area()
+            return
+
+        if self.worm_scan_result_mode == "delete":
+            # ton code existant pour supprimer lors du drag
             x_bounding_box_proportion = float(self.bounding_box_size / display_width)
             y_bounding_box_proportion = float(self.bounding_box_size / display_height)
 
@@ -1950,7 +2037,14 @@ class WormAnalysisApp:
                 self.img_label.configure(image=updated_img)
                 self.img_label.image = updated_img
                 self.resize_scan_content_area()
-         
+
+    def on_stitching_image_release(self, event):
+        """
+        Fin du drag : on libère l'état de dragging.
+        """
+        self._dragging_worm_id = None
+        self._drag_offset_prop = (0.0, 0.0)
+
     def delete_all_worms(self):
         """
         Deletes all recorded worm positions from the dataset and updates the image displayed.
@@ -3693,10 +3787,12 @@ class WormAnalysisApp:
         button_row_frame.pack(pady=5, anchor="center")  
         
         # Choose which button appears "selected"
-        add_bg = self.colors.theme["tertiary_background"] if self.add_worm_scan_result else self.colors.theme["primary_background"]
-        remove_bg = self.colors.theme["tertiary_background"] if not self.add_worm_scan_result else self.colors.theme["primary_background"]
-        add_icon = self.add_worm_icon if not self.add_worm_scan_result else self.add_worm_icon_hover
-        rmeove_icon = self.remove_worm_icon if self.add_worm_scan_result else self.remove_worm_icon_hover
+        add_bg = self.colors.theme["tertiary_background"] if self.worm_scan_result_mode == "add" else self.colors.theme["primary_background"]
+        remove_bg = self.colors.theme["tertiary_background"] if self.worm_scan_result_mode == "delete" else self.colors.theme["primary_background"]
+        move_bg = self.colors.theme["tertiary_background"] if self.worm_scan_result_mode == "move" else self.colors.theme["primary_background"]
+        add_icon = self.add_worm_icon_hover if self.worm_scan_result_mode == "add" else self.add_worm_icon
+        remove_icon = self.remove_worm_icon_hover if self.worm_scan_result_mode == "delete" else self.remove_worm_icon
+        move_icon = self.move_worm_icon_hover if self.worm_scan_result_mode == "move" else self.move_worm_icon
         
         # -- Add worm button --
         add_button_frame = tk.Frame(button_row_frame, bg=self.colors.theme["primary_background"])
@@ -3707,7 +3803,7 @@ class WormAnalysisApp:
             text="",
             icon=add_icon,
             icon_hover=self.add_worm_icon_hover,
-            command=lambda: self.toggle_add_worm_scan_result(),
+            command=lambda: self.toggle_mode_worm_scan_result(mode="add"),
             bg_color=add_bg,
             text_color=self.colors.theme["primary_text"],
             hover_color=self.colors.theme["tertiary_background"],
@@ -3727,9 +3823,38 @@ class WormAnalysisApp:
         add_info_icon.pack(side=tk.TOP, pady=(4, 0))  # slight spacing above icon
         Tooltip(add_info_icon, "Click on the image to add a new worm position", title="Info", theme="info", posx=70, posy=-80)
         
+        # -- Move worm button --
+        move_button_frame = tk.Frame(button_row_frame, bg=self.colors.theme["primary_background"])
+        move_button_frame.pack(side=tk.LEFT, pady=5, padx=30)
+
+        self.create_rounded_button(
+            parent=move_button_frame,
+            text="",
+            icon=move_icon,           
+            icon_hover=self.move_worm_icon_hover,
+            command=lambda: self.toggle_mode_worm_scan_result(mode="move"),
+            bg_color=move_bg,
+            text_color=self.colors.theme["primary_text"],
+            hover_color=self.colors.theme["tertiary_background"],
+            font=(self.font, 16),
+            width_pixels=100,
+            height_pixels=60,
+            corner_radius=20,
+            side=tk.TOP,
+            pady=0,
+            padx=0,
+            padx_text=-6,
+            border_width=2,
+            border_color=self.colors.theme["stroke_button"]
+        )
+
+        move_info_icon = tk.Label(move_button_frame, image=self.info_icon, bg=self.colors.theme["primary_background"])
+        move_info_icon.pack(side=tk.TOP, pady=(4, 0))  # slight spacing above icon
+        Tooltip(move_info_icon, "Click on a worm box and drag to move its position", title="Info", theme="info", posx=70, posy=-80)
+
         
         # -- Start analysis button --
-        start_button_frame = tk.Frame(button_row_frame, bg=self.colors.theme["primary_background"])
+        """start_button_frame = tk.Frame(button_row_frame, bg=self.colors.theme["primary_background"])
         start_button_frame.pack(side=tk.LEFT, pady=5, padx=30)
 
         self.create_rounded_button(
@@ -3771,7 +3896,7 @@ class WormAnalysisApp:
 
         # Tooltip
         Tooltip(start_info_icon, "Be sure to use the L camera.", posx=70, posy=-70)      
-        
+        """
         
         # -- Remove worm button --
         remove_button_frame = tk.Frame(button_row_frame, bg=self.colors.theme["primary_background"])
@@ -3780,9 +3905,9 @@ class WormAnalysisApp:
         self.create_rounded_button(
             parent=remove_button_frame,
             text="",
-            icon=rmeove_icon,
+            icon=remove_icon,
             icon_hover=self.remove_worm_icon_hover,
-            command=lambda: self.toggle_add_worm_scan_result(),
+            command=lambda: self.toggle_mode_worm_scan_result(mode="delete"),
             bg_color=remove_bg,
             text_color=self.colors.theme["primary_text"],
             hover_color=self.colors.theme["tertiary_background"],
@@ -3825,8 +3950,9 @@ class WormAnalysisApp:
         self.img_label.pack(expand=True)
         
         # Bind click event to the image label
-        self.img_label.bind("<Button-1>", self.on_stitching_image_click)
-        self.img_label.bind("<B1-Motion>", self.on_stitching_image_drag)
+        self.img_label.bind("<Button-1>", self.on_stitching_image_press_or_click)
+        self.img_label.bind("<B1-Motion>", self.on_stitching_image_drag)    
+        self.img_label.bind("<ButtonRelease-1>", self.on_stitching_image_release)
  
     def show_load_position_page(self):
         """

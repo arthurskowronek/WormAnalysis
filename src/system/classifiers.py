@@ -834,6 +834,9 @@ def evaluate_models_with_scalers(
                 with parallel_backend("threading", n_jobs=1):
                     scores = cross_val_score(pipe, X, y, cv=kf, scoring=scorer, n_jobs=-1)
                 mean_score = scores.mean()
+                # écrire les résultats de la variance dans un fichier txt
+                open("variance_results.txt", "a").write(f"{model_type} - {scaler_name} : {scores.std()}\n")
+                
             except Exception as e:
                 print(f"[ERROR] cross_val_score failed for {model_type} with {scaler_name}: {e}")
                 mean_score = np.nan
