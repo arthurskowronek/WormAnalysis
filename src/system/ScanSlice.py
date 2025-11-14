@@ -1,5 +1,7 @@
 import re
 import cv2
+import time
+import traceback
 import numpy as np
 from PIL import Image
 from pathlib import Path
@@ -8,7 +10,7 @@ from tifffile import imwrite, imread
 from collections import defaultdict
 from scipy.spatial import cKDTree
 
-from config import MODELS_DIR, RESSOURCES_DIR, DATA_DIR, save_corner_positions_into_yaml_config_file, load_config_file
+from config import MODELS_DIR, RESSOURCES_DIR, DATA_DIR, save_corner_positions_into_yaml_config_file, load_config_file, loadCore, log_error
 
 class ScanSlice:
     """
@@ -53,43 +55,168 @@ class ScanSlice:
         self.scan_dir = Path(DATA_DIR) / "Scan"
         self.scan_modified_dir = Path(DATA_DIR) / "Scan_modified"
     
-    def initialize_scan(self):
-        """
-        Prepares the microscope and calculates the scanning grid.
 
-        This method calculates the actual step sizes with overlap, determines
-        the scanning area, and saves the corner positions to the configuration file.
-        It also moves the stage to the starting position for the scan.
+
+    def safe_set_xy(self, x, y, retries=5, wait_between=1.0):
         """
-        # Calculate actual steps considering overlap
+        Robust wrapper to set XY position: retries, waitForDevice, fallback, and optional unload.
+        Returns True on success, raises RuntimeError on persistent failure.
+        """
+        try:
+            xy_label = self.mmc.getXYStageDevice()
+        except Exception:
+            xy_label = None
+
+        # attempt to increase timeout if available
+        old_timeout = None
+        try:
+            old_timeout = self.mmc.getTimeoutMs()
+            self.mmc.setTimeoutMs(max(old_timeout, 5000))
+        except Exception:
+            old_timeout = None
+
+        last_exc = None
+        for attempt in range(1, retries + 1):
+            try:
+                # choose un label stable pour les waitForDevice
+                cur_label = xy_label if xy_label else self.mmc.getXYStageDevice()
+                print(f"[safe_set_xy] Attempt {attempt} -> device='{cur_label}' pos=({x},{y})")
+                self.mmc.waitForDevice(cur_label)
+                # deux signatures possibles ; utiliser la signature avec label si on l'a
+                if xy_label:
+                    self.mmc.setXYPosition(xy_label, float(x), float(y))
+                else:
+                    self.mmc.setXYPosition(float(x), float(y))
+                self.mmc.waitForDevice(cur_label)
+
+                # restore timeout
+                if old_timeout is not None:
+                    try: self.mmc.setTimeoutMs(old_timeout)
+                    except Exception: pass
+                return True
+
+            except Exception as e:
+                last_exc = e
+                print(f"[safe_set_xy] Attempt {attempt} failed: {e}")
+                traceback.print_exc()
+                time.sleep(wait_between)
+
+                # fallback: pinger le device avec un mouvement relatif 0,0 (avant dernier essai)
+                if attempt == retries - 1:
+                    try:
+                        print("[safe_set_xy] Fallback ping: setRelativeXYPosition(0,0)")
+                        if xy_label:
+                            self.mmc.setRelativeXYPosition(xy_label, 0.0, 0.0)
+                            self.mmc.waitForDevice(xy_label)
+                        else:
+                            self.mmc.setRelativeXYPosition(0.0, 0.0)
+                            self.mmc.waitForDevice(self.mmc.getXYStageDevice())
+                    except Exception as e2:
+                        print("[safe_set_xy] Fallback relatif KO:", e2)
+
+                # dernier recours local : unload du device stage (attention, risque)
+                if attempt == retries:
+                    if xy_label:
+                        try:
+                            print(f"[safe_set_xy] Last resort: unloadDevice('{xy_label}')")
+                            self.mmc.unloadDevice(xy_label)
+                            time.sleep(1.0)
+                        except Exception as ue:
+                            print("[safe_set_xy] unloadDevice a levé:", ue)
+
+        # restore timeout si non remis
+        if old_timeout is not None:
+            try: self.mmc.setTimeoutMs(old_timeout)
+            except Exception: pass
+
+        raise RuntimeError("safe_set_xy: impossible de déplacer le stage après plusieurs tentatives") from last_exc
+
+    def safe_reload_core(self):
+        """
+        Reload the core/configuration but first attempt to gracefully unload camera devices
+        to avoid 'camera already open' errors.
+        """
+        print("[safe_reload_core] Tentative de reload du core (unload des caméras si présentes).")
+        try:
+            loaded = self.mmc.getLoadedDevices()
+        except Exception:
+            loaded = []
+
+        # Décharger les devices ressemblant à une caméra pour diminuer chance d'erreur PVCAM
+        for dev in loaded:
+            try:
+                if "Camera" in dev or "camera" in dev or dev.upper().startswith("CAM"):
+                    print(f"[safe_reload_core] Unload device '{dev}'")
+                    self.mmc.unloadDevice(dev)
+                    time.sleep(0.5)
+            except Exception as e:
+                print(f"[safe_reload_core] Impossible d'unload '{dev}' : {e}")
+
+        # Maintenant recharger la config / core via ta fonction loadCore()
+        try:
+            # loadCore doit retourner un objet mmc initialisé ; adapte si ta fonction diffère
+            self.mmc = loadCore()
+            # si nécessaire, appeler initializeAllDevices() pour être sûr que tout est prêt
+            try:
+                self.mmc.initializeAllDevices()
+            except Exception:
+                pass
+            print("[safe_reload_core] Core rechargé et devices initialisés")
+        except Exception as e:
+            print("[safe_reload_core] reload du core a échoué :", e)
+            raise
+
+    def initialize_scan(self):
+        # calculs initiaux...
         self.actual_step_x = self.step_size_x * (1 - self.overlap_percent / 100)
         self.actual_step_y = self.step_size_y * (1 - self.overlap_percent / 100)
-        
+
         # Get starting position
         self.start_x, self.start_y = self.mmc.getXYPosition()
 
         # Close shutter
         self.mmc.setAutoShutter(False)
-        
-        # Calculate scan area
+
+        # Calcul scan...
         config = load_config_file()
         end_x = self.start_x + (int(config.get("scan_height_length")) if self.scan_shape == "Square" else int(config.get("scan_width_length")))
         end_y = self.start_y + int(config.get("scan_height_length"))
-        
-        # Compute the scan dimensions
         self.scan_width = int((end_x - self.start_x) / self.actual_step_x)
         self.scan_height = int((end_y - self.start_y) / self.actual_step_y)
-        
-        # Move to starting position
-        self.mmc.setXYPosition(self.mmc.getXYStageDevice(), self.start_x, self.start_y)
-        self.mmc.waitForDevice(self.mmc.getXYStageDevice())
-        
+
+        # Move to starting position (robuste)
+        try:
+            self.safe_set_xy(self.start_x, self.start_y)
+        except Exception as e:
+            print("Initialisation : safe_set_xy a échoué :", e)
+            traceback.print_exc()
+            try:
+                time.sleep(2.0)
+                self.safe_set_xy(self.start_x, self.start_y, retries=3, wait_between=2.0)
+            except Exception as e2:
+                print("Tentatives locales échouées, on tente reload contrôlé du core")
+                try:
+                    self.safe_reload_core()
+                    # après reload, relire positions et ré-essayer
+                    self.start_x, self.start_y = self.mmc.getXYPosition()
+                    self.safe_set_xy(self.start_x, self.start_y)
+                except Exception as e3:
+                    print("Reload contrôlé échoué :", e3)
+                    raise
+
+        # s'assurer que device est prêt
+        try:
+            self.mmc.waitForDevice(self.mmc.getXYStageDevice())
+        except Exception:
+            pass
+
         # Initialize working variables
         self.file_count = 1
         self.image = None
         self.final_end_x = 0
         self.final_end_y = 0
-    
+
+
     def scan(self, verbose=False):
         """
         Executes the main scanning loop.

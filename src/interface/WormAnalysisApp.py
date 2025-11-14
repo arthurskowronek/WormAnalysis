@@ -908,7 +908,7 @@ class WormAnalysisApp:
             if str(self.loaded_params.get(f"microscope_objective_size_{i}")) != ""
         ]
         bg = "parameters_button_background" if "scan_objective" in self.enable_parameters_buttons else "parameters_button_disabled_background"
-        tk.Label(self.params_content_frame, text="Scan Objective", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
+        tk.Label(self.params_content_frame, text="Scan objective", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
         _, self.scan_objective_dropdown = self.create_rounded_dropdown(
             self.params_content_frame, list_scan_objective, self.scan_objective, bg
         )
@@ -954,7 +954,7 @@ class WormAnalysisApp:
 
         # Fluo objective
         bg = "parameters_button_background" if "fluo_objective" in self.enable_parameters_buttons else "parameters_button_disabled_background"
-        tk.Label(self.params_content_frame, text="Fluo objective", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
+        tk.Label(self.params_content_frame, text="Live objective", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
         _, self.fluo_objective_dropdown = self.create_rounded_dropdown(
             self.params_content_frame, list_scan_objective, self.fluo_objective, bg
         )
@@ -998,7 +998,7 @@ class WormAnalysisApp:
 
         # Create the canvas
         canvas = tk.Canvas(parent, width=canvas_width, height=canvas_height,
-                           bg=parent.cget("bg"), highlightthickness=0) # Use parent's bg for canvas
+                           bg=parent.cget("bg"), highlightthickness=0, takefocus=0) # Use parent's bg for canvas
         canvas.pack(fill=tk.X, pady=(0, 15), padx=20)
 
         # Draw the rounded background
@@ -1051,7 +1051,7 @@ class WormAnalysisApp:
 
         # Create the canvas
         canvas = tk.Canvas(parent, width=canvas_width, height=canvas_height,
-                        bg=parent.cget("bg"), highlightthickness=0)
+                        bg=parent.cget("bg"), highlightthickness=0, takefocus=0)
         canvas.pack(fill=tk.X, pady=(0, 0))
 
         # Draw the background
@@ -1063,7 +1063,7 @@ class WormAnalysisApp:
         if isinstance(icon, str):
             # It's a text/emoji icon
             tk.Label(canvas, text=icon, bg=self.colors.theme[bg],
-                    fg=self.colors.theme["secondary_text"], font=(self.font, 12)).place(x=5, rely=0.5, anchor="w")
+                    fg=self.colors.theme["secondary_text"], font=(self.font, 12)).place(x=5, rely=0.5, anchor="w", takefocus=0)
         else:
             # Assume it's an image (PhotoImage or ImageTk.PhotoImage)
             canvas.create_image(10, canvas_height // 2, anchor="w", image=icon)
@@ -1114,7 +1114,7 @@ class WormAnalysisApp:
 
         # Create the canvas
         canvas = tk.Canvas(parent, width=canvas_width, height=canvas_height,
-                        bg=parent.cget("bg"), highlightthickness=0)
+                        bg=parent.cget("bg"), highlightthickness=0, takefocus=0)
         canvas.pack(fill=tk.X, pady=(0, 0))
 
         # Draw the background
@@ -1163,7 +1163,7 @@ class WormAnalysisApp:
 
         # Add the label of the toggle
         tk.Label(frame, text=label, bg=self.colors.theme[bg],
-                fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(side=tk.LEFT)
+                fg=self.colors.theme["secondary_text"], font=(self.font, 10), takefocus=0).pack(side=tk.LEFT)
 
         # Create the toggle
         if size == "small":
@@ -1175,7 +1175,7 @@ class WormAnalysisApp:
             
         toggle_canvas = tk.Canvas(frame, width=open_toggle_icon.width(),
                                 height=open_toggle_icon.height(),
-                                bg=self.colors.theme["primary_background"], highlightthickness=0)
+                                bg=self.colors.theme["primary_background"], highlightthickness=0, takefocus=0)
         toggle_canvas.pack(side=tk.RIGHT, padx=3)
 
         def draw_toggle():
@@ -1237,7 +1237,8 @@ class WormAnalysisApp:
             width=width_pixels,
             height=height_pixels,
             bg=parent.cget("bg"),
-            highlightthickness=0
+            highlightthickness=0,
+            takefocus=0
         )
         canvas.pack(side=side, padx=padx, pady=pady)
 
@@ -1272,19 +1273,19 @@ class WormAnalysisApp:
         if icon:
             label_frame = tk.Frame(canvas, bg=bg_color)
 
-            icon_label = tk.Label(label_frame, image=icon, bg=bg_color)
+            icon_label = tk.Label(label_frame, image=icon, bg=bg_color, takefocus=0)
             icon_label.image = icon
             if icon_hover:
                 icon_label.image_normal = icon
                 icon_label.image_hover = icon_hover
             icon_label.pack(side=tk.LEFT, padx=(0, 5))
 
-            text_label = tk.Label(label_frame, text=text, bg=bg_color, fg=text_color, font=font)
+            text_label = tk.Label(label_frame, text=text, bg=bg_color, fg=text_color, font=font, takefocus=0)
             text_label.pack(side=tk.LEFT)
 
             label_widget = label_frame
         else:
-            text_label = tk.Label(canvas, text=text, bg=bg_color, fg=text_color, font=font)
+            text_label = tk.Label(canvas, text=text, bg=bg_color, fg=text_color, font=font, takefocus=0)
             label_widget = text_label
 
         # Place the label on the canvas
@@ -1537,6 +1538,8 @@ class WormAnalysisApp:
             self.current_page = page_id
             self.refresh_ui()
             self._show_enhanced_preview = False
+            self.root.unbind_all("<Left>")
+            self.root.unbind_all("<Right>")
             self.root.update_idletasks()
         except Exception as e:
             self.context_error = log_error(e, f"Switch page {page_id} failed")
@@ -1710,13 +1713,6 @@ class WormAnalysisApp:
         4. Reconstructs the final image from the scan.
         5. Switches the page to display the scan results.
         """
-        try:
-            x, y = self.CORE.getXYPosition()
-            if hasattr(self, "init_pos_x"):
-                if x != self.init_pos_x or y != self.init_pos_y:
-                    self.CORE.setXYPosition(self.CORE.getXYStageDevice(), self.init_pos_x, self.init_pos_y)
-        except Exception as e:
-            self.context_error = log_error(e, "Go to start position failed")
 
         # Show "Starting scan" message
         try:
@@ -3632,6 +3628,14 @@ class WormAnalysisApp:
         to be responsive, ensuring the content area resizes correctly when
         the window is resized.
         """
+        try:
+            x, y = self.CORE.getXYPosition()
+            if hasattr(self, "init_pos_x"):
+                if x != self.init_pos_x or y != self.init_pos_y:
+                    self.CORE.setXYPosition(self.CORE.getXYStageDevice(), self.init_pos_x, self.init_pos_y)
+        except Exception as e:
+            self.context_error = log_error(e, "Go to start position failed")
+        
         # Clear previous widgets if needed
         for widget in self.main_content.winfo_children():
             widget.destroy()
@@ -4009,7 +4013,7 @@ class WormAnalysisApp:
         
         # Placeholder for live image
         if not hasattr(self, "live_image_label") or not self.live_image_label.winfo_exists():
-            self.live_image_label = tk.Label(live_analysis_container, bg="black")
+            self.live_image_label = tk.Label(live_analysis_container, bg="black", takefocus=0)
             self.live_image_label.pack(expand=True, fill=tk.BOTH)
             
             self.live_image_label.bind("<Button-1>", self.on_live_image_click)
@@ -4053,7 +4057,8 @@ class WormAnalysisApp:
             text="Live",
             bg=self.colors.theme["primary_background"],
             fg=self.colors.theme["secondary_text"],
-            font=(self.font, 10)
+            font=(self.font, 10),
+            takefocus=0
         ).pack()
 
         # --- Second button + label ---
@@ -4087,7 +4092,8 @@ class WormAnalysisApp:
             text="Snap image",
             bg=self.colors.theme["primary_background"],
             fg=self.colors.theme["secondary_text"],
-            font=(self.font, 10)
+            font=(self.font, 10),
+            takefocus=0
         ).pack()
         
         # --- Third button + label ---
@@ -4116,7 +4122,8 @@ class WormAnalysisApp:
             text="",
             bg=self.colors.theme["primary_background"],
             fg=self.colors.theme["tertiary_text"],
-            font=(self.font, 10)
+            font=(self.font, 10),
+            takefocus=0
         )
         self.save_button_label_ref.pack()
 
@@ -4157,7 +4164,8 @@ class WormAnalysisApp:
             text="Synaptic profiling prediction",
             bg=self.colors.theme["primary_background"],
             fg=self.colors.theme["secondary_text"],
-            font=(self.font, 10, "bold")
+            font=(self.font, 10, "bold"),
+            takefocus=0
         ).pack(pady=(0, 0), anchor="center")  
 
         self.prediction_label = tk.Label(
@@ -4166,7 +4174,8 @@ class WormAnalysisApp:
             bg=self.colors.theme["primary_background"],
             fg=self.colors.theme["secondary_text"],
             justify="center",  
-            font=(self.font, 8)
+            font=(self.font, 8),
+            takefocus=0
         )
         self.prediction_label.pack(pady=(5, 0), anchor="center")
 
@@ -4176,7 +4185,8 @@ class WormAnalysisApp:
             bg=self.colors.theme["primary_background"],
             fg=self.colors.theme["secondary_text"],
             justify="center",  
-            font=(self.font, 8)
+            font=(self.font, 8),
+            takefocus=0
         )
         self.prediction_label_2.pack(pady=(0, 0), anchor="center")
 
@@ -4222,9 +4232,9 @@ class WormAnalysisApp:
         )
 
         tk.Label(sub1_2_analysis_container, text="Wild-Type", bg=self.colors.theme["primary_background"],
-                fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack()
+                fg=self.colors.theme["secondary_text"], font=(self.font, 10), takefocus=0).pack()
         self.proportion_wt_label_ref = tk.Label(sub1_2_analysis_container, text=f"{int(100*(1-self.worms_position.get_mutant_proportion()))}%", bg=self.colors.theme["primary_background"],
-                fg=self.colors.theme["secondary_text"], font=(self.font, 7))
+                fg=self.colors.theme["secondary_text"], font=(self.font, 7), takefocus=0)
         self.proportion_wt_label_ref.pack()
         
         # 2nd - classify as mutant
@@ -4252,9 +4262,9 @@ class WormAnalysisApp:
         )
 
         tk.Label(sub2_2_analysis_container, text="Mutation", bg=self.colors.theme["primary_background"],
-                fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack()
+                fg=self.colors.theme["secondary_text"], font=(self.font, 10), takefocus=0).pack()
         self.proportion_mutant_label_ref = tk.Label(sub2_2_analysis_container, text=f"{int(100*(self.worms_position.get_mutant_proportion()))}%", bg=self.colors.theme["primary_background"],
-                fg=self.colors.theme["secondary_text"], font=(self.font, 7))
+                fg=self.colors.theme["secondary_text"], font=(self.font, 7), takefocus=0)
         self.proportion_mutant_label_ref.pack()
 
         # 3. Text Container
@@ -4265,7 +4275,8 @@ class WormAnalysisApp:
             text=f"{self.id_worm_seen+1}/{self.worms_position.get_number_of_worms()}",
             bg=self.colors.theme["primary_background"],
             fg=self.colors.theme["tertiary_text"],
-            font=(self.font, 10)
+            font=(self.font, 10),
+            takefocus=0
         )
         self.id_worm_seen_label.pack(pady=0)
         
@@ -4336,7 +4347,8 @@ class WormAnalysisApp:
             bg=self.colors.theme["primary_background"],
             fg=self.colors.theme["secondary_text"],
             font=(self.font, 9, "bold"),
-            justify="center"
+            justify="center",
+            takefocus=0
         )
         warning_label.pack(pady=(5, 0))
 
@@ -4369,12 +4381,18 @@ class WormAnalysisApp:
             text="Launch analysis", 
             bg=self.colors.theme["primary_background"],
             fg=self.colors.theme["secondary_text"],
-            font=(self.font, 10)
+            font=(self.font, 10),
+            takefocus=0
         ).pack()
         
-        self.main_content.focus_set()  # Make sure the frame has focus to capture key events
+        self.root.lift()
+        self.root.after(50, lambda: (self.root.focus_force(), self.root.update_idletasks()))
+        self.root.bind("<Left>", lambda event: self.go_to_last_worm())
+        self.root.bind("<Right>", lambda event: self.go_to_next_worm())
+
+        """self.main_content.focus_set()  # Make sure the frame has focus to capture key events
         self.main_content.bind("<Left>", lambda event: self.go_to_last_worm())
-        self.main_content.bind("<Right>", lambda event: self.go_to_next_worm())
+        self.main_content.bind("<Right>", lambda event: self.go_to_next_worm())"""
 
         # Update the live image
         if self.live_image:
