@@ -86,3 +86,4 @@ date,best_scaler_name,best_model_name,best_score,len_y
 20251107_113613,Normalizer,hist_gradient_boosting,0.7583333333333333,124
 20251107_115531,RobustScaler,random_forest,0.8066666666666666,124
 20251107_120041,QuantileTransformer,random_forest,0.7973333333333333,124
+20251114_141033,NoScaler,mlp,0.7736666666666667,124

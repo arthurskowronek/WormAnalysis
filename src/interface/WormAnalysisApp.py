@@ -1735,7 +1735,7 @@ class WormAnalysisApp:
             self.scan_height.set(scanner.scan_height)
         except Exception as e:
             self.context_error = log_error(e, "Launch scan failed")
-
+        
         # Update: saving worm positions
         self.scan_status_label.config(text="Saving worm positions...")
         self.scan_status_label.update_idletasks()
@@ -1744,7 +1744,7 @@ class WormAnalysisApp:
             update_user_statistics('nb_vers_detected', self.worms_position.get_number_of_worms())
         except Exception as e:
             self.context_error = log_error(e, "Saving worm position failed")
-
+        
         # Update: reconstructing image
         self.scan_status_label.config(text="Reconstructing scan result...")
         self.scan_status_label.update_idletasks()
@@ -1757,7 +1757,7 @@ class WormAnalysisApp:
         self.scan_status_label.config(text="Scan complete. Displaying results...")
         self.scan_status_label.update_idletasks()
         self.switch_page("scan_result")
-
+    
     def end_of_program(self): 
         """
         Performs cleanup tasks and prepares the application for shutdown.
@@ -1779,8 +1779,13 @@ class WormAnalysisApp:
             big_dataset.set_features(compute=False, name_dataset="big_dataset")
             big_dataset.remove_unclassified()
             big_dataset.get_model(compute=True)
-        except:
-            pass
+            
+            self.CORE.unloadAllDevices() 
+            self.CORE.shutdown() 
+        
+        except Exception as e:
+            self.context_error = log_error(e, f"Erreur durant le nettoyage du Core ou du stage")
+            pass 
         
         finally:
             self.root.quit()
@@ -3972,7 +3977,7 @@ class WormAnalysisApp:
         # Clear previous widgets
         for widget in self.main_content.winfo_children():
             widget.destroy()
-            
+         
         self.worms_position = WormPositionManager(new_acquisition=False, id = self.id_worm_seen)
         # move to the 1st worm
         x_microscope, y_microscope = self.CORE.getXYPosition()
@@ -3985,7 +3990,7 @@ class WormAnalysisApp:
         self.update_parameter_widgets_state(disabled_widgets=["scan_shape", "scan_objective"]) 
         self.refresh_parameters_interface()
         self.update_parameter_widgets_state(disabled_widgets=["scan_shape", "scan_objective"])
-
+        
         # Configure grid layout for main_content
         self.main_content.grid_columnconfigure(0, weight=75)
         self.main_content.grid_columnconfigure(1, weight=25)

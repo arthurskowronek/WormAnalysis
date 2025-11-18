@@ -14,11 +14,13 @@ from sklearn.neural_network import MLPClassifier as SklearnMLPClassifier
 from sklearn.model_selection import cross_val_score, StratifiedKFold, cross_val_predict, learning_curve
 from sklearn.metrics import confusion_matrix, make_scorer, recall_score
 from sklearn.pipeline import Pipeline
-from sklearn.feature_selection import SelectKBest, f_classif, SelectFromModel
+from sklearn.feature_selection import SelectKBest, f_classif, SelectFromModel, RFE
+from sklearn.svm import SVC
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.linear_model import LassoCV, ElasticNetCV
 from sklearn.preprocessing import FunctionTransformer
 from boruta import BorutaPy
+
 
 from src.system.base import BaseModel
 from config import DEFAULT_RANDOM_STATE, DEFAULT_CV_FOLDS
@@ -966,7 +968,7 @@ class BorutaFeatureSelector(BaseEstimator, TransformerMixin):
 def make_feature_selector(method='lasso', k=20, random_state=42):
     """
     Retourne un objet transformer compatible sklearn selon la méthode.
-    method: 'kbest', 'lasso', 'elasticnet', 'boruta', 'none'
+    method: 'kbest', 'lasso', 'elasticnet', 'boruta', 'rfe_svc', 'rfe_rf', 'none'
     """
     method = method.lower()
     if method == 'kbest':
@@ -979,6 +981,12 @@ def make_feature_selector(method='lasso', k=20, random_state=42):
         from sklearn.ensemble import RandomForestClassifier
         rf = RandomForestClassifier(n_jobs=-1, random_state=random_state, max_depth=5)
         return BorutaFeatureSelector(rf_estimator=rf, n_estimators='auto', verbose=0, random_state=random_state)
+    elif method == 'rfe_svc':
+        estimator = SVC(kernel="linear", random_state=random_state)
+        return RFE(estimator=estimator, n_features_to_select=k, step=1, verbose=0)
+    elif method == 'rfe_rf':
+        estimator = RandomForestClassifier(n_estimators=100, random_state=random_state) 
+        return RFE(estimator=estimator, n_features_to_select=k, step=1, verbose=0)
     elif method == 'none':
         # Pas de sélection : identite
         return FunctionTransformer(lambda X: X, validate=False)

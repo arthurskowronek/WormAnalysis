@@ -47,13 +47,15 @@ class WormPositionManager:
         
         if new_acquisition:
             self._initialize_csv(table_worm_position)
+            self.go_to_first_worm(id)
         else:
             if not os.path.exists(self.csv_file_path):
                 self._initialize_csv(table_worm_position)
-            else:
-                self.find_shortest_path()
                 self.go_to_first_worm(id)
-         
+            else:
+                #self.find_shortest_path()
+                self.go_to_first_worm(id)
+     
     def _initialize_csv(self, table_worm_position = []) -> None:
         """
         Creates and initializes a new CSV file with worm position headers.
