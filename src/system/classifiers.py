@@ -982,10 +982,11 @@ def make_feature_selector(method='lasso', k=20, random_state=42):
         rf = RandomForestClassifier(n_jobs=-1, random_state=random_state, max_depth=5)
         return BorutaFeatureSelector(rf_estimator=rf, n_estimators='auto', verbose=0, random_state=random_state)
     elif method == 'rfe_svc':
-        estimator = SVC(kernel="linear", random_state=random_state)
+        estimator = SVC(kernel="linear", C=0.5, random_state=random_state)
         return RFE(estimator=estimator, n_features_to_select=k, step=1, verbose=0)
     elif method == 'rfe_rf':
-        estimator = RandomForestClassifier(n_estimators=100, random_state=random_state) 
+        from sklearn.ensemble import RandomForestClassifier
+        estimator = RandomForestClassifier(n_jobs=-1, n_estimators=100, max_depth=7, min_samples_leaf=5, random_state=random_state) 
         return RFE(estimator=estimator, n_features_to_select=k, step=1, verbose=0)
     elif method == 'none':
         # Pas de sélection : identite

@@ -1756,6 +1756,7 @@ class WormAnalysisApp:
         # Update: switching page
         self.scan_status_label.config(text="Scan complete. Displaying results...")
         self.scan_status_label.update_idletasks()
+        self.id_worm_seen = 0
         self.switch_page("scan_result")
     
     def end_of_program(self): 

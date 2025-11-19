@@ -5,9 +5,9 @@ exposure_time: '100'
 scan_objective: 4x
 shape: Square
 user_directory: Arthur_2025_11_14
-start_x: -1482.0
+start_x: -12868.2001953125
 start_y: -1482.0
-end_x: 22240.5
+end_x: 10854.2998046875
 end_y: 22240.5
 scan_width: '8'
 scan_height: '8'

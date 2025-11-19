@@ -68,3 +68,12 @@ svm - QuantileTransformer : 0.04960286730063541
 random_forest - QuantileTransformer : 0.07058170993804114
 knn - QuantileTransformer : 0.11538534472703967
 mlp - QuantileTransformer : 0.03858036345661408
+svm - NoScaler : 0.049211561423894865
+random_forest - NoScaler : 0.05838188455715047
+knn - NoScaler : 0.05568163471418962
+svm - StandardScaler : 0.03072458299147446
+random_forest - StandardScaler : 0.05838188455715047
+knn - StandardScaler : 0.052729919822093844
+svm - NoScaler : 0.04414118761932493
+random_forest - NoScaler : 0.062485553886033884
+knn - NoScaler : 0.05528109984434102

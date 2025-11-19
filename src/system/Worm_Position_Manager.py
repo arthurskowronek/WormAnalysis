@@ -510,6 +510,7 @@ class WormPositionManager:
         Sets the first worm in the TSP-calculated path as the currently 'seen' worm.
         All other worms are marked as 'not seen'.
         """
+        print(f"id: {id}")
         df = pd.read_csv(self.csv_file_path)
         
         if df.empty:
