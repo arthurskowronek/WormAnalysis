@@ -14,7 +14,8 @@ from scipy.spatial.distance import cdist
 
 def get_synapses_graph(worm_mask: np.ndarray,
                       maxima_coords: np.ndarray,
-                      n_segments: int = 20) -> Tuple[np.ndarray, nx.Graph, float, float, float, np.ndarray, np.ndarray]:
+                      n_segments: int = 20,
+                      verbose: bool = False) -> Tuple[np.ndarray, nx.Graph, float, float, float, np.ndarray, np.ndarray]:
     """
     Creates a graph representation of potential synapses by analyzing their distribution
     along the worm's skeleton and body.
@@ -53,29 +54,36 @@ def get_synapses_graph(worm_mask: np.ndarray,
     
     # ----- Input validation -----
     if worm_mask is None or worm_mask.size == 0 or maxima_coords is None or len(maxima_coords) == 0:
-        print("Warning: Empty worm mask or maxima coordinates provided")
-        print(maxima_coords)
+        if verbose: print("Warning: Empty worm mask or maxima coordinates provided")
         return DEFAULT_RETURN
         
     # -- 1 -- Skeletonize worm and get main branch
     skeleton = ski.morphology.skeletonize(worm_mask)
     G = _skeleton_to_graph(skeleton)  # Create initial graph from skeleton
-    G, skeleton = _skeleton_keep_main_branch(G, skeleton, maxima_coords, keep=1)
-    if len(G.nodes) == 0: print("Warning: No nodes found in skeleton"); return DEFAULT_RETURN
+    G, skeleton = _skeleton_keep_main_branch(G, skeleton, maxima_coords, keep=1, verbose=verbose)
+    if len(G.nodes) == 0: 
+        if verbose: print("Warning: No nodes found in skeleton"); 
+        return DEFAULT_RETURN
 
     # -- 2 -- Decompose skeleton into segments
     skel_path = _order_skeleton_points_skan(skeleton)
-    if not skel_path: print("Warning: No skeleton points found"); return DEFAULT_RETURN
+    if not skel_path: 
+        if verbose: print("Warning: No skeleton points found"); 
+        return DEFAULT_RETURN
     n = len(skel_path)
     seg_len = max(1, n // n_segments)  # Ensure non-zero segment length
     centers = [skel_path[i * seg_len + seg_len // 2] for i in range(min(n_segments, n))]
-    if not centers: print("Warning: No segment centers found"); return DEFAULT_RETURN
+    if not centers: 
+        if verbose: print("Warning: No segment centers found"); 
+        return DEFAULT_RETURN
 
     # -- 3 -- Calculate segment statistics
     distances = cdist(maxima_coords, centers)
     labels = np.argmin(distances, axis=1)
     counts = np.bincount(labels, minlength=len(centers))
-    if len(counts) == 0: print("Warning: No valid segment counts"); return DEFAULT_RETURN
+    if len(counts) == 0: 
+        if verbose: print("Warning: No valid segment counts"); 
+        return DEFAULT_RETURN
     mean_count = np.mean(counts)
     diff_points = counts - mean_count
     measure_diff_points = np.sqrt(np.sum(diff_points**2))
@@ -94,7 +102,9 @@ def get_synapses_graph(worm_mask: np.ndarray,
         norm = np.linalg.norm(vec)
         vec = vec / norm if norm > 0 else np.zeros_like(start, dtype=float)
         directions.append(vec)
-    if not directions: print("Warning: No valid segment directions found"); return DEFAULT_RETURN
+    if not directions: 
+        if verbose: print("Warning: No valid segment directions found"); 
+        return DEFAULT_RETURN
 
     # -- 5 -- Decompose segments into slices
     # Set entire border to black
@@ -201,12 +211,14 @@ def get_synapses_graph(worm_mask: np.ndarray,
         NUMBER_OF_CORDS = 1
     skeleton = _graph_to_skeleton(G, shape=worm_mask.shape)
       
-    G, skeleton = _skeleton_keep_main_branch(G, skeleton, maxima_coords, keep=NUMBER_OF_CORDS)
+    G, skeleton = _skeleton_keep_main_branch(G, skeleton, maxima_coords, keep=NUMBER_OF_CORDS, verbose=verbose)
 
     # Get final maxima
     maxima = np.array([node for node in maxima_coords if 0 <= node[0] < skeleton.shape[0] 
                       and 0 <= node[1] < skeleton.shape[1] and skeleton[node[0], node[1]] == 1])                  
-    if len(maxima) == 0: print("Warning: No valid maxima points found in skeleton"); return DEFAULT_RETURN
+    if len(maxima) == 0: 
+        if verbose: print("Warning: No valid maxima points found in skeleton"); 
+        return DEFAULT_RETURN
                 
     return maxima, G, median_width, measure_diff_slice, measure_diff_points, NUMBER_OF_CORDS
 
@@ -353,7 +365,8 @@ def _calculate_segment_properties(start, end_pos, end_neg):
 
 def _find_endpoints_graph(G: nx.Graph, 
                   maxima_coords: np.ndarray,
-                  angle_threshold_degrees: float = 90) -> Tuple[List, List]:
+                  angle_threshold_degrees: float = 90,
+                  verbose: bool = False) -> Tuple[List, List]:
     """
     Identifies endpoints and angle junctions in a skeleton graph.
 
@@ -380,7 +393,7 @@ def _find_endpoints_graph(G: nx.Graph,
     
     # Input validation
     if G is None or len(G.nodes) == 0 or maxima_coords is None or len(maxima_coords) == 0:
-        print("Warning: Empty graph or maxima coordinates provided to find_endpoints")
+        if verbose: print("Warning: Empty graph or maxima coordinates provided to find_endpoints")
         return [], []
     
     # Find endpoints (nodes with degree 1)
@@ -392,7 +405,9 @@ def _find_endpoints_graph(G: nx.Graph,
             elif isinstance(node, (int, np.integer)):
                 if node < len(maxima_coords):
                     endpoints.append(tuple(maxima_coords[node]))       
-    if not endpoints: print("Warning: No endpoints found"); return [], []
+    if not endpoints: 
+        if verbose: print("Warning: No endpoints found"); 
+        return [], []
     
     # Process each node for finding angle junctions
     angle_junctions = []
@@ -566,7 +581,8 @@ def _order_skeleton_points_skan(skeleton):
 def _skeleton_keep_main_branch(G: 'nx.Graph',
                             skel: np.ndarray,
                             maxima_coords: np.ndarray,
-                            keep: int = 1) -> Tuple['nx.Graph', np.ndarray]:
+                            keep: int = 1,
+                            verbose: bool = False) -> Tuple['nx.Graph', np.ndarray]:
     """
     Identifies and keeps only the main branches of a skeleton, discarding minor
     or irrelevant ones.
@@ -594,7 +610,7 @@ def _skeleton_keep_main_branch(G: 'nx.Graph',
         return nx.Graph(), np.zeros((1, 1), dtype=bool)
     
     # Find endpoints and junctions
-    endpoints, angle_junctions = _find_endpoints_graph(G, maxima_coords)
+    endpoints, angle_junctions = _find_endpoints_graph(G, maxima_coords, verbose)
     if len(endpoints) < 2:
         return G, skel  # Return original if insufficient endpoints
 

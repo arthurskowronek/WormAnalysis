@@ -70,7 +70,8 @@ class Dataset_Manager:
                 visualize: bool = False,
                 training: bool = False,
                 validation: bool = False,
-                name_dataset: str = DEFAULT_PKL_NAME) -> 'Dataset_Manager':
+                name_dataset: str = DEFAULT_PKL_NAME,
+                verbose: bool = False) -> 'Dataset_Manager':
         """
         Loads and preprocesses images from the specified data directories.
 
@@ -137,6 +138,7 @@ class Dataset_Manager:
             # choose the base directory to look into: either model_base_dir (if used) or self.data_dir
             base_dir = model_base_dir if use_model_folder and model_base_dir is not None else Path(self.data_dir)
 
+            ind=0
             for label_dir in label_dirs:
                 dir_path = base_dir / label_dir
 
@@ -145,8 +147,10 @@ class Dataset_Manager:
                     continue
 
                 # Iterate through all .tif images in the directory.
+                
                 for img_path in dir_path.glob('*.tif'):
-                    print(f"Processing image: {img_path}")
+                    print(f"Processing image {ind + 1} : {img_path}")
+                    ind +=1
                     try:
                         # Basic image loading and preprocessing
                         img = imread(img_path)
@@ -157,8 +161,15 @@ class Dataset_Manager:
                         worm_mask = preprocessing.worm_segmentation(img)
 
                         # Skip coiled worms if requested
-                        if preprocessing.is_coiled_worm(worm_mask):
-                            print(f"Skipping coiled worm in {img_path}")
+                        if not preprocessing.is_coiled_worm(worm_mask):
+                            # Get synapse data
+                            maxima, graph, median_width, diff_slice, diff_segment, NUMBER_OF_CORDS = preprocessing.get_synapse_using_graph(img, worm_mask, verbose=verbose)
+                            if len(maxima) <= 10:
+                                coiled = True
+                            else:
+                                coiled = False
+                        else:
+                            if verbose: print(f"Skipping coiled worm in {img_path}")
                             empty_graph = nx.Graph()
                             maxima = []
                             graph = empty_graph
@@ -167,11 +178,7 @@ class Dataset_Manager:
                             diff_segment = 0 
                             coiled = True
                             NUMBER_OF_CORDS = 1
-                        else:
-                            # Get synapse data
-                            coiled = False
-                            maxima, graph, median_width, diff_slice, diff_segment, NUMBER_OF_CORDS = preprocessing.get_synapse_using_graph(img, worm_mask)
-
+                            
                         if validation:
                             # When reading from validation directory, attempt to infer label from filename:
                             # fall back to the label_dir if inference fails.
@@ -464,7 +471,7 @@ class Dataset_Manager:
 
             count = 0
             for item in self.data:
-                if not item.coiled:
+                if (not item.coiled) and (item.coiled is not None):
                     item.set_features_selected(features[count], feature_names)
                     count += 1
             return self

@@ -2280,7 +2280,7 @@ class WormAnalysisApp:
         except Exception as e:
             self.context_error = log_error(e, f"Classify as mutant failed")
      
-    def find_worm_segmentation(self, img):
+    def find_worm_segmentation(self, img, verbose=False):
         """
         Segments a worm from the background in an image using a YOLO model.
 
@@ -2302,12 +2302,23 @@ class WormAnalysisApp:
             image = img.copy()
             
             # Normalize image for YOLO
-            """threshold = 3000
-            image = np.clip(image, 0, threshold).astype(np.uint16)"""
+            #image = cv2.normalize(image, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
             
-            # Normalize image for YOLO
-            image = cv2.normalize(image, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
+            def auto_contrast(image, percentile_low=0.5, percentile_high=99.5):
+                img = image.astype(np.float32)
+                vmin = np.percentile(img, percentile_low)
+                vmax = np.percentile(img, percentile_high)
+                if vmax <= vmin:
+                    vmax = vmin + 1.0
+                # Scale to 0-255 and clip
+                img_scaled = np.clip((img - vmin) / (vmax - vmin) * 255, 0, 255).astype(np.uint8)
+                return img_scaled
+
+            # In find_worm_segmentation:
+            image = auto_contrast(image)
             
+            
+ 
             # Save temporary image
             temp_path = Path(MODELS_DIR) / "temp_converted_image.png"
             cv2.imwrite(str(temp_path), image)
@@ -2346,6 +2357,22 @@ class WormAnalysisApp:
             
             resized_mask = cv2.resize(closest_mask.astype(np.uint8), (w,h), interpolation=cv2.INTER_NEAREST)
             mask_bool = resized_mask.astype(bool)
+            
+            if verbose:
+                # Show the original image
+                plt.figure(figsize=(10,5))
+                plt.subplot(1,2,1)
+                plt.imshow(image, cmap='gray')
+                plt.title("Original Image")
+                plt.axis('off')
+
+                # Show the mask
+                plt.subplot(1,2,2)
+                plt.imshow(mask_bool, cmap='gray')  # or cmap='Reds' to highlight
+                plt.title("Detected Mask")
+                plt.axis('off')
+
+                plt.show()
 
             result = np.zeros_like(image)
 
@@ -2372,26 +2399,27 @@ class WormAnalysisApp:
         mutant). The prediction result is saved and displayed to the user.
         If the model fails, a default prediction is used.
         """
+        VERBOSE = True
         # Step 0: Tell the user the analysis is starting
         self.prediction_label_2.configure(text=f"with a probability of : computing...")
-        self.root.update() # tester avec self.root.update() vs self.root.update_idletasks()
+        self.root.update() 
         
         # Step 1: Segment the image and save it
         img = self.snap_image(analysis_mode=True)
-        img = self.find_worm_segmentation(img) 
+        img = self.find_worm_segmentation(img, verbose=VERBOSE) 
         id = self.worms_position.get_id_worm_seen()
         unclassified_path = Path(DATA_DIR) / "Unclassified" / f"{id}.tif"
         imwrite(str(unclassified_path), img)
         self.prediction_label_2.configure(text=f"with a probability of : segmenting...")
-        self.root.update() # tester avec self.root.update() vs self.root.update_idletasks()
+        self.root.update() 
 
-        # Step 2: Try to predict with model, fallback to random
+        # Step 2: Try to predict with model
         try:
             dataset = Dataset_Manager()
             _, _, _, self.enhanced_image = dataset.load_images(visualize=True)
             dataset.set_features()
             self.prediction_label_2.configure(text=f"with a probability of : set features...")
-            self.root.update() # tester avec self.root.update() vs self.root.update_idletasks()
+            self.root.update() 
 
             model, _ = dataset.get_model(model_name = str(self.name_model.get()))
             pred = model.predict(dataset.get_features_selected()[0])[0]
@@ -2405,11 +2433,11 @@ class WormAnalysisApp:
             self.worms_position.update_worm_prediction(id, pred)
             self.prediction = str(int(100*pred))
             self.prediction_label_2.configure(text=f"with a probability of {self.prediction}%")
-            self.root.update() # tester avec self.root.update() vs self.root.update_idletasks()
+            self.root.update() 
         except Exception as e:
             self.context_error = log_error(e, f"Prediction failed")
             self.prediction_label_2.configure(text=f"with a probability of : doesn't succeed to make a prediction")
-            self.root.update() # tester avec self.root.update() vs self.root.update_idletasks()
+            self.root.update() 
             pred = -1
         
         # Step 4: Save image in the corresponding directory 
@@ -4285,6 +4313,10 @@ class WormAnalysisApp:
             takefocus=0
         )
         self.id_worm_seen_label.pack(pady=0)
+        
+        order_worms_icon = tk.Label(text_3_analysis_container, image=self.info_icon, bg=self.colors.theme["primary_background"])
+        order_worms_icon.pack(side=tk.TOP, pady=(4, 0))  # slight spacing above icon
+        Tooltip(order_worms_icon, "Be aware, the display order may change if you leave this page.", title="Info", theme="info", posx=70, posy=-80)
         
         # Add number of worm to the statistic file
         update_user_statistics('nb_vers_final', self.worms_position.get_number_of_worms())

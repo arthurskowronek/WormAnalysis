@@ -5,7 +5,9 @@ import shap
 import optuna
 import numpy as np
 import pandas as pd
+from copy import deepcopy
 from sklearn.svm import SVC
+import multiprocessing as mp
 from joblib import parallel_backend
 from typing import Dict, Any, Optional, Tuple
 from sklearn.neighbors import KNeighborsClassifier
@@ -812,6 +814,8 @@ def evaluate_models_with_scalers(
     for scaler_name, scaler in scaler_dict.items():
         scaler_results = {}
         for model_type in model_types:
+            print(f"[INFO] Evaluating combination: Scaler={scaler_name}, Model={model_type}")
+            
             clf = classifier_factory.create(model_type)
 
             # build pipeline: scaler + selector + classifier
@@ -836,9 +840,10 @@ def evaluate_models_with_scalers(
                 with parallel_backend("threading", n_jobs=1):
                     scores = cross_val_score(pipe, X, y, cv=kf, scoring=scorer, n_jobs=-1)
                 mean_score = scores.mean()
-                # écrire les résultats de la variance dans un fichier txt
-                open("variance_results.txt", "a").write(f"{model_type} - {scaler_name} : {scores.std()}\n")
-                
+                # write variance
+                open("variance_results.txt", "a").write(
+                    f"{model_type} - {scaler_name} : {scores.std()}\n"
+                )
             except Exception as e:
                 print(f"[ERROR] cross_val_score failed for {model_type} with {scaler_name}: {e}")
                 mean_score = np.nan
@@ -848,10 +853,15 @@ def evaluate_models_with_scalers(
             if mean_score is not None and not np.isnan(mean_score) and mean_score > best_score:
                 best_score = mean_score
                 best_combo = (scaler_name, model_type)
-                best_pipeline = pipe  # pipeline, but not yet fitted
+                best_pipeline = deepcopy(pipe)   
+                best_pipeline.fit(X, y) 
+                
+            print(f"[INFO] Score for Scaler={scaler_name}, Model={model_type}: {mean_score}")
 
         results[scaler_name] = scaler_results
 
+    print(f"[INFO] Best combination: Scaler={best_combo[0]}, Model={best_combo[1]}, Score={best_score}")
+    print("Retraining the best pipeline on the full dataset...")
     # Retrain only the best pipeline on the complete data (fit scaler+selector+clf on full X)
     if best_pipeline is None:
         raise RuntimeError("No valid pipeline found (best_pipeline is None).")
@@ -986,7 +996,7 @@ def make_feature_selector(method='lasso', k=20, random_state=42):
         return RFE(estimator=estimator, n_features_to_select=k, step=1, verbose=0)
     elif method == 'rfe_rf':
         from sklearn.ensemble import RandomForestClassifier
-        estimator = RandomForestClassifier(n_jobs=-1, n_estimators=100, max_depth=7, min_samples_leaf=5, random_state=random_state) 
+        estimator = RandomForestClassifier(n_jobs=-1, n_estimators=40, max_depth=5, min_samples_leaf=8, random_state=random_state) 
         return RFE(estimator=estimator, n_features_to_select=k, step=1, verbose=0)
     elif method == 'none':
         # Pas de sélection : identite

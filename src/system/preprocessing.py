@@ -132,7 +132,7 @@ class Preprocessing():
         region = regions[0]
         return region.major_axis_length / region.minor_axis_length <= 1.5
 
-    def get_synapse_using_graph(self, image: np.ndarray, worm_mask: np.ndarray) -> tuple:
+    def get_synapse_using_graph(self, image: np.ndarray, worm_mask: np.ndarray, verbose: bool = False) -> tuple:
         """
         Detects synapses in an image using a graph-based approach.
 
@@ -160,15 +160,15 @@ class Preprocessing():
             len_maxima = 0
             for g in [10, 30, 50, 70]:
                 img, local_max = self.find_local_maxima(image, g)
-                maxima, G, median_width, diff_slice, diff_segment, NUMBER_OF_CORDS = get_synapses_graph(worm_mask, local_max)
+                maxima, G, median_width, diff_slice, diff_segment, NUMBER_OF_CORDS = get_synapses_graph(worm_mask, local_max, verbose=verbose)
                 maxima = list(map(tuple, maxima))
                 
                 if len(maxima) > len_maxima:
                     len_maxima = len(maxima)
                     gamma = g 
             
-            img, local_max = self.find_local_maxima(image, g)
-            maxima, G, median_width, diff_slice, diff_segment, NUMBER_OF_CORDS = get_synapses_graph(worm_mask, local_max)
+            img, local_max = self.find_local_maxima(image, gamma)
+            maxima, G, median_width, diff_slice, diff_segment, NUMBER_OF_CORDS = get_synapses_graph(worm_mask, local_max, verbose=verbose)
             maxima = list(map(tuple, maxima))
 
             return maxima, G, median_width, diff_slice, diff_segment, NUMBER_OF_CORDS
@@ -223,7 +223,11 @@ class Preprocessing():
         frangi_response = label_components
         
         # Normalize response
-        frangi_response = (frangi_response - frangi_response.min()) / (frangi_response.max() - frangi_response.min())
+        denom = frangi_response.max() - frangi_response.min()
+        if denom != 0:
+            frangi_response = (frangi_response - frangi_response.min()) / denom
+        else:
+            frangi_response = np.zeros_like(frangi_response) 
         
         # Create mask
         threshold = np.percentile(frangi_response, 95)
