@@ -2216,7 +2216,9 @@ class WormAnalysisApp:
                 
             else:
                 snap_img = self.snap_image()
-                img = self.find_worm_segmentation(snap_img)
+                mask = self.find_worm_segmentation(snap_img)
+                img = np.zeros_like(snap_img)
+                img[mask] = snap_img[mask]
                 cv2.imwrite(str(classified_path), img)
         except Exception as e:
             self.context_error = log_error(e, f"Classify as WT failed")
@@ -2275,7 +2277,9 @@ class WormAnalysisApp:
                 
             else:
                 snap_img = self.snap_image()
-                img = self.find_worm_segmentation(snap_img)
+                mask = self.find_worm_segmentation(snap_img)
+                img = np.zeros_like(snap_img)
+                img[mask] = snap_img[mask]
                 cv2.imwrite(str(classified_path), img)
         except Exception as e:
             self.context_error = log_error(e, f"Classify as mutant failed")
@@ -2294,8 +2298,7 @@ class WormAnalysisApp:
             img (np.ndarray): The input image (2D grayscale or 3D color).
 
         Returns:
-            np.ndarray: The input image with the background masked out, resulting
-                        in only the worm being visible.
+            np.ndarray: The mask of the segmented worm as a booleana array.
         """
         try:
             model = self.segmentation_model
@@ -2318,7 +2321,6 @@ class WormAnalysisApp:
             image = auto_contrast(image)
             
             
- 
             # Save temporary image
             temp_path = Path(MODELS_DIR) / "temp_converted_image.png"
             cv2.imwrite(str(temp_path), image)
@@ -2374,17 +2376,7 @@ class WormAnalysisApp:
 
                 plt.show()
 
-            result = np.zeros_like(image)
-
-            if image.ndim == 2:
-                # Image grayscale 2D
-                result[mask_bool] = image[mask_bool]
-            else:
-                # Image couleur 3D
-                for c in range(image.shape[2]):
-                    result[..., c][mask_bool] = image[..., c][mask_bool]
-            
-            return result
+            return mask_bool
         except Exception as e:
             self.context_error = log_error(e, f"Find worm segmentation failed")
             return None
@@ -2406,7 +2398,7 @@ class WormAnalysisApp:
         
         # Step 1: Segment the image and save it
         img = self.snap_image(analysis_mode=True)
-        img = self.find_worm_segmentation(img, verbose=VERBOSE) 
+        mask = self.find_worm_segmentation(img, verbose=VERBOSE) 
         id = self.worms_position.get_id_worm_seen()
         unclassified_path = Path(DATA_DIR) / "Unclassified" / f"{id}.tif"
         imwrite(str(unclassified_path), img)
@@ -2416,7 +2408,7 @@ class WormAnalysisApp:
         # Step 2: Try to predict with model
         try:
             dataset = Dataset_Manager()
-            _, _, _, self.enhanced_image = dataset.load_images(visualize=True)
+            _, _, _, self.enhanced_image = dataset.load_images(visualize=True, bool_mask=mask)
             dataset.set_features()
             self.prediction_label_2.configure(text=f"with a probability of : set features...")
             self.root.update() 

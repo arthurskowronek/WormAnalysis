@@ -62,6 +62,7 @@ DEFAULT_CV_FOLDS = 5  # Number of cross-validation folds
 EXPOSURE_TIME_LIVE = 50  # Default exposure time for live mode in milliseconds
 EXPOSURE_TIME_ANALYSIS = 100 # Exposure time for analysis mode in milliseconds
 NAME_CAMERA = "Camera-1" # TODO : name of the camera
+# NAME_CAMERA = "DEV_1AB22C037A15"
 
 def set_up_environment():
     # 2. Crée les dossiers EXTERNES (ceux qui sont à côté de l'EXE)
@@ -117,6 +118,7 @@ def loadCore(verbose = False):
         Any exception raised by pymmcore methods (e.g., loading configuration or setting devices).
     """
     CONFIG = "BESSEREAU_Lab.cfg" 
+    # CONFIG = "AlliedVision3.cfg"
     
     config = load_config_file()
     mmc = pymmcore.CMMCore()

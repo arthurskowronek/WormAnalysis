@@ -71,6 +71,7 @@ class Dataset_Manager:
                 training: bool = False,
                 validation: bool = False,
                 name_dataset: str = DEFAULT_PKL_NAME,
+                bool_mask = None,
                 verbose: bool = False) -> 'Dataset_Manager':
         """
         Loads and preprocesses images from the specified data directories.
@@ -158,10 +159,14 @@ class Dataset_Manager:
                         preprocessing = Preprocessing()
 
                         # Get worm mask
-                        worm_mask = preprocessing.worm_segmentation(img)
+                        if not training and bool_mask is not None:
+                            worm_mask = bool_mask
+                        else:
+                            worm_mask = preprocessing.worm_segmentation(img)
 
                         # Skip coiled worms if requested
                         if not preprocessing.is_coiled_worm(worm_mask):
+                            
                             # Get synapse data
                             maxima, graph, median_width, diff_slice, diff_segment, NUMBER_OF_CORDS = preprocessing.get_synapse_using_graph(img, worm_mask, verbose=verbose)
                             if len(maxima) <= 10:
@@ -178,7 +183,9 @@ class Dataset_Manager:
                             diff_segment = 0 
                             coiled = True
                             NUMBER_OF_CORDS = 1
-                            
+                           
+                        
+                         
                         if validation:
                             # When reading from validation directory, attempt to infer label from filename:
                             # fall back to the label_dir if inference fails.
@@ -701,6 +708,7 @@ class Dataset_Manager:
             if model_type == 'classifier':
                 print("Training classifier...")
                 # Define and filter the scalers to be used.
+                n_samples = X.shape[0]
                 scaler_dict_complete = {
                     'NoScaler': FunctionTransformer(func=None),
                     'StandardScaler': StandardScaler(),
@@ -708,7 +716,7 @@ class Dataset_Manager:
                     'MinMaxScaler': MinMaxScaler(),
                     'MaxAbsScaler': MaxAbsScaler(),
                     'Normalizer': Normalizer(),
-                    'QuantileTransformer': QuantileTransformer()
+                    'QuantileTransformer': QuantileTransformer(n_quantiles=min(1000, n_samples))
                 }
                 scaler_dict = {name: scaler_dict_complete[name] for name in scaler if name in scaler_dict_complete}
 

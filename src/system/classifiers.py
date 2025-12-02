@@ -3,6 +3,7 @@ Implementation of various classifiers.
 """
 import shap
 import optuna
+import warnings
 import numpy as np
 import pandas as pd
 from copy import deepcopy
@@ -20,7 +21,7 @@ from sklearn.feature_selection import SelectKBest, f_classif, SelectFromModel, R
 from sklearn.svm import SVC
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.linear_model import LassoCV, ElasticNetCV
-from sklearn.preprocessing import FunctionTransformer
+from sklearn.preprocessing import FunctionTransformer, QuantileTransformer
 from boruta import BorutaPy
 
 
@@ -800,6 +801,7 @@ def evaluate_models_with_scalers(
     best_score = -float('inf')
     best_combo = (None, None)
     best_pipeline = None
+    warnings.filterwarnings("ignore", category=FutureWarning)
 
     # set scorer
     if scoring == 'all_mutants':
@@ -854,7 +856,6 @@ def evaluate_models_with_scalers(
                 best_score = mean_score
                 best_combo = (scaler_name, model_type)
                 best_pipeline = deepcopy(pipe)   
-                best_pipeline.fit(X, y) 
                 
             print(f"[INFO] Score for Scaler={scaler_name}, Model={model_type}: {mean_score}")
 

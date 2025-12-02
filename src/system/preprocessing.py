@@ -56,9 +56,21 @@ class Preprocessing():
                 image = img.copy()
                 
                 # Normalize image for YOLO
-                threshold = 3000
-                image = np.clip(image, 0, threshold).astype(np.uint16)
                 image = cv2.normalize(image, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
+                
+                if False:
+                    def auto_contrast(image, percentile_low=0.5, percentile_high=99.5):
+                        img = image.astype(np.float32)
+                        vmin = np.percentile(img, percentile_low)
+                        vmax = np.percentile(img, percentile_high)
+                        if vmax <= vmin:
+                            vmax = vmin + 1.0
+                        # Scale to 0-255 and clip
+                        img_scaled = np.clip((img - vmin) / (vmax - vmin) * 255, 0, 255).astype(np.uint8)
+                        return img_scaled
+                        
+                    # In find_worm_segmentation:
+                    image = auto_contrast(image)
                 
                 # Save temporary image
                 temp_path = DATA_DIR / "temp_converted_image.png"
