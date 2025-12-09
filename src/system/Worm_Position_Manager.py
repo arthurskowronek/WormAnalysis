@@ -532,8 +532,7 @@ class WormPositionManager:
         Navigates to the next worm in the TSP-calculated path.
         
         The current 'seen' worm is marked as 'not seen', and the worm with
-        the next `id_path` is marked as 'seen'. Wraps around to the beginning
-        if at the end of the path.
+        the next `id_path` is marked as 'seen'. 
         """
         df = pd.read_csv(self.csv_file_path)
         
@@ -545,7 +544,7 @@ class WormPositionManager:
                 
         mask = df['id_path'] == id_seen
         if id_seen+1 >= len(df):
-            mask2 = df['id_path'] == 0
+            mask2 = df['id_path'] == id_seen
         else:
             mask2 = df['id_path'] == id_seen+1
         df.loc[mask, 'seen'] = False
@@ -588,7 +587,7 @@ class WormPositionManager:
                 
         mask = df['id_path'] == id_seen
         if id_seen-1 < 0:
-            mask2 = df['id_path'] == len(df)-1
+            mask2 = df['id_path'] == id_seen
         else:
             mask2 = df['id_path'] == id_seen-1
         

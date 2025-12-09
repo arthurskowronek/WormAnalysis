@@ -19,3 +19,5 @@ Micro-Manager-2.0gamma
 Worm_detection
 Worm_detection.app
 main.spec
+notebooks/runs
+notebooks/YOLO_data
