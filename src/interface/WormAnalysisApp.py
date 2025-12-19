@@ -54,6 +54,8 @@ class WormAnalysisApp:
         self.CORE = mmc
         self.root.title("Worm Analysis")
         self.root.geometry("1440x960")
+        self.screen_width = self.root.winfo_screenwidth()
+        self.screen_height = self.root.winfo_screenheight()
         self.PARAMS_FILE = PARAMETERS_FILE
         self.context_error = ""
         
@@ -97,6 +99,7 @@ class WormAnalysisApp:
         self._sensor_min_possible = 0
         self._sensor_max_possible = 65535
         self._image_update_lock = False
+        self.save_in_live_mode = False
 
         self._dragging_worm_id = None            # id du ver en cours de déplacement
         self._drag_offset_prop = (0.0, 0.0)      # offset entre le centre de la box et le point cliqué (en proportions)
@@ -3276,7 +3279,7 @@ class WormAnalysisApp:
         after a short delay.
         """
         try:
-            if self.live_image == False: 
+            if self.live_image == False or self.save_in_live_mode == True: 
                 self.save_button_label_ref.configure(text="Saved")
                 self.root.update_idletasks()
                 
@@ -3296,12 +3299,15 @@ class WormAnalysisApp:
                 img_to_save = np.clip(img_to_save, 0, 65535).astype(np.uint16)
 
                 imwrite(str(path), img_to_save) 
+                self.save_in_live_mode = False
                 
                 self.root.after(2000, lambda: self.save_button_label_ref.configure(text=""))
             else:
-                self.save_button_label_ref.configure(text="Only in snap mode")
-                self.root.update_idletasks()
-                self.root.after(2000, lambda: self.save_button_label_ref.configure(text=""))
+                self.original_snap_array = self.snap_image()
+                self.snap_img = self.original_snap_array
+                self.save_in_live_mode = True
+                self.save_snap_image()
+                
         except Exception as e:
             self.context_error = log_error(e, f"Save snap image failed")
           
@@ -3736,10 +3742,10 @@ class WormAnalysisApp:
             bg_color=self.colors.theme["primary_background"],
             text_color=self.colors.theme["primary_text"],
             hover_color=self.colors.theme["secondary_background"],
-            font=(self.font, 16),
-            width_pixels=200,
-            height_pixels=60,
-            corner_radius=20,
+            font=(self.font, self.screen_height // 60), # 16
+            width_pixels=self.screen_height // 5, # old 200, new 192
+            height_pixels=self.screen_height // 16, # 60
+            corner_radius=self.screen_height // 48, # 20
             side=tk.TOP,
             pady=5,
             padx_text=-10,
@@ -3755,7 +3761,7 @@ class WormAnalysisApp:
         title_launch_scan = tk.Label(
             launch_label_frame, text="Launch scan",
             bg=self.colors.theme["primary_background"], fg=self.colors.theme["tertiary_text"],
-            font=(self.font, 10)
+            font=(self.font, self.screen_height // 96) # 10
         )
         title_launch_scan.pack(side=tk.LEFT)
 
@@ -3837,10 +3843,10 @@ class WormAnalysisApp:
             bg_color=add_bg,
             text_color=self.colors.theme["primary_text"],
             hover_color=self.colors.theme["tertiary_background"],
-            font=(self.font, 16),
-            width_pixels=100,
-            height_pixels=60,
-            corner_radius=20,
+            font=(self.font, self.screen_height // 60), # 16
+            width_pixels=self.screen_height // 10, # old 100, new 96
+            height_pixels= self.screen_height // 16, # 60
+            corner_radius=self.screen_height // 48, # 20
             side=tk.TOP,
             pady=0,
             padx=0,
@@ -3866,10 +3872,10 @@ class WormAnalysisApp:
             bg_color=move_bg,
             text_color=self.colors.theme["primary_text"],
             hover_color=self.colors.theme["tertiary_background"],
-            font=(self.font, 16),
-            width_pixels=100,
-            height_pixels=60,
-            corner_radius=20,
+            font=(self.font, self.screen_height // 60), # 16
+            width_pixels=self.screen_height // 10, # old 100, new 96
+            height_pixels= self.screen_height // 16, # 60
+            corner_radius=self.screen_height // 48, # 20
             side=tk.TOP,
             pady=0,
             padx=0,
@@ -3941,10 +3947,10 @@ class WormAnalysisApp:
             bg_color=remove_bg,
             text_color=self.colors.theme["primary_text"],
             hover_color=self.colors.theme["tertiary_background"],
-            font=(self.font, 16),
-            width_pixels=100,
-            height_pixels=60,
-            corner_radius=20,
+            font=(self.font, self.screen_height // 60), # 16
+            width_pixels=self.screen_height // 10, # old 100, new 96
+            height_pixels= self.screen_height // 16, # 60
+            corner_radius=self.screen_height // 48, # 20
             side=tk.TOP,
             pady=0,
             padx=0,
@@ -4067,10 +4073,10 @@ class WormAnalysisApp:
             bg_color=bg_live_button,
             text_color=self.colors.theme["primary_text"],
             hover_color=self.colors.theme["tertiary_background"],
-            font=(self.font, 16),
-            width_pixels=180,
-            height_pixels=60,
-            corner_radius=20,
+            font=(self.font, self.screen_height // 60), # 16
+            width_pixels=self.screen_height // 5, # old 180, new 192
+            height_pixels=self.screen_height // 16, # 60
+            corner_radius=self.screen_height // 48, # 20
             side=tk.TOP,
             pady=5,
             padx_text=-7,
@@ -4083,7 +4089,7 @@ class WormAnalysisApp:
             text="Live",
             bg=self.colors.theme["primary_background"],
             fg=self.colors.theme["secondary_text"],
-            font=(self.font, 10),
+            font=(self.font, self.screen_height // 96), # 10
             takefocus=0
         ).pack()
 
@@ -4102,10 +4108,10 @@ class WormAnalysisApp:
             bg_color=bg_snap_button,
             text_color=self.colors.theme["primary_text"],
             hover_color=self.colors.theme["tertiary_background"],
-            font=(self.font, 16),
-            width_pixels=180,
-            height_pixels=60,
-            corner_radius=20,
+            font=(self.font, self.screen_height // 60), # 16
+            width_pixels=self.screen_height // 5, # old 180, new 192
+            height_pixels=self.screen_height // 16, # 60
+            corner_radius=self.screen_height // 48, # 20
             side=tk.TOP,
             pady=5,
             padx_text=-7,
@@ -4118,7 +4124,7 @@ class WormAnalysisApp:
             text="Snap image",
             bg=self.colors.theme["primary_background"],
             fg=self.colors.theme["secondary_text"],
-            font=(self.font, 10),
+            font=(self.font, self.screen_height // 96), # 10
             takefocus=0
         ).pack()
         
@@ -4133,10 +4139,10 @@ class WormAnalysisApp:
             bg_color=self.colors.theme["primary_background"],
             text_color=self.colors.theme["secondary_text"],
             hover_color=self.colors.theme["tertiary_background"],
-            font=(self.font, 10),
-            width_pixels=120,
-            height_pixels=30,
-            corner_radius=20,
+            font=(self.font, self.screen_height // 96), # 10
+            width_pixels=self.screen_height // 8, # 120
+            height_pixels=self.screen_height // 32, # 30
+            corner_radius=self.screen_height // 48, # 20
             side=tk.TOP,
             pady=(0,0),
             padx_text=0,
@@ -4148,7 +4154,7 @@ class WormAnalysisApp:
             text="",
             bg=self.colors.theme["primary_background"],
             fg=self.colors.theme["tertiary_text"],
-            font=(self.font, 10),
+            font=(self.font, self.screen_height // 96), # 10
             takefocus=0
         )
         self.save_button_label_ref.pack()
@@ -4175,7 +4181,7 @@ class WormAnalysisApp:
         # Create a canvas inside this frame for drawing the rounded rectangle
         self.top_label_canvas = tk.Canvas(
             self.top_label_1_analysis_container, 
-            height=100, 
+            height=self.screen_height // 10, # old 100, new 96 
             highlightthickness=0,
             bg=self.colors.theme["primary_background"]
         )
@@ -4190,7 +4196,7 @@ class WormAnalysisApp:
             text="Synaptic profiling prediction",
             bg=self.colors.theme["primary_background"],
             fg=self.colors.theme["secondary_text"],
-            font=(self.font, 10, "bold"),
+            font=(self.font, self.screen_height // 96, "bold"), # 10
             takefocus=0
         ).pack(pady=(0, 0), anchor="center")  
 
@@ -4200,7 +4206,7 @@ class WormAnalysisApp:
             bg=self.colors.theme["primary_background"],
             fg=self.colors.theme["secondary_text"],
             justify="center",  
-            font=(self.font, 8),
+            font=(self.font, self.screen_height // 120), # 8
             takefocus=0
         )
         self.prediction_label.pack(pady=(5, 0), anchor="center")
@@ -4211,7 +4217,7 @@ class WormAnalysisApp:
             bg=self.colors.theme["primary_background"],
             fg=self.colors.theme["secondary_text"],
             justify="center",  
-            font=(self.font, 8),
+            font=(self.font, self.screen_height // 120), # 8
             takefocus=0
         )
         self.prediction_label_2.pack(pady=(0, 0), anchor="center")
@@ -4222,7 +4228,6 @@ class WormAnalysisApp:
         )
 
         self.top_label_canvas.bind("<Configure>", self.resize_prediction_result_box)
-
 
         # To hide it, you can use :
         #   self.top_label_1_analysis_container.grid_remove()
@@ -4246,10 +4251,10 @@ class WormAnalysisApp:
             bg_color=self.colors.theme["primary_background"],
             text_color=self.colors.theme["primary_text"],
             hover_color=self.colors.theme["secondary_background"],
-            font=(self.font, 14),
-            width_pixels=104,
-            height_pixels=70,
-            corner_radius=20,
+            font=(self.font, self.screen_height // 69), # 14
+            width_pixels=self.screen_height // 9, # old 104, new 107
+            height_pixels=self.screen_height // 14, # old 70, new 69
+            corner_radius=self.screen_height // 48, # 20
             side=tk.TOP,
             padx_text=-5,
             pady=5,
@@ -4258,9 +4263,9 @@ class WormAnalysisApp:
         )
 
         tk.Label(sub1_2_analysis_container, text="Wild-Type", bg=self.colors.theme["primary_background"],
-                fg=self.colors.theme["secondary_text"], font=(self.font, 10), takefocus=0).pack()
+                fg=self.colors.theme["secondary_text"], font=(self.font, self.screen_height // 96), takefocus=0).pack()
         self.proportion_wt_label_ref = tk.Label(sub1_2_analysis_container, text=f"{int(100*(1-self.worms_position.get_mutant_proportion()))}%", bg=self.colors.theme["primary_background"],
-                fg=self.colors.theme["secondary_text"], font=(self.font, 7), takefocus=0)
+                fg=self.colors.theme["secondary_text"], font=(self.font, self.screen_height // 137), takefocus=0)
         self.proportion_wt_label_ref.pack()
         
         # 2nd - classify as mutant
@@ -4276,10 +4281,10 @@ class WormAnalysisApp:
             bg_color=self.colors.theme["primary_background"],
             text_color=self.colors.theme["primary_text"],
             hover_color=self.colors.theme["secondary_background"],
-            font=(self.font, 14),
-            width_pixels=104,
-            height_pixels=70,
-            corner_radius=20,
+            font=(self.font, self.screen_height // 69), # 14
+            width_pixels=self.screen_height // 9, # old 104, new 107
+            height_pixels=self.screen_height // 14, # old 70, new 69
+            corner_radius=self.screen_height // 48, # 20
             side=tk.TOP,
             padx_text=-5,
             pady=5,
@@ -4288,27 +4293,30 @@ class WormAnalysisApp:
         )
 
         tk.Label(sub2_2_analysis_container, text="Mutation", bg=self.colors.theme["primary_background"],
-                fg=self.colors.theme["secondary_text"], font=(self.font, 10), takefocus=0).pack()
+                fg=self.colors.theme["secondary_text"], font=(self.font, self.screen_height // 96), takefocus=0).pack()
         self.proportion_mutant_label_ref = tk.Label(sub2_2_analysis_container, text=f"{int(100*(self.worms_position.get_mutant_proportion()))}%", bg=self.colors.theme["primary_background"],
-                fg=self.colors.theme["secondary_text"], font=(self.font, 7), takefocus=0)
+                fg=self.colors.theme["secondary_text"], font=(self.font, self.screen_height // 137), takefocus=0)
         self.proportion_mutant_label_ref.pack()
 
         # 3. Text Container
         text_3_analysis_container = tk.Frame(right_map_analysis_container, bg=self.colors.theme["primary_background"])
-        text_3_analysis_container.grid(row=2, column=1, sticky="ew", pady=0, ipady=0) 
+        text_3_analysis_container.grid(row=2, column=1, sticky="ew", pady=0, ipady=0)
+        
+        order_worms_icon = tk.Label(text_3_analysis_container, image=self.info_icon, bg=self.colors.theme["primary_background"])
+        order_worms_icon.pack(side=tk.TOP, pady=(4, 5))  # slight spacing above icon
+        Tooltip(order_worms_icon, "Be aware, the display order may change if you leave this page.", title="Info", theme="info", posx=70, posy=-80)
+        
+         
         self.id_worm_seen_label = tk.Label(
             text_3_analysis_container,
             text=f"{self.id_worm_seen+1}/{self.worms_position.get_number_of_worms()}",
             bg=self.colors.theme["primary_background"],
             fg=self.colors.theme["tertiary_text"],
-            font=(self.font, 10),
+            font=(self.font, self.screen_height // 96),
             takefocus=0
         )
         self.id_worm_seen_label.pack(pady=0)
         
-        order_worms_icon = tk.Label(text_3_analysis_container, image=self.info_icon, bg=self.colors.theme["primary_background"])
-        order_worms_icon.pack(side=tk.TOP, pady=(4, 0))  # slight spacing above icon
-        Tooltip(order_worms_icon, "Be aware, the display order may change if you leave this page.", title="Info", theme="info", posx=70, posy=-80)
         
         # Add number of worm to the statistic file
         update_user_statistics('nb_vers_final', self.worms_position.get_number_of_worms())
@@ -4334,10 +4342,10 @@ class WormAnalysisApp:
             bg_color=self.colors.theme["primary_background"],
             text_color=self.colors.theme["primary_text"],
             hover_color=self.colors.theme["secondary_background"],
-            font=(self.font, 12),
-            width_pixels=104,
-            height_pixels=70,
-            corner_radius=10,
+            font=(self.font, self.screen_height // 80), # 12
+            width_pixels=self.screen_height // 9, # old 104, new 107
+            height_pixels=self.screen_height // 14, # old 70, new 69
+            corner_radius=self.screen_height // 96, # 10
             side=tk.TOP,
             padx=10,  
             pady=5,
@@ -4358,10 +4366,10 @@ class WormAnalysisApp:
             bg_color=self.colors.theme["primary_background"],
             text_color=self.colors.theme["primary_text"],
             hover_color=self.colors.theme["secondary_background"],
-            font=(self.font, 12),
-            width_pixels=104,
-            height_pixels=70,
-            corner_radius=10,
+            font=(self.font, self.screen_height // 80), # 12
+            width_pixels=self.screen_height // 9, # old 104, new 107
+            height_pixels=self.screen_height // 14, # old 70, new 69
+            corner_radius=self.screen_height // 96, # 10
             side=tk.TOP,
             padx=10, 
             pady=5,
@@ -4376,7 +4384,7 @@ class WormAnalysisApp:
                  "Use the buttons above, or the arrows on the keyboard instead.",
             bg=self.colors.theme["primary_background"],
             fg=self.colors.theme["secondary_text"],
-            font=(self.font, 9, "bold"),
+            font=(self.font, self.screen_height // 107, "bold"),
             justify="center",
             takefocus=0
         )
@@ -4392,13 +4400,13 @@ class WormAnalysisApp:
             icon=self.play_icon,
             icon_hover=self.play_icon_hover,
             command=lambda: self.analyse_worm(),
-            bg_color=self.colors.theme["primary_background"],
+            bg_color=self.colors.theme["primary_background"],  
             text_color=self.colors.theme["primary_text"],
             hover_color=self.colors.theme["secondary_background"],
-            font=(self.font, 12),
-            width_pixels=250,
-            height_pixels=60,
-            corner_radius=10,
+            font=(self.font, self.screen_height // 80), # 12
+            width_pixels=self.screen_height // 4, # old 250, new 240
+            height_pixels=self.screen_height // 16, # 60
+            corner_radius=self.screen_height // 96, # 10
             side=tk.TOP,
             pady=5,
             padx_text=-10,
@@ -4411,7 +4419,7 @@ class WormAnalysisApp:
             text="Launch analysis", 
             bg=self.colors.theme["primary_background"],
             fg=self.colors.theme["secondary_text"],
-            font=(self.font, 10),
+            font=(self.font, self.screen_height // 96),
             takefocus=0
         ).pack()
         
