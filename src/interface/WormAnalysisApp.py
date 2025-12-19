@@ -53,7 +53,7 @@ class WormAnalysisApp:
         self.root = root
         self.CORE = mmc
         self.root.title("Worm Analysis")
-        self.root.geometry("1440x960")
+        self.root.geometry("1550x960")
         self.screen_width = self.root.winfo_screenwidth()
         self.screen_height = self.root.winfo_screenheight()
         self.PARAMS_FILE = PARAMETERS_FILE
@@ -4176,7 +4176,8 @@ class WormAnalysisApp:
         # 1. Label Container (fixed space with rounded border)
         self.top_label_1_analysis_container = tk.Frame(right_map_analysis_container)
         self.top_label_1_analysis_container.grid(row=0, column=1, sticky="ew", pady=(30, 10))
-        self.top_label_1_analysis_container.grid_columnconfigure(1, weight=1)
+        self.top_label_1_analysis_container.grid_columnconfigure(0, weight=1)
+        self.top_label_1_analysis_container.config(bg=self.colors.theme["primary_background"])
 
         # Create a canvas inside this frame for drawing the rounded rectangle
         self.top_label_canvas = tk.Canvas(
