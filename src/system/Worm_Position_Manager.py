@@ -5,7 +5,7 @@ import pandas as pd
 from pathlib import Path
 from typing import Optional
 
-from config import RESSOURCES_DIR, load_config_file
+from config import RESSOURCES_DIR, MICROSOPE, load_config_file
 
 from python_tsp.exact import solve_tsp_dynamic_programming # more than 25 pts
 from python_tsp.heuristics import solve_tsp_local_search # less than 25 pts
@@ -465,8 +465,12 @@ class WormPositionManager:
         shape = config.get("shape")
         if shape == "Square":
             # 0,0 is in the top right corner, so we need to change the origin
-            x_prop = 1 - y
-            y_prop = x
+            if MICROSCOPE == "Macrozoom":
+                x_prop = 1 - x
+                y_prop = 1 - y
+            elif MICROSCOPE == "Nikon":
+                x_prop = 1 - y
+                y_prop = x
         else:
             x_prop = 1 - x
             y_prop = 1 - y
@@ -493,8 +497,12 @@ class WormPositionManager:
         config = load_config_file()
         shape = config.get("shape")
         if shape == "Square":
-            x = y_prop
-            y = 1 - x_prop
+            if MICROSCOPE == "Macrozoom":
+                x = 1 - x_prop
+                y = 1 - y_prop
+            elif MICROSCOPE == "Nikon":
+                x = y_prop
+                y = 1 - x_prop 
         else:
             x = 1 - x_prop
             y = 1 - y_prop

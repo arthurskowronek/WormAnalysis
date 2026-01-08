@@ -9,6 +9,13 @@ import datetime
 import pymmcore 
 import traceback
 from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
+MICROSOPE = os.environ.get("MICROSOPE_CONFIG")
+CONFIG_FILE = os.environ.get("CONFIG_FILE")
+EXPOSURE_TIME_LIVE = os.environ.get("EXPOSURE_TIME_LIVE_CONFIG")
+NAME_CAMERA = os.environ.get("NAME_CAMERA_CONFIG")
 
 # --- 1. DÉFINITION DU CHEMIN STABLE D'EXÉCUTION (Lecture/Écriture Externe) ---
 # EXECUTION_PATH = Dossier contenant le .exe (où se trouvent data, user, Micro-Manager, etc.)
@@ -59,11 +66,9 @@ DEFAULT_RANDOM_STATE = 42  # For reproducibility
 DEFAULT_CV_FOLDS = 5  # Number of cross-validation folds
 
 # Microscope parameters
-EXPOSURE_TIME_LIVE = 50  # Default exposure time for live mode in milliseconds
+EXPOSURE_TIME_LIVE = EXPOSURE_TIME_LIVE_CONFIG # Default exposure time for live mode in milliseconds
 EXPOSURE_TIME_ANALYSIS = 100 # Exposure time for analysis mode in milliseconds
-NAME_CAMERA = "Camera-1" # TODO : name of the camera
-# NAME_CAMERA = "DEV_1AB22C037A15"
-
+ 
 def set_up_environment():
     # 2. Crée les dossiers EXTERNES (ceux qui sont à côté de l'EXE)
     # MM_DIR est supposé exister (copié manuellement) et ne doit pas être créé ici.
@@ -117,7 +122,7 @@ def loadCore(verbose = False):
     Raises:
         Any exception raised by pymmcore methods (e.g., loading configuration or setting devices).
     """
-    CONFIG = "BESSEREAU_Lab.cfg" 
+    CONFIG = CONFIG_FILE
     # CONFIG = "AlliedVision3.cfg"
     
     config = load_config_file()
@@ -128,10 +133,10 @@ def loadCore(verbose = False):
     mmc.setExposure(EXPOSURE_TIME_LIVE)
     mmc.setAutoShutter(False)
     mmc.setProperty(NAME_CAMERA, "Binning",str(config.get("binning")))
-    mmc.setProperty("Camera-1","PixelType","32bit")
+    mmc.setProperty(NAME_CAMERA,"PixelType","32bit")
 
     if verbose: 
-        print(mmc.getDevicePropertyNames("Camera-1"))
+        print(mmc.getDevicePropertyNames(NAME_CAMERA))
         
     return mmc
 

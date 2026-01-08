@@ -10,7 +10,7 @@ from tifffile import imwrite, imread
 from collections import defaultdict
 from scipy.spatial import cKDTree
 
-from config import MODELS_DIR, RESSOURCES_DIR, DATA_DIR, save_corner_positions_into_yaml_config_file, load_config_file, loadCore, log_error
+from config import MODELS_DIR, RESSOURCES_DIR, DATA_DIR, MICROSOPE, save_corner_positions_into_yaml_config_file, load_config_file, loadCore, log_error
 
 class ScanSlice:
     """
@@ -354,11 +354,17 @@ class ScanSlice:
                 dy_um2 = (y2/H - 0.5) * step
                 
                 # Calculate true worm position on stage
-                x_worm1 = pos_x + dy_um1
-                y_worm1 = pos_y - dx_um1
-                x_worm2 = pos_x + dy_um2
-                y_worm2 = pos_y - dx_um2
-                
+                if MICROSOPE == "Macrozoom":
+                    x_worm1 = pos_x - dx_um1
+                    y_worm1 = pos_y - dy_um1
+                    x_worm2 = pos_x - dx_um2
+                    y_worm2 = pos_y - dy_um2
+                elif MICROSOPE == "Nikon":
+                    x_worm1 = pos_x + dy_um1
+                    y_worm1 = pos_y - dx_um1
+                    x_worm2 = pos_x + dy_um2
+                    y_worm2 = pos_y - dx_um2
+
                 self.list_bounding_boxes.append([id, x_worm1, y_worm1, x_worm2, y_worm2])
                 
                 if drawing:
@@ -674,9 +680,16 @@ class ScanSlice:
         crop_h = tile_h_full - 2 * margin_y
         
         # Final stitched image size
-        stitched_height = (max_y + 1) * crop_w
-        stitched_width = (max_x + 1) * crop_h
-        stitched_image = np.zeros((stitched_height, stitched_width), dtype=sample_image.dtype)
+        # -- 2 -- Determine grid size (Inversion des dimensions pour la rotation)
+        # On calcule les dimensions finales en inversant l'usage de max_x et max_y
+        if MICROSOPE == "Macrozoom":
+            stitched_height = (max_x + 1) * crop_h
+            stitched_width = (max_y + 1) * crop_w
+            stitched_image = np.zeros((stitched_height, stitched_width), dtype=sample_image.dtype)
+        elif MICROSCOPE == "Nikon":
+            stitched_height = (max_y + 1) * crop_w
+            stitched_width = (max_x + 1) * crop_h
+            stitched_image = np.zeros((stitched_height, stitched_width), dtype=sample_image.dtype)
         
         # -- 3 -- Stitch images
         i = 0
@@ -694,14 +707,17 @@ class ScanSlice:
                 margin_x: tile_w_half - margin_x
             ]
             
-            # Flip x to go from bottom to top (row), y is regular (col)
-            row = y_idx
-            col = max_x - x_idx
+            if MICROSCOPE == "Macrozoom":
+                row = max_x - x_idx 
+                col = max_y - y_idx  
+            elif MICROSCOPE == "Nikon":
+                row = y_idx 
+                col = max_x - x_idx
             
             y_pos = row * crop_h
             x_pos = col * crop_w
             stitched_image[y_pos:y_pos + crop_h, x_pos:x_pos + crop_w] = img_cropped
-        
+         
         # -- 4 -- Save final image
         img = stitched_image.astype(np.float32)
         img = (img - img.min()) / (img.max() - img.min())

@@ -19,7 +19,7 @@ from PIL import Image, ImageTk, ImageColor
 from tkinter.scrolledtext import ScrolledText
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
         
-from config import RESSOURCES_DIR, DATA_DIR, MODELS_DIR, USER_DIR, LOG_DIR, TRAINING_DIR, PARAMETERS_FILE, DATE_FORMAT, EXPOSURE_TIME_LIVE, NAME_CAMERA, EXPOSURE_TIME_ANALYSIS, load_config_file, log_error, increment_user_statistics, update_user_statistics, clear_scan_directory
+from config import RESSOURCES_DIR, DATA_DIR, MODELS_DIR, USER_DIR, LOG_DIR, TRAINING_DIR, PARAMETERS_FILE, DATE_FORMAT, EXPOSURE_TIME_LIVE, NAME_CAMERA, EXPOSURE_TIME_ANALYSIS, MICROSOPE, load_config_file, log_error, increment_user_statistics, update_user_statistics, clear_scan_directory
 
 from src.interface.Tooltip import Tooltip
 from src.system.ScanSlice import ScanSlice
@@ -1877,26 +1877,46 @@ class WormAnalysisApp:
         # Get scan image associated for a futur annotation and improvement of the model
         if self.worm_scan_result_mode == "add":
             try:
-                for i in range(int(self.scan_width.get()) + 1):
-                    if i/int(self.scan_width.get()) > x_mouse:
-                        scan_image_position_width = i-1
-                        break
-                for i in range(int(self.scan_height.get()) + 1):
-                    if i/int(self.scan_height.get()) > y_mouse:
-                        scan_image_position_height = i-1
-                        break
+                if MICROSCOPE == "Macrozoom":
+                    # Loop for Image Height (Stitched Y / Mic Y / R)
+                    for i in range(int(self.scan_height.get()) + 1):
+                        if i/int(self.scan_height.get()) > y_mouse:
+                            scan_image_position_height = i-1
+                            break
                     
-                if self.shape.get() == "Square":
-                    filename_scan_image_associate = f"SlideScan_R{int(self.scan_width.get())-scan_image_position_width-1}_C{scan_image_position_height}_"
-                else:
-                    filename_scan_image_associate = f"SlideScan_R{int(self.scan_height.get()) - scan_image_position_height - 1}_C{int(self.scan_width.get())-scan_image_position_width-1}_"
+                    # Loop for Image Width (Stitched X / Mic X / C)
+                    for i in range(int(self.scan_width.get()) + 1):
+                        if i/int(self.scan_width.get()) > x_mouse:
+                            scan_image_position_width = i-1
+                            break
+                        
+                    if self.shape.get() == "Square":
+                        # Row (R, Mic Y) -> depends on Stitched Y (height loop). Inverted (max - R).
+                        # Col (C, Mic X) -> depends on Stitched X (width loop). Inverted (max - C).
+                        filename_scan_image_associate = f"SlideScan_R{int(self.scan_height.get())-scan_image_position_height-1}_C{int(self.scan_width.get())-scan_image_position_width-1}_"
+                    else:
+                        filename_scan_image_associate = f"SlideScan_R{int(self.scan_height.get()) - scan_image_position_height - 1}_C{int(self.scan_width.get())-scan_image_position_width-1}_"
+                elif MICROSCOPE == "Nikon":
+                    for i in range(int(self.scan_width.get()) + 1):
+                        if i/int(self.scan_width.get()) > x_mouse:
+                            scan_image_position_width = i-1
+                            break
+                    for i in range(int(self.scan_height.get()) + 1):
+                        if i/int(self.scan_height.get()) > y_mouse:
+                            scan_image_position_height = i-1
+                            break
+                        
+                    if self.shape.get() == "Square":
+                        filename_scan_image_associate = f"SlideScan_R{int(self.scan_width.get())-scan_image_position_width-1}_C{scan_image_position_height}_"
+                    else:
+                        filename_scan_image_associate = f"SlideScan_R{int(self.scan_height.get()) - scan_image_position_height - 1}_C{int(self.scan_width.get())-scan_image_position_width-1}_"
 
                 source_dir = Path(DATA_DIR) / "Scan"
                 dest_dir = Path(LOG_DIR) / "Image_to_annotate"
                 
                 # Find files that start with filename and end with .tif
                 matching_files = list(source_dir.glob(f"{filename_scan_image_associate}*.tif"))
-                if filename_scan_image_associate not in self.list_files_to_annotate:
+                if matching_files and filename_scan_image_associate not in self.list_files_to_annotate: # check matching_files not empty
                     self.list_files_to_annotate.append(filename_scan_image_associate)
                     source_file = matching_files[0]
                     

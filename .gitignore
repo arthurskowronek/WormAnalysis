@@ -21,3 +21,4 @@ Worm_detection.app
 main.spec
 notebooks/runs
 notebooks/YOLO_data
+.env
