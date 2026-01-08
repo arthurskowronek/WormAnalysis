@@ -242,15 +242,19 @@ class ScanSlice:
                 pos_y = self.start_y + y_idx * self.actual_step_y
                 self.mmc.setXYPosition(self.mmc.getXYStageDevice(), pos_x, pos_y) # Move to next position
                 
-                # Update final positions (we don't want to get the last position if it is on the same x or y position as the start)
-                if pos_x > self.final_end_x: self.final_end_x = pos_x
-                if pos_y > self.final_end_y: self.final_end_y = pos_y
-                
                 if self.image is not None: # We process the previous image in order to do the compute during the microscope movement
                     self.process_image_to_detect_worms()
-                
+
                 # Wait for movement to complete
                 self.mmc.waitForDevice(self.mmc.getXYStageDevice())
+                
+                # Get the actual position from the microscope
+                real_x, real_y = self.mmc.getXYPosition()
+
+                # Update final positions (we don't want to get the last position if it is on the same x or y position as the start)
+                if real_x > self.final_end_x: self.final_end_x = real_x
+                if real_y > self.final_end_y: self.final_end_y = real_y
+
                 self.mmc.snapImage() # Capture image
                 self.image = self.mmc.getImage()
                 
@@ -258,9 +262,9 @@ class ScanSlice:
                 imwrite(self.scan_dir / self.file_name, self.image)  # Save image
                 
                 # Record position info
-                self.positions_info.append([self.file_count, pos_x, pos_y, x_idx, y_idx])
+                self.positions_info.append([self.file_count, real_x, real_y, x_idx, y_idx])
                 self.file_count += 1
-                if verbose: print(f"Image {self.file_count-1}/{self.scan_width*self.scan_height} captured at X={pos_x:.2f}, Y={pos_y:.2f}")
+                if verbose: print(f"Image {self.file_count-1}/{self.scan_width*self.scan_height} captured at X={real_x:.2f}, Y={real_y:.2f}")
         
         # Return to starting position
         self.mmc.setXYPosition(self.mmc.getXYStageDevice(), self.start_x, self.start_y)
