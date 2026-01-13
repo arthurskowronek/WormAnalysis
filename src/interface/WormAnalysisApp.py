@@ -3794,7 +3794,10 @@ class WormAnalysisApp:
         info_label.pack(side=tk.LEFT, padx=(5, 0))  # small gap between text and icon
 
         # Tooltip on hover
-        Tooltip(info_label, "Be sure to have the objective in the lower right corner and to use the L camera, and to focus the microscope.", posx=70, posy=-70)
+        if MICROSCOPE == "Nikon":
+            Tooltip(info_label, "Be sure to have the objective in the lower right corner and to use the L camera, and to focus the microscope.", posx=70, posy=-70)
+        elif MICROSCOPE == "Macrozoom":
+            Tooltip(info_label, "Set the objective to 2x and adjust the zoom to the 3rd detent (click-stop) before focusing the image.", posx=70, posy=-70)
 
         # Trigger resizing after layout completes with error handling
         try:
