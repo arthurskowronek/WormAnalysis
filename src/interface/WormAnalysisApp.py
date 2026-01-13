@@ -19,7 +19,7 @@ from PIL import Image, ImageTk, ImageColor
 from tkinter.scrolledtext import ScrolledText
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
         
-from config import RESSOURCES_DIR, DATA_DIR, MODELS_DIR, USER_DIR, LOG_DIR, TRAINING_DIR, PARAMETERS_FILE, DATE_FORMAT, EXPOSURE_TIME_LIVE, NAME_CAMERA, EXPOSURE_TIME_ANALYSIS, MICROSOPE, load_config_file, log_error, increment_user_statistics, update_user_statistics, clear_scan_directory
+from config import MICROSCOPE, RESSOURCES_DIR, DATA_DIR, MODELS_DIR, USER_DIR, LOG_DIR, TRAINING_DIR, PARAMETERS_FILE, DATE_FORMAT, EXPOSURE_TIME_LIVE, NAME_CAMERA, EXPOSURE_TIME_ANALYSIS, MICROSOPE, load_config_file, log_error, increment_user_statistics, update_user_statistics, clear_scan_directory
 
 from src.interface.Tooltip import Tooltip
 from src.system.ScanSlice import ScanSlice
@@ -2105,31 +2105,32 @@ class WormAnalysisApp:
             event (tk.Event): The event object from the click, containing
                             the `x` and `y` coordinates of the click.
         """
-        self.clear_enhanced_preview()
+        if MICROSCOPE == "Nikon":
+            self.clear_enhanced_preview()
         
-        # Get clicked coordinates in displayed image
-        x_display, y_display = event.x, event.y
+            # Get clicked coordinates in displayed image
+            x_display, y_display = event.x, event.y
 
-        # Get displayed image size
-        display_width = self.live_image_label.winfo_width()
-        display_height = self.live_image_label.winfo_height()
-        
-        # Compute position
-        config = load_config_file()
-        objective = int(self.fluo_objective.get().replace("x", ""))
-        y_mouse = 1 - float(x_display / display_width)
-        x_mouse = float(y_display / display_height)  
-        display_real_size = int(int(config.get("microscope_step_size")) / objective)
-        
-        # Move microscope to the clicked position
-        x_microscope, y_microscope = self.CORE.getXYPosition()
-        x_new = x_microscope + (x_mouse - 0.5) * display_real_size
-        y_new = y_microscope + (y_mouse - 0.5) * display_real_size
-        self.CORE.setXYPosition(self.CORE.getXYStageDevice(), x_new, y_new)
+            # Get displayed image size
+            display_width = self.live_image_label.winfo_width()
+            display_height = self.live_image_label.winfo_height()
+            
+            # Compute position
+            config = load_config_file()
+            objective = int(self.fluo_objective.get().replace("x", ""))
+            y_mouse = 1 - float(x_display / display_width)
+            x_mouse = float(y_display / display_height)  
+            display_real_size = int(int(config.get("microscope_step_size")) / objective)
+            
+            # Move microscope to the clicked position
+            x_microscope, y_microscope = self.CORE.getXYPosition()
+            x_new = x_microscope + (x_mouse - 0.5) * display_real_size
+            y_new = y_microscope + (y_mouse - 0.5) * display_real_size
+            self.CORE.setXYPosition(self.CORE.getXYStageDevice(), x_new, y_new)
 
-        # Save new position in the worm position csv file
-        id = self.worms_position.get_id_worm_seen()
-        self.worms_position.update_worm_position(id, x_new, y_new)
+            # Save new position in the worm position csv file
+            id = self.worms_position.get_id_worm_seen()
+            self.worms_position.update_worm_position(id, x_new, y_new)
 
     def go_to_next_worm(self, event=None):
         """
