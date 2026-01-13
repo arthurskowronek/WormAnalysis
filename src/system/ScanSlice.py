@@ -274,10 +274,11 @@ class ScanSlice:
             imwrite(self.scan_modified_dir / self.file_name, self.image)
         
         # Get the actual corner positions (it was the center before)
-        start_corner_x = self.start_x - self.actual_step_x // 2
-        start_corner_y = self.start_y - self.actual_step_y // 2
-        end_corner_x = self.final_end_x + self.actual_step_x // 2
-        end_corner_y = self.final_end_y + self.actual_step_y // 2
+        # Use theoretical positions to avoid drift caused by stage hysteresis/outliers
+        start_corner_x = self.start_x - self.actual_step_x / 2
+        start_corner_y = self.start_y - self.actual_step_y / 2
+        end_corner_x = self.start_x + (self.scan_width - 1) * self.actual_step_x + self.actual_step_x / 2
+        end_corner_y = self.start_y + (self.scan_height - 1) * self.actual_step_y + self.actual_step_y / 2
         save_corner_positions_into_yaml_config_file(start_corner_x, start_corner_y, end_corner_x, end_corner_y)
         
         return self.get_worms_position()
