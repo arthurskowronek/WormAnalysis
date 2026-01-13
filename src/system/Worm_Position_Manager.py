@@ -472,8 +472,12 @@ class WormPositionManager:
                 x_prop = 1 - y
                 y_prop = x
         else:
-            x_prop = 1 - x
-            y_prop = 1 - y
+            if MICROSCOPE == "Macrozoom":
+                x_prop = 1 - y
+                y_prop = x
+            elif MICROSCOPE == "Nikon":
+                x_prop = 1 - x
+                y_prop = 1 - y
             
         return x_prop, y_prop
         
@@ -504,8 +508,12 @@ class WormPositionManager:
                 x = y_prop
                 y = 1 - x_prop 
         else:
-            x = 1 - x_prop
-            y = 1 - y_prop
+            if MICROSCOPE == "Macrozoom":
+                x = y_prop
+                y = 1 - x_prop
+            elif MICROSCOPE == "Nikon":
+                x = 1 - x_prop
+                y = 1 - y_prop 
 
         x_microscope = x * (end_corner_x - start_corner_x) + start_corner_x
         y_microscope = y * (end_corner_y - start_corner_y) + start_corner_y
