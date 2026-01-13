@@ -2751,14 +2751,17 @@ class WormAnalysisApp:
                                 # Use self.last_live_frame (float32) to create a 8-bit PIL image
                                 arr_auto = getattr(self, "last_live_frame", None)
                                 if arr_auto is not None and arr_auto.size:
-                                    # replicate same normalization logic as above
-                                    max_val_a = arr_auto.max()
-                                    if max_val_a > 255:
-                                        arr_auto_8 = (arr_auto / 256.0).clip(0, 255).astype(np.uint8)
-                                    else:
-                                        min_val_a = arr_auto.min()
-                                        denom_a = (max_val_a - min_val_a) if (max_val_a - min_val_a) != 0 else 1.0
-                                        arr_auto_8 = (((arr_auto - min_val_a) / denom_a) * 255.0).clip(0, 255).astype(np.uint8)
+                                    # Use percentile scaling (0.5% - 99.5%) to be robust against outliers and ensure good contrast
+                                    # similar to auto_adjust_contrast logic
+                                    vmin_a = np.percentile(arr_auto, 0.5)
+                                    vmax_a = np.percentile(arr_auto, 99.5)
+                                    
+                                    # Safety check
+                                    if vmax_a <= vmin_a:
+                                        vmax_a = vmin_a + 1.0
+
+                                    denom_a = (vmax_a - vmin_a)
+                                    arr_auto_8 = (((arr_auto - vmin_a) / denom_a) * 255.0).clip(0, 255).astype(np.uint8)
 
                                     pil_auto = Image.fromarray(arr_auto_8.astype(np.uint8), mode="L")
 
