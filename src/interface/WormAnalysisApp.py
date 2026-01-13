@@ -19,7 +19,7 @@ from PIL import Image, ImageTk, ImageColor
 from tkinter.scrolledtext import ScrolledText
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
         
-from config import MICROSCOPE, RESSOURCES_DIR, DATA_DIR, MODELS_DIR, USER_DIR, LOG_DIR, TRAINING_DIR, PARAMETERS_FILE, DATE_FORMAT, EXPOSURE_TIME_LIVE, NAME_CAMERA, EXPOSURE_TIME_ANALYSIS, MICROSOPE, load_config_file, log_error, increment_user_statistics, update_user_statistics, clear_scan_directory
+from config import RESSOURCES_DIR, DATA_DIR, MODELS_DIR, USER_DIR, LOG_DIR, TRAINING_DIR, PARAMETERS_FILE, DATE_FORMAT, EXPOSURE_TIME_LIVE_CONFIG, NAME_CAMERA, EXPOSURE_TIME_ANALYSIS, MICROSCOPE, load_config_file, log_error, increment_user_statistics, update_user_statistics, clear_scan_directory
 
 from src.interface.Tooltip import Tooltip
 from src.system.ScanSlice import ScanSlice
@@ -2539,7 +2539,7 @@ class WormAnalysisApp:
                 self.CORE.setExposure(int(self.exposure_time.get()))
             self.CORE.snapImage()
             img = self.CORE.getImage()
-            self.CORE.setExposure(EXPOSURE_TIME_LIVE)
+            self.CORE.setExposure(EXPOSURE_TIME_LIVE_CONFIG)
 
             # Normalize returned type to numpy float32 (raw values)
             if isinstance(img, np.ndarray):

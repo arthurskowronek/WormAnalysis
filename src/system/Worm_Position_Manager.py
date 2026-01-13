@@ -5,7 +5,7 @@ import pandas as pd
 from pathlib import Path
 from typing import Optional
 
-from config import RESSOURCES_DIR, MICROSOPE, load_config_file
+from config import RESSOURCES_DIR, MICROSCOPE, load_config_file
 
 from python_tsp.exact import solve_tsp_dynamic_programming # more than 25 pts
 from python_tsp.heuristics import solve_tsp_local_search # less than 25 pts

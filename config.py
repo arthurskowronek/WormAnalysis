@@ -12,9 +12,9 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
-MICROSOPE = os.environ.get("MICROSOPE_CONFIG")
+MICROSCOPE = os.environ.get("MICROSCOPE_CONFIG")
 CONFIG_FILE = os.environ.get("CONFIG_FILE")
-EXPOSURE_TIME_LIVE = os.environ.get("EXPOSURE_TIME_LIVE_CONFIG")
+EXPOSURE_TIME_LIVE_CONFIG = os.environ.get("EXPOSURE_TIME_LIVE_CONFIG")
 NAME_CAMERA = os.environ.get("NAME_CAMERA_CONFIG")
 
 # --- 1. DÉFINITION DU CHEMIN STABLE D'EXÉCUTION (Lecture/Écriture Externe) ---
@@ -66,7 +66,7 @@ DEFAULT_RANDOM_STATE = 42  # For reproducibility
 DEFAULT_CV_FOLDS = 5  # Number of cross-validation folds
 
 # Microscope parameters
-EXPOSURE_TIME_LIVE = EXPOSURE_TIME_LIVE_CONFIG # Default exposure time for live mode in milliseconds
+EXPOSURE_TIME_LIVE = float(EXPOSURE_TIME_LIVE_CONFIG) # Default exposure time for live mode in milliseconds
 EXPOSURE_TIME_ANALYSIS = 100 # Exposure time for analysis mode in milliseconds
  
 def set_up_environment():

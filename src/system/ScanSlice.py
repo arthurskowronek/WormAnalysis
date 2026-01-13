@@ -10,7 +10,7 @@ from tifffile import imwrite, imread
 from collections import defaultdict
 from scipy.spatial import cKDTree
 
-from config import MODELS_DIR, RESSOURCES_DIR, DATA_DIR, MICROSOPE, save_corner_positions_into_yaml_config_file, load_config_file, loadCore, log_error
+from config import MODELS_DIR, RESSOURCES_DIR, DATA_DIR, MICROSCOPE, save_corner_positions_into_yaml_config_file, load_config_file, loadCore, log_error
 
 class ScanSlice:
     """
@@ -358,12 +358,12 @@ class ScanSlice:
                 dy_um2 = (y2/H - 0.5) * step
                 
                 # Calculate true worm position on stage
-                if MICROSOPE == "Macrozoom":
+                if MICROSCOPE == "Macrozoom":
                     x_worm1 = pos_x - dx_um1
                     y_worm1 = pos_y - dy_um1
                     x_worm2 = pos_x - dx_um2
                     y_worm2 = pos_y - dy_um2
-                elif MICROSOPE == "Nikon":
+                elif MICROSCOPE == "Nikon":
                     x_worm1 = pos_x + dy_um1
                     y_worm1 = pos_y - dx_um1
                     x_worm2 = pos_x + dy_um2
@@ -686,7 +686,7 @@ class ScanSlice:
         # Final stitched image size
         # -- 2 -- Determine grid size (Inversion des dimensions pour la rotation)
         # On calcule les dimensions finales en inversant l'usage de max_x et max_y
-        if MICROSOPE == "Macrozoom":
+        if MICROSCOPE == "Macrozoom":
             stitched_height = (max_x + 1) * crop_h
             stitched_width = (max_y + 1) * crop_w
             stitched_image = np.zeros((stitched_height, stitched_width), dtype=sample_image.dtype)
