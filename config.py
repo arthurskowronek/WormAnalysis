@@ -153,9 +153,14 @@ def load_config_file():
     """
     if os.path.exists(PARAMETERS_FILE):
         with open(PARAMETERS_FILE, "r") as f:
-            return yaml.safe_load(f)
+            config = yaml.safe_load(f)
     else:
-        return {}
+        config = {}
+        
+    # Override/Set with environment variable
+    config["microscope_step_size"] = os.environ.get("MICROSCOPE_STEP_SIZE", "13180")
+    
+    return config
 
 def save_corner_positions_into_yaml_config_file(start_x, start_y, end_x, end_y):
     """

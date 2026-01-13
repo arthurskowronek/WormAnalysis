@@ -317,7 +317,6 @@ class WormAnalysisApp:
             "scan_height": self.scan_height.get(),
             "scan_height_length": self.scan_height_length.get(),
             "scan_width_length": self.scan_width_length.get(),
-            "microscope_step_size": self.microscope_step_size.get(),
             "microscope_objective_size_1": self.microscope_objective_size_1.get(),
             "microscope_objective_size_2": self.microscope_objective_size_2.get(),
             "microscope_objective_size_3": self.microscope_objective_size_3.get(),
@@ -5358,44 +5357,6 @@ class WormAnalysisApp:
         Tooltip(info_scan_label, "When you let the microscope scan the entire slide, it will use the above value to determine the width and height of the scan (in the microscope's system unit). When the 'Square' option is used, its edge lengthis the width. When the 'Rectangle' option is used, the 2 values define the rectangle's shape.", title="Info", theme="info", posx=70, posy=-70)
 
 
-        # -------------------------------------------------------------------------------------------------- #
-        # section with button step size microscope
-        buttons_scan_step_size = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
-        buttons_scan_step_size.pack(fill=tk.BOTH, expand=True, pady=(10,10))
-
-        # Create an inner frame to hold the canvas
-        input_container_step_size_frame = tk.Frame(buttons_scan_step_size, bg=self.colors.theme["primary_background"])
-        # Center this inner frame horizontally
-        input_container_step_size_frame.pack(pady=0)
-
-        # Create the first canvas (size_scan_height) and pack it to the left
-        self.size_step_microscope_canva = self.create_rounded_input(
-            input_container_step_size_frame, self.microscope_step_size, bg="machine_config_button", width=100
-        )
-        self.size_step_microscope_canva.pack(side=tk.LEFT, padx=0) 
-
-
-        # Container to hold label + info icon
-        microscope_step_size_label_frame = tk.Frame(buttons_scan_step_size, bg=self.colors.theme["primary_background"])
-        microscope_step_size_label_frame.pack()
-
-        # Text label
-        title_step_size = tk.Label(
-            microscope_step_size_label_frame, text="Manage the microscope step size (default value : 13 180)",
-            bg=self.colors.theme["primary_background"], fg=self.colors.theme["tertiary_text"],
-            font=(self.font, 10)
-        )
-        title_step_size.pack(side=tk.LEFT)
-
-        # Info icon
-        info_step_size_label = tk.Label(
-            microscope_step_size_label_frame, image=self.info_icon,
-            bg=self.colors.theme["primary_background"]
-        )
-        info_step_size_label.pack(side=tk.LEFT, padx=(5, 0))  # small gap between text and icon
-
-        # Tooltip on hover
-        Tooltip(info_step_size_label, "This value represents the size of a window (in the microscope unit system) when the objective magnification is 1x.", title="Info", theme="info", posx=70, posy=-70)
 
 
         # -------------------------------------------------------------------------------------------------- #

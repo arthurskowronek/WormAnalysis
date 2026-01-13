@@ -14,7 +14,6 @@ scan_height: '8'
 machine_has_dual_view: false
 scan_height_length: '26000'
 scan_width_length: '45000'
-microscope_step_size: '13180'
 microscope_objective_size_1: '4'
 microscope_objective_size_2: '5'
 microscope_objective_size_3: '10'
