@@ -233,10 +233,8 @@ class WormAnalysisApp:
         self.shape.trace_add("write", lambda *args: self.save_parameters())
 
         self.exposure_time = tk.StringVar(value=self.loaded_params.get("exposure_time", 100))
-        self.exposure_time.trace_add("write", lambda *args: self.save_parameters())
         
         self.binning = tk.StringVar(value=self.loaded_params.get("binning", "2x2"))
-        self.binning.trace_add("write", lambda *args: self.save_parameters())
         
         """self.shutter = tk.BooleanVar(value=self.loaded_params.get("shutter", False))
         self.shutter.trace_add("write", lambda *args: self.save_parameters())"""
@@ -295,7 +293,24 @@ class WormAnalysisApp:
         
         self.microscope_objective_size_6 = tk.StringVar(value=self.loaded_params.get("microscope_objective_size_6"))
         self.microscope_objective_size_6.trace_add("write", lambda *args: self.save_parameters())
+
+        self.exposure_time.trace_add("write", self.update_exposure_and_save)
+        self.binning.trace_add("write", self.update_binning_and_save)
                   
+    def update_exposure_and_save(self, *args):
+        self.save_parameters()
+        try:
+            self.CORE.setExposure(int(self.exposure_time.get()))
+        except Exception:
+            pass
+
+    def update_binning_and_save(self, *args):
+        self.save_parameters()
+        try:
+            self.CORE.setProperty(NAME_CAMERA, "Binning", self.binning.get()) 
+        except Exception:
+            pass
+
     def save_parameters(self):
         """
         Updates the parameters in the YAML file
@@ -1721,6 +1736,11 @@ class WormAnalysisApp:
             self.scan_status_label.config(text="Launching scan... please wait.")
             self.scan_status_label.update_idletasks()
             clear_scan_directory()
+            try:
+                self.CORE.setExposure(int(self.exposure_time.get()))
+                self.CORE.setProperty(NAME_CAMERA, "Binning", self.binning.get())
+            except Exception:
+                pass
             scanner = ScanSlice(self.CORE, self.scan_objective, self.dual_view, self.shape)
         except Exception as e:
             self.context_error = log_error(e, "Initialize scan failed")
@@ -2538,7 +2558,10 @@ class WormAnalysisApp:
                 self.CORE.setExposure(int(self.exposure_time.get()))
             self.CORE.snapImage()
             img = self.CORE.getImage()
-            self.CORE.setExposure(EXPOSURE_TIME_LIVE_CONFIG)
+            try:
+                self.CORE.setExposure(int(self.exposure_time.get()))
+            except Exception:
+                self.CORE.setExposure(EXPOSURE_TIME_LIVE_CONFIG)
 
             # Normalize returned type to numpy float32 (raw values)
             if isinstance(img, np.ndarray):
@@ -2677,6 +2700,12 @@ class WormAnalysisApp:
                 if self.CORE is None:
                     raise RuntimeError("CORE is None")
                 # These calls may raise; catch below
+                try:
+                    exp = int(self.exposure_time.get())
+                    self.CORE.setExposure(exp)
+                    self.CORE.setProperty(NAME_CAMERA, "Binning", self.binning.get())
+                except Exception:
+                    pass
                 self.CORE.snapImage()
                 image_data = self.CORE.getImage()
             except Exception as e:
