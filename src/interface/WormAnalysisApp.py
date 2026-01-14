@@ -5107,90 +5107,162 @@ class WormAnalysisApp:
             return container
 
         # Prepare content for each of your three pages
+        # Prepare content for each of your three pages
+        
+        # ----------------- Getting Started / Interface -----------------
+        intro_content = [
+            "Welcome to the Worm Analysis App! This application is designed for automated scanning, detection, and analysis of C. elegans worms.",
+            "Use the sidebar menu on the left to navigate between the main modules of the application.",
+            "Top Bar Controls:",
+            "- Dark/Light Mode: Toggle the application theme.",
+            "- '...' Button: Opens/Closes the Parameters Panel on the right side.",
+            "Parameters Panel:",
+            "- Allows you to configure exposure time, binning, objectives, and other hardware settings.",
+            "- Changes here apply immediately to the connected hardware."
+        ]
+        intro_shortcuts = [
+            "Use the sidebar to quickly switch between tasks.",
+            "Click parameters (...) to adjust camera settings on the fly."
+        ]
+        
         # ----------------- Automatic Scan Page -----------------
         automatic_content = [
             "Purpose: Start and run an automated microscope scan that stitches images to produce a full field view.",
-            "Main UI elements: large resizable content area (for live scan preview), 'Launch scan' rounded button, status label showing scan steps.",
-            "Behavior notes: Many scan parameters get disabled on this page to prevent inconsistent state during scanning.",
-            "The scan search for worms during acquisition and marks them with bounding boxes while saving their positions."
-            "The scan preview area does not update during an active scan to avoid performance issues.",
-            "After scan completion, you will be automatically redirected to the Scan Results page.",
+            "Process:",
+            "1. The microscope scans the slide based on the configured 'Scan shape' and 'Search area'.",
+            "2. It automatically detects worms in the field of view.",
+            "3. Bounding boxes are drawn around detected worms, and their positions are saved.",
+            "Main UI elements:",
+            "- Large resizable content area: Shows the live feed (before scan) or scan progress.",
+            "- 'Launch scan' button: Starts the automated process.",
+            "- Status label: Displays the current action (e.g., 'Moving to position...', 'Acquiring image').",
+            "Behavior notes: Many scan parameters get disabled on this page during acquisition to prevent inconsistencies.",
+            "Performance: The scan preview might pause updates during high-speed movement to prioritize data capture.",
+            "Completion: After the scan finishes, you will be automatically redirected to the Scan Results page."
         ]
         automatic_shortcuts = [
-            "Make sure the objective is in the lower-right corner before launching.",
+            "Make sure the objective is in the lower-right corner (default home) before launching if required by your setup.",
         ]
         automatic_tips = [
-            "Use the L camera for scan acquisitions.",
-            "Ensure stage is homed and objective turret is in correct position before starting."
+            "Use the 'Scan Objective' (e.g., 4x) for faster scans covering larger areas.",
+            "Ensure the stage is homed and the objective turret is in the correct position before starting."
         ]
-        automatic_warning = "The worm detection model has been trained with the 4x objective with the maximum white light intensity; using other settings may yield suboptimal results"
+        automatic_warning = "The default detection model is optimized for 4x magnification with high white light intensity. Using other settings may miss worms."
 
         # ----------------- Scan Results Page -----------------
         result_content = [
-            "Purpose: Display stitched scan image with detected-worm bounding boxes. Allow manual correction (add/remove worms).",
-            "Main UI elements: stitched image display, Add / Remove worm buttons, Start analysis button to go to worm-by-worm analysis.",
-            "Behavior notes: Many scan parameters get disabled on this page to prevent inconsistent state during correction."
+            "Purpose: Review the stitched scan image and manually correct worm detections.",
+            "Workflow:",
+            "1. Inspect the stitched map. Green boxes indicate detected worms.",
+            "2. Use 'Add worm' to mark missed worms.",
+            "3. Use 'Remove worm' to delete false positives or debris.",
+            "4. Click 'Start analysis' to proceed to the detailed analysis of each worm.",
+            "Main UI elements:",
+            "- Stitched image display: Pan and zoom to inspect details.",
+            "- Add / Remove toggle buttons: Switch between correction modes.",
+            "- Start analysis button: Finalizes the positions and moves to the analysis phase."
         ]
         result_shortcuts = [
             "Click on the stitched image to add a worm (when in Add mode).",
             "Drag over worms to remove them (when in Remove mode).",
-            "Press 'E' to clear all detected worms from the scan."
+            "Press 'E' to clear ALL detected worms from the scan (Use with caution!)."
         ]
         result_tips = [
-            "Switch between Add / Remove mode using the two small rounded buttons — the active one visually highlights.",
-            "After corrections, press 'Start analysis' to proceed to the worm-by-worm review screen."
+            "The active mode (Add/Remove) is highlighted visually.",
+            "You cannot change scan geometry or objectives here; this page is for data validation only."
         ]
-        result_warning = "Do not try to change scan geometry or objectives on this page; parameters are disabled intentionally."
+        result_warning = "Once you leave this page by starting analysis, the list of worms is finalized for the next step."
 
         # ----------------- Worm Analysis Page -----------------
         load_content = [
-            "Purpose: Review and analyze individual worm snapshots; allow live preview, snapping, manual classification, and launching the analysis model.",
-            "Main UI elements: left live/snap image area (resizable), right panel with prediction & manual classification buttons, navigation (next/previous worm).",
-            "Behavior notes: Live mode periodically updates the image; snapping freezes frame for manual inspection or saving.",
-            "Use the navigation buttons or keyboard arrows to move between worms; avoid using the joystick for this purpose.",
-            "The analysis button run the prediction model on the currently displayed worm, giving a classification and confidence score in the top-right panel about the synaptic profile of the worm.",
-            "You can manually classify the worm as Wild-Type or Mutant using the buttons below the prediction panel. The proportion of each class is shown below the respective buttons.",
-            "The histogram window let you adjust the brightness/contrast of the live/snap image for better visualization.",
-            "The save image button allows you to save the currently snapped image. It will not take care of the modifications you made using the histogram window."
+            "Purpose: Analyze individual worms one by one. Features live preview, snapping, AI prediction, and manual classification.",
+            "Interface Structure:",
+            "- Left Panel: Live camera feed or snapped image. Use the histogram tool to adjust brightness/contrast.",
+            "- Right Panel: Prediction results, manual classification buttons, and navigation controls.",
+            "Workflow:",
+            "1. Navigate between worms using the Next/Previous buttons.",
+            "2. The stage automatically moves to center the selected worm.",
+            "3. 'Analyse' button: Runs the specific activity/synapse classification model on the current view.",
+            "4. Review the AI confidence score.",
+            "5. Manually classify as 'Wild-Type' or 'Mutant' if needed. This updates the session statistics.",
+            "6. 'Save image': Save a snapshot of the current view to disk."
         ]
         load_shortcuts = [
-            "Left / Right arrow keys: navigate between worms.",
-            "Use the on-screen navigation buttons instead of the joystick for reliable positioning."
+            "Left / Right arrow keys: Navigate to previous/next worm.",
+            "Do NOT use the joystick to move between worms; the app tracks coordinates internally."
         ]
         load_tips = [
-            "Click on the live image to move the microscope stage to center your clicked position in the field of view.",
-            "If live mode is enabled, `update_live_image()` keeps the preview refreshed. Snap to freeze before saving.",
-            "Save snapshots with 'Save image' button to preserve data for later review. Only works in snap mode."
+            "Click on the live image to recenter the stage on that specific point.",
+            "Snap an image to freeze it before saving if the worm is moving.",
+            "Adjust the histogram (brightness/contrast) to see faint features better."
         ]
-        load_warning = "⚠️ Don't use the joystick to move between worms; use the provided buttons or keyboard arrows."
+        load_warning = "Avoid manually moving the stage with the joystick, as it may desynchronize the app's coordinate system."
 
 
         # ----------------- Training Model Page -----------------
         training_content = [
-                "Purpose: Create a new model directory, add Mutant/WT images, run checks and train a classification model.",
-                "Folder structure: TRAINING_DIR/<model_name>/Mutant/ and TRAINING_DIR/<model_name>/WT/ (optional validation/ will be moved automatically).",
-                "Supported images: .tiff (non-recursive).",
-                "Minimum dataset: At least 50 images in each category (Mutant and WT) — otherwise training will warn/abort.",
-                "Training flow: validates folders → loads images (~2s/image) → computes features (~1.5s/image) → computes model and returns accuracy.",
-                "After training: any files in TRAINING_DIR/<model>/validation/ that match known filenames are moved to Mutant/ or WT/ and validation/ is removed if empty.",
-                "Status messages appear in the status box and errors are logged to the app's error handler."
-            ]
+            "Purpose: Train a new AI model for worm classification (e.g., Mutant vs WT) using your own images.",
+            "Prerequisites:",
+            "- A folder structure will be created: TRAINING_DIR/<model_name>/Mutant/ and .../WT/.",
+            "- You need at least 50 images in EACH category.",
+            "- Images should be .tiff format.",
+            "Process:",
+            "1. Create a new model directory or select an existing one.",
+            "2. Use the 'Open folder' buttons to place your training images into the respective 'Mutant' and 'WT' folders.",
+            "3. Click 'Train model'.",
+            "4. The app validates folders, loads images (~2s/image), computes features, and trains the classifier.",
+            "5. Upon success, the accuracy score is displayed, and the model becomes available for selection in the Parameters panel."
+        ]
         training_shortcuts = [
-                "Create new model: Type name in 'New model name' and press 'Create directory'.",
-                "Open folders: Use 'Open Mutant folder' / 'Open WT folder' to drop images in the OS file manager."
-            ]
+            "Type a name and click 'Create directory' to set up the workspace.",
+        ]
         training_tips = [
-                "Use simple model names (no special characters or spaces) to avoid OS issues.",
-                "Back up your images before running training — files from validation/ may be moved.",
-                "Populate both Mutant and WT with at least 50 images to proceed."
-            ]
-        training_warning = (
-                "⚠️ Training may be time-consuming and CPU intensive. "
-                "Ensure sufficient disk space and do not interrupt the application while file moves or training are in progress. "
-                "The app will move files from the 'validation' folder into Mutant/ or WT/ automatically — keep backups if necessary."
-            )
+            "Use simple names for models (no spaces/special chars specific to your OS).",
+            "The training process moves 'validation' images automatically; keep backups of your raw data."
+        ]
+        training_warning = "Training is CPU-intensive. Ensure you have enough disk space and do not close the app during training."
+
+        # ----------------- Parameters & Configuration -----------------
+        params_content = [
+            "The Parameters Panel (right side) allows you to control the microscope and camera:",
+            "- Scan Objective: Selects the objective lens used for the automated scan (usually low mag, e.g., 4x).",
+            "- scan shape: Defines the geometry of the scan area (Square or Rectangle).",
+            "- Exposure time (ms): Sets how long the camera sensor collects light. Increase for brighter images, decrease for less motion blur.",
+            "- Binning: Combines pixels to increase sensitivity (e.g., 2x2), at the cost of resolution.",
+            "- Live objective: Selects the lens used for the detailed 'Analyse Worms' phase (usually high mag, e.g., 40x or 100x).",
+            "- Model name: Choose which AI model to use for the 'Analyse' button in the Worm Analysis page."
+        ]
+        params_tips = [
+            "Parameters are disabled during active scans to prevent hardware conflicts.",
+            "Dual View options appear here if enabled in Machine Configuration."
+        ]
+
+        # ----------------- Machine Configuration -----------------
+        config_content = [
+            "Found in 'Menu > Help > Machine Config'.",
+            "Purpose: Set global hardware constants. THESE SHOULD RARELY BE CHANGED.",
+            "Settings:",
+            "- Dual View Mode: Toggle this if your system uses a dual-view splitter (allows simultaneous dual-channel imaging).",
+            "- Scan Area Dimensions: Defines the physical travel limits of the scan in microscope units (default 26000 x 45000).",
+            "- Objective Offsets/Parcentricity: Calibrate the position difference between objectives."
+        ]
+        config_warning = "Incorrectly changing scan dimensions or offsets can cause the stage to crash or coordinates to be wrong. Only change if you know the physical limits."
+
+        # ----------------- Troubleshooting -----------------
+        trouble_content = [
+            "Q: The live image is black.",
+            "A: Check if the light source is on, the shutter is open, and exposure time is high enough. Also check 'Binning' matches the camera capabilities.",
+            "",
+            "Q: 'No images found' during training.",
+            "A: Ensure you put the images inside the specific 'Mutant' and 'WT' subfolders created by the app, not just the root model folder.",
+            "",
+            "Q: Stage is moving to the wrong place.",
+            "A: Did you move the joystick manually? Try re-homing the stage or restarting the app to reset coordinates."
+        ]
 
         # Create sections with quick navigation buttons that try to call your page switcher
+        make_section("Introduction", intro_content, shortcuts=intro_shortcuts)
+        
         make_section(
             "Automatic Scan",
             automatic_content,
@@ -5218,6 +5290,17 @@ class WormAnalysisApp:
             quick_action={"label": "Open Training Page", "command": lambda: self.switch_page("training_model")},
             shortcuts=training_shortcuts, tips=training_tips, warning=training_warning
         )
+
+        make_section("Parameters & Settings", params_content, tips=params_tips)
+
+        make_section(
+            "Machine Configuration",
+            config_content,
+            quick_action={"label": "Open Config", "command": lambda: self.switch_page("configuration")},
+            warning=config_warning
+        )
+
+        make_section("Troubleshooting", trouble_content)
 
         # Footer: general notes and close/back button
         footer_frame = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
