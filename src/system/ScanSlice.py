@@ -688,8 +688,8 @@ class ScanSlice:
         # -- 2 -- Determine grid size (Inversion des dimensions pour la rotation)
         # On calcule les dimensions finales en inversant l'usage de max_x et max_y
         if MICROSCOPE == "Macrozoom":
-            stitched_height = (max_x + 1) * crop_h
-            stitched_width = (max_y + 1) * crop_w
+            stitched_height = (max_y + 1) * crop_w
+            stitched_width = (max_x + 1) * crop_h
             stitched_image = np.zeros((stitched_height, stitched_width), dtype=sample_image.dtype)
         elif MICROSCOPE == "Nikon":
             stitched_height = (max_y + 1) * crop_w
@@ -713,15 +713,21 @@ class ScanSlice:
             ]
             
             if MICROSCOPE == "Macrozoom":
-                row = max_x - x_idx 
-                col = max_y - y_idx  
+                # Invert dimensions and rotate tile to match the global rotation later
+                row = max_y - y_idx
+                col = x_idx
+                img_cropped = cv2.rotate(img_cropped, cv2.ROTATE_90_COUNTERCLOCKWISE)
+                
+                y_pos = row * crop_w
+                x_pos = col * crop_h
             elif MICROSCOPE == "Nikon":
                 row = y_idx 
                 col = max_x - x_idx
+                
+                y_pos = row * crop_h
+                x_pos = col * crop_w
             
-            y_pos = row * crop_h
-            x_pos = col * crop_w
-            stitched_image[y_pos:y_pos + crop_h, x_pos:x_pos + crop_w] = img_cropped
+            stitched_image[y_pos:y_pos + img_cropped.shape[0], x_pos:x_pos + img_cropped.shape[1]] = img_cropped
          
         # -- 4 -- Save final image
         img = stitched_image.astype(np.float32)
@@ -734,6 +740,7 @@ class ScanSlice:
         
         if self.scan_shape == "Square":
             pil_image = pil_image.resize((1424, 1424), Image.LANCZOS)
+            pil_image = pil_image.rotate(270, expand=True)
         else:
             pil_image = pil_image.resize((1064, 1748), Image.LANCZOS)
             pil_image = pil_image.rotate(270, expand=True)
