@@ -466,15 +466,15 @@ class WormPositionManager:
         if shape == "Square":
             # 0,0 is in the top right corner, so we need to change the origin
             if MICROSCOPE == "Macrozoom":
-                x_prop = x
-                y_prop = y
+                x_prop = 1 - x
+                y_prop = 1 - y  
             elif MICROSCOPE == "Nikon":
                 x_prop = 1 - y
                 y_prop = x
         else:
             if MICROSCOPE == "Macrozoom":
-                x_prop = x
-                y_prop = y
+                x_prop = 1 - x
+                y_prop = 1 - y
             elif MICROSCOPE == "Nikon":
                 x_prop = 1 - x
                 y_prop = 1 - y
@@ -502,15 +502,15 @@ class WormPositionManager:
         shape = config.get("shape")
         if shape == "Square":
             if MICROSCOPE == "Macrozoom":
-                x = x_prop
-                y = y_prop
+                x = 1 - x_prop
+                y = 1 - y_prop
             elif MICROSCOPE == "Nikon":
                 x = y_prop
                 y = 1 - x_prop 
         else:
             if MICROSCOPE == "Macrozoom":
-                x = x_prop
-                y = y_prop
+                x = 1 - x_prop
+                y = 1 - y_prop
             elif MICROSCOPE == "Nikon":
                 x = 1 - x_prop
                 y = 1 - y_prop 

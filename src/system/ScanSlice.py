@@ -714,8 +714,8 @@ class ScanSlice:
             
             if MICROSCOPE == "Macrozoom":
                 # Invert dimensions and rotate tile to match the global rotation later
-                row = max_y - y_idx
-                col = x_idx
+                row = y_idx
+                col = max_x - x_idx
                 img_cropped = cv2.rotate(img_cropped, cv2.ROTATE_90_COUNTERCLOCKWISE)
                 
                 y_pos = row * crop_w

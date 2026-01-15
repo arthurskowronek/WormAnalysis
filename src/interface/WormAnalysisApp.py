@@ -26,6 +26,7 @@ from src.system.ScanSlice import ScanSlice
 from src.interface.colorTheme import ColorTheme
 from src.system.dataset_manager import Dataset_Manager
 from src.system.Worm_Position_Manager import WormPositionManager
+from src.system.preprocessing import Preprocessing
 
 class WormAnalysisApp:
     def __init__(self, root, mmc = None, initial_dark_mode=True, first_page = "automatic_scan", initial_show_parameters = True, initial_live_image = True, initial_id_worm_seen = 0):
@@ -87,6 +88,9 @@ class WormAnalysisApp:
         self.enable_parameters_buttons = ["exposure_time","binning","shutter","dual_view","display_mode","scan_objective","fluo_objective","scan_shape", "model_name"]
         self.list_files_to_annotate = []
 
+        # Initialize preprocessing
+        self.preprocessing = Preprocessing()
+
         self.contrast_win = None
         self.vmin_var = None
         self.vmax_var = None
@@ -123,6 +127,8 @@ class WormAnalysisApp:
             self.show_result_scan_page()
         elif self.current_page == "load_position":
             self.show_load_position_page()
+        elif self.current_page == "length_analysis":
+            self.show_length_analysis_page()
         elif self.current_page == "documentation":
             self.show_documentation_page()
         elif self.current_page == "configuration":
@@ -795,6 +801,7 @@ class WormAnalysisApp:
         
         self.create_menu_section("Analysis", [
             ("Analyse worms", "load_position", self.loading_icon, self.loading_icon_hover),
+            ("Length analysis", "length_analysis", self.loading_icon, self.loading_icon_hover),
             ("Training model", "training", self.training_model_icon, self.training_model_icon_hover)
         ])
         
@@ -1649,6 +1656,15 @@ class WormAnalysisApp:
         """
         try:
             w, h = event.width, event.height
+            
+            # New case for length_analysis page (maximize square in container)
+            if self.current_page == "length_analysis":
+                 size = min(w, h)
+                 x = (w - size) // 2
+                 y = (h - size) // 2
+                 self.live_analysis_container_ref.place(x=x, y=y, width=size, height=size)
+                 return
+
             size = min(w, h - 80)  # leave space for bottom button
             x = (w - size) // 2
             if self.current_page == "assist_acquisition":
@@ -2729,7 +2745,8 @@ class WormAnalysisApp:
                     # store raw frame for histogram/contrast code
                     self.last_live_frame = arr.copy()
 
-                    if self.current_page == "load_position":
+                    print(f"DEBUG: current_page={self.current_page}, contrast={getattr(self, 'vmin_var', None) is not None}")
+                    if self.current_page == "load_position" or self.current_page == "length_analysis":
                         # If contrast controls are present (user opened contrast window),
                         # delegate display + histogram drawing to update_image_and_histogram.
                         if getattr(self, "vmin_var", None) is not None or getattr(self, "hist_canvas", None) is not None:
@@ -2742,21 +2759,32 @@ class WormAnalysisApp:
                                 # to accept arguments, call without args and let it use self.last_live_frame
                                 self.update_image_and_histogram()
                         else:
-                            # No contrast UI: fall back to your original 16->8bit display path
-                            arr_16 = arr  # original values (assumed 0..65535 or similar)
-                            # safe normalization to 8-bit: divide by 256 if max>255, else scale
-                            max_val = arr_16.max() if arr_16.size else 255.0
-                            if max_val > 255:
-                                arr_8bit = (arr_16 / 256.0).clip(0, 255).astype(np.uint8)
-                            else:
-                                # scale to 0..255
+                            # 1) If length_analysis: use auto-scaling (min-max) to ensure visibility
+                            if self.current_page == "length_analysis":
+                                arr_16 = arr
                                 min_val = arr_16.min() if arr_16.size else 0.0
-                                denom = (max_val - min_val) if (max_val - min_val) != 0 else 1.0
+                                max_val = arr_16.max() if arr_16.size else 0.0
+                                denom = (max_val - min_val)
+                                if denom == 0:
+                                    denom = 1.0
                                 arr_8bit = (((arr_16 - min_val) / denom) * 255.0).clip(0, 255).astype(np.uint8)
+                            
+                            # 2) Otherwise (e.g. load_position without manual contrast): use fixed absolute scaling
+                            #    so user sees true dark/bright levels (exposure setting)
+                            else:
+                                arr_16 = arr
+                                max_val = arr_16.max() if arr_16.size else 255.0
+                                if max_val > 255:
+                                    arr_8bit = (arr_16 / 256.0).clip(0, 255).astype(np.uint8)
+                                else:
+                                    # unlikely fallback if camera somehow returned 8-bit range
+                                    min_val = arr_16.min() if arr_16.size else 0.0
+                                    denom = (max_val - min_val) if (max_val - min_val) != 0 else 1.0
+                                    arr_8bit = (((arr_16 - min_val) / denom) * 255.0).clip(0, 255).astype(np.uint8)
 
-                            image = Image.fromarray(arr_8bit.astype(np.uint8), mode="L")
+                            image = Image.fromarray(arr_8bit, mode="L")
 
-                            # resize to label size if available (for the main analysis page)
+                            # resize to label size if available
                             try:
                                 label_width = self.live_image_label.winfo_width()
                                 label_height = self.live_image_label.winfo_height()
@@ -4495,6 +4523,253 @@ class WormAnalysisApp:
                 self.update_live_image()
             self.root.after(300, self._try_open_histogram)
     
+    def show_length_analysis_page(self):
+        """
+        Constructs the UI for the Length Analysis page.
+        """
+        # Clear previous widgets
+        for widget in self.main_content.winfo_children():
+            widget.destroy()
+
+        # Disable inappropriate parameters
+        self.update_parameter_widgets_state(disabled_widgets=["scan_shape", "scan_objective"])
+        self.refresh_parameters_interface()
+        self.update_parameter_widgets_state(disabled_widgets=["scan_shape", "scan_objective"])
+
+        # Configure grid layout for main_content
+        self.main_content.grid_columnconfigure(0, weight=75)
+        self.main_content.grid_columnconfigure(1, weight=25)
+        self.main_content.grid_rowconfigure(0, weight=1)
+
+        # ----- LEFT CONTAINER (Live Image) -----
+        left_container = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
+        left_container.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        self.left_length_analysis_container_ref = left_container # Store ref for resizing
+
+        left_container.grid_rowconfigure(0, weight=1)
+        left_container.grid_columnconfigure(0, weight=1)
+
+        # Live image container
+        live_container = tk.Frame(
+            left_container,
+            bg=self.colors.theme["secondary_background"],
+            relief=tk.RAISED,
+            bd=1
+        )
+        live_container.grid(row=0, column=0, sticky="nsew")
+        
+        # Placeholder for live image
+        if not hasattr(self, "live_image_label") or not self.live_image_label.winfo_exists():
+            self.live_image_label = tk.Label(live_container, bg="black", takefocus=0)
+            self.live_image_label.pack(expand=True, fill=tk.BOTH)
+            
+        # Hook up resize event if needed, reusing existing method if compatible
+        # For now just simple pack, could reuse resize_live_image if self.live_analysis_container_ref is set
+        self.live_analysis_container_ref = live_container # Reuse this ref name for resize_live_image compatibility
+        left_container.bind("<Configure>", self.resize_live_image)
+
+
+        # ----- RIGHT CONTAINER (Controls & Results) -----
+        right_container = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
+        right_container.grid(row=0, column=1, sticky="nsew")
+        right_container.grid_columnconfigure(0, weight=1)
+        right_container.grid_rowconfigure(1, weight=1) # Table expands
+
+        # 1. Launch Button
+        button_frame = tk.Frame(right_container, bg=self.colors.theme["primary_background"])
+        button_frame.grid(row=0, column=0, pady=20, sticky="ew")
+
+        self.create_rounded_button(
+            parent=button_frame,
+            text="Launch length analysis",
+            icon=self.play_icon,
+            icon_hover=self.play_icon_hover,
+            command=self.launch_length_analysis,
+            bg_color=self.colors.theme["secondary_background"],
+            text_color=self.colors.theme["primary_text"],
+            hover_color=self.colors.theme["tertiary_background"],
+            font=(self.font, 14),
+            width_pixels=280,
+            height_pixels=60,
+            corner_radius=20,
+            side=tk.TOP,
+            pady=0,
+            border_width=2,
+            border_color=self.colors.theme["stroke_button"]
+        )
+
+        # 2. Results Table
+        table_frame = tk.Frame(right_container, bg=self.colors.theme["primary_background"])
+        table_frame.grid(row=1, column=0, sticky="nsew", padx=20)
+
+        columns = ("worm_id", "length_px")
+        self.length_tree = ttk.Treeview(table_frame, columns=columns, show="headings", selectmode="browse")
+        self.length_tree.heading("worm_id", text="Worm ID")
+        self.length_tree.heading("length_px", text="Length (px)")
+        self.length_tree.column("worm_id", width=100, anchor="center")
+        self.length_tree.column("length_px", width=150, anchor="center")
+        
+        # Add scrollbar
+        scrollbar = ttk.Scrollbar(table_frame, orient=tk.VERTICAL, command=self.length_tree.yview)
+        self.length_tree.configure(yscroll=scrollbar.set)
+        
+        self.length_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # 3. Statistics
+        stats_frame = tk.Frame(right_container, bg=self.colors.theme["primary_background"])
+        stats_frame.grid(row=2, column=0, sticky="ew", pady=20, padx=20)
+        
+        self.stats_labels = {}
+        for i, stat in enumerate(["Mean", "Variance", "Min", "Max"]):
+            lbl = tk.Label(
+                stats_frame, 
+                text=f"{stat}: --", 
+                bg=self.colors.theme["primary_background"], 
+                fg=self.colors.theme["primary_text"],
+                font=(self.font, 12)
+            )
+            lbl.grid(row=i//2, column=i%2, sticky="w", padx=20, pady=5)
+            self.stats_labels[stat] = lbl
+
+        # Update the live image
+        self.live_image = True
+        if self.live_image:
+            if not getattr(self, "_live_running", False):
+                self._live_running = True
+                self.update_live_image()
+
+    def launch_length_analysis(self):
+        """
+        Executes the length analysis on all detected worms.
+        """
+        # Stop live updates during analysis to control display
+        if hasattr(self, "_live_running") and self._live_running:
+            self.live_image = False
+            self._live_running = False
+            # Cancel any pending after callbacks for live loop
+            if hasattr(self, "_live_after_id") and self._live_after_id:
+                try:
+                    self.root.after_cancel(self._live_after_id)
+                except Exception:
+                    pass
+
+        # Initialize WormPositionManager if not present
+        if self.worms_position is None:
+             self.worms_position = WormPositionManager()
+
+        all_worms = self.worms_position.get_all_worm_microscope_position()
+        if not all_worms:
+            log_error(Exception("No worms found"), "No worms to analyze")
+            return
+
+        # Clear table
+        for item in self.length_tree.get_children():
+            self.length_tree.delete(item)
+
+        lengths = []
+        
+        # Iterate over worms
+        for i, (x, y) in enumerate(all_worms):
+            worm_id = i + 1 # Assuming 1-based ID for display
+            
+            # 1. Move Microscope
+            try:
+                self.CORE.setXYPosition(self.CORE.getXYStageDevice(), x, y)
+                self.CORE.waitForDevice(self.CORE.getXYStageDevice())
+                time.sleep(0.5) # Settle time
+            except Exception as e:
+                log_error(e, f"Failed to move to worm {worm_id}")
+                continue
+
+            # 2. Snap Image
+            try:
+                self.CORE.snapImage()
+                img = self.CORE.getImage()
+                
+                # Check dimensions and reshape if necessary
+                if img.ndim == 2:
+                    pass
+                elif img.ndim == 3 and img.shape[2] == 1: # (H, W, 1) to (H, W) 
+                     img = img.squeeze()
+                elif img.ndim == 3: # (H, W, C) -> Gray ?? Or just take first channel
+                     if img.shape[2] > 1:
+                         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+            except Exception as e:
+                log_error(e, f"Failed to snap image for worm {worm_id}")
+                continue
+
+            # 3. Process
+            try:
+                # Segment
+                worm_mask = self.preprocessing.worm_segmentation(img)
+                if np.sum(worm_mask) == 0:
+                    continue # No worm found
+
+                # Skeletonize
+                # get_synapse_using_graph returns: maxima, G, median_width, diff_slice, diff_segment, NUMBER_OF_CORDS
+                _, G, _, _, _, _ = self.preprocessing.get_synapse_using_graph(img, worm_mask)
+                
+                # Calculate Length (number of nodes in skeleton graph)
+                if G is not None:
+                     length = G.number_of_nodes()
+                     lengths.append(length)
+                     
+                     # Update Table
+                     self.length_tree.insert("", "end", values=(worm_id, length))
+                     
+                     # --- VISUALIZATION ---
+                     # Convert to BGR for coloring
+                     display_img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+                     
+                     # 1. Draw Segmentation (Green)
+                     # Find contours requires uint8
+                     contours, _ = cv2.findContours(worm_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                     cv2.drawContours(display_img, contours, -1, (0, 255, 0), 1)
+                     
+                     # 2. Draw Skeleton (Red)
+                     # Iterate over graph edges
+                     for edge in G.edges:
+                         pt1 = (edge[0][1], edge[0][0]) # (x, y) for cv2, nodes are (y, x)
+                         pt2 = (edge[1][1], edge[1][0])
+                         cv2.line(display_img, pt1, pt2, (0, 0, 255), 1)
+                         
+                     # Display image
+                     # Convert BGR (OpenCV) to RGB (PIL)
+                     display_img_rgb = cv2.cvtColor(display_img, cv2.COLOR_BGR2RGB)
+                     pil_img = Image.fromarray(display_img_rgb)
+                     
+                     # Use display_enhanced_image logic or direct update
+                     # Resize to label
+                     w = self.live_image_label.winfo_width()
+                     h = self.live_image_label.winfo_height()
+                     if w > 0 and h > 0:
+                        pil_img = pil_img.resize((w, h), Image.Resampling.LANCZOS)
+                        
+                     tk_img = ImageTk.PhotoImage(pil_img)
+                     self.live_image_label.configure(image=tk_img)
+                     self.live_image_label.image = tk_img # Keep reference
+                     
+                     self.main_content.update_idletasks() # Refresh UI
+                     # Small pause to let user see
+                     time.sleep(0.5) 
+                
+            except Exception as e:
+                log_error(e, f"Analysis failed for worm {worm_id}")
+
+            # Update stats live
+            if lengths:
+                self.stats_labels["Mean"].config(text=f"Mean: {np.mean(lengths):.2f}")
+                self.stats_labels["Variance"].config(text=f"Variance: {np.var(lengths):.2f}")
+                self.stats_labels["Min"].config(text=f"Min: {np.min(lengths)}")
+                self.stats_labels["Max"].config(text=f"Max: {np.max(lengths)}")
+                self.main_content.update_idletasks()
+        
+        # Restart live view after analysis
+        self.live_image = True
+        self.start_live()
+
     def show_training_model_page(self):
         """
         Page: Training a model
@@ -5153,14 +5428,12 @@ class WormAnalysisApp:
         result_content = [
             "Purpose: Review the stitched scan image and manually correct worm detections.",
             "Workflow:",
-            "1. Inspect the stitched map. Green boxes indicate detected worms.",
+            "1. Inspect the stitched map. Red boxes indicate detected worms.",
             "2. Use 'Add worm' to mark missed worms.",
             "3. Use 'Remove worm' to delete false positives or debris.",
-            "4. Click 'Start analysis' to proceed to the detailed analysis of each worm.",
+            "4. Use 'Move worm' to move a box to the wished location.",
             "Main UI elements:",
-            "- Stitched image display: Pan and zoom to inspect details.",
-            "- Add / Remove toggle buttons: Switch between correction modes.",
-            "- Start analysis button: Finalizes the positions and moves to the analysis phase."
+            "- Add / Move / Remove toggle buttons: Switch between correction modes."
         ]
         result_shortcuts = [
             "Click on the stitched image to add a worm (when in Add mode).",
@@ -5168,7 +5441,7 @@ class WormAnalysisApp:
             "Press 'E' to clear ALL detected worms from the scan (Use with caution!)."
         ]
         result_tips = [
-            "The active mode (Add/Remove) is highlighted visually.",
+            "The active mode (Add/Move/Remove) is highlighted visually.",
             "You cannot change scan geometry or objectives here; this page is for data validation only."
         ]
         result_warning = "Once you leave this page by starting analysis, the list of worms is finalized for the next step."
