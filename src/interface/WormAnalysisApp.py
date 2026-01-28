@@ -2193,6 +2193,71 @@ class WormAnalysisApp:
         self.worms_position.add_worm_microscope_position(x_microscope, y_microscope)
     
     # load position page
+    def on_live_image_press(self, event):
+        """
+        Handles mouse press events on the live image to initialize drag or click.
+        """
+        self.drag_start_x = event.x
+        self.drag_start_y = event.y
+        self.is_dragging = False
+
+    def on_live_image_drag(self, event):
+        """
+        Handles mouse drag events on the live image to move the microscope (pan).
+        """
+        if not hasattr(self, 'drag_start_x') or not hasattr(self, 'drag_start_y'):
+            return
+
+        # Threshold to consider it a drag
+        if not self.is_dragging:
+            if abs(event.x - self.drag_start_x) > 5 or abs(event.y - self.drag_start_y) > 5:
+                self.is_dragging = True
+            else:
+                return
+
+        # Calculate delta
+        dx = event.x - self.drag_start_x
+        dy = event.y - self.drag_start_y
+        
+        # Update start position for next drag event (incremental move)
+        self.drag_start_x = event.x
+        self.drag_start_y = event.y
+        
+        # Get displayed image size
+        display_width = self.live_image_label.winfo_width()
+        display_height = self.live_image_label.winfo_height()
+        
+        # Calculate scale factor
+        fov_size_um = 100 # à tester
+        
+        delta_stage_y = (dx / display_width) * fov_size_um
+        delta_stage_x = -(dy / display_height) * fov_size_um
+        
+        # Move microscope
+        if self.CORE:
+            try:
+                current_x, current_y = self.CORE.getXYPosition()
+                new_x = current_x + delta_stage_x
+                new_y = current_y + delta_stage_y
+                self.CORE.setXYPosition(self.CORE.getXYStageDevice(), new_x, new_y)
+                
+                # Update worm position if we are tracking one
+                if self.worms_position:
+                    id = self.worms_position.get_id_worm_seen()
+                    self.worms_position.update_worm_position(id, new_x, new_y)
+            except Exception as e:
+                log_error(e, "Drag move failed")
+
+    def on_live_image_release(self, event):
+        """
+        Handles mouse release events. If it was a click (not drag), center the image.
+        """
+        if hasattr(self, 'is_dragging') and not self.is_dragging and MICROSCOPE == "Nikon":
+            self.on_live_image_click(event)
+        
+        # Reset state
+        self.is_dragging = False
+
     def on_live_image_click(self, event):
         """
         Handles click events on the live image to move the camera to the position being clicked.
@@ -2204,29 +2269,29 @@ class WormAnalysisApp:
         if MICROSCOPE == "Nikon":
             self.clear_enhanced_preview()
         
-            # Get clicked coordinates in displayed image
-            x_display, y_display = event.x, event.y
+        # Get clicked coordinates in displayed image
+        x_display, y_display = event.x, event.y
 
-            # Get displayed image size
-            display_width = self.live_image_label.winfo_width()
-            display_height = self.live_image_label.winfo_height()
-            
-            # Compute position
-            config = load_config_file()
-            objective = int(self.fluo_objective.get().replace("x", ""))
-            y_mouse = 1 - float(x_display / display_width)
-            x_mouse = float(y_display / display_height)  
-            display_real_size = int(int(config.get("microscope_step_size")) / objective)
-            
-            # Move microscope to the clicked position
-            x_microscope, y_microscope = self.CORE.getXYPosition()
-            x_new = x_microscope + (x_mouse - 0.5) * display_real_size
-            y_new = y_microscope + (y_mouse - 0.5) * display_real_size
-            self.CORE.setXYPosition(self.CORE.getXYStageDevice(), x_new, y_new)
+        # Get displayed image size
+        display_width = self.live_image_label.winfo_width()
+        display_height = self.live_image_label.winfo_height()
+        
+        # Compute position
+        config = load_config_file()
+        objective = int(self.fluo_objective.get().replace("x", ""))
+        y_mouse = 1 - float(x_display / display_width)
+        x_mouse = float(y_display / display_height)  
+        display_real_size = int(int(config.get("microscope_step_size")) / objective)
+        
+        # Move microscope to the clicked position
+        x_microscope, y_microscope = self.CORE.getXYPosition()
+        x_new = x_microscope + (x_mouse - 0.5) * display_real_size
+        y_new = y_microscope + (y_mouse - 0.5) * display_real_size
+        self.CORE.setXYPosition(self.CORE.getXYStageDevice(), x_new, y_new)
 
-            # Save new position in the worm position csv file
-            id = self.worms_position.get_id_worm_seen()
-            self.worms_position.update_worm_position(id, x_new, y_new)
+        # Save new position in the worm position csv file
+        id = self.worms_position.get_id_worm_seen()
+        self.worms_position.update_worm_position(id, x_new, y_new)
 
     def move_microscope_relative(self, direction):
         """
@@ -4267,7 +4332,9 @@ class WormAnalysisApp:
             self.live_image_label = tk.Label(live_analysis_container, bg="black", takefocus=0)
             self.live_image_label.pack(expand=True, fill=tk.BOTH)
             
-            self.live_image_label.bind("<Button-1>", self.on_live_image_click)
+            self.live_image_label.bind("<Button-1>", self.on_live_image_press)
+            self.live_image_label.bind("<B1-Motion>", self.on_live_image_drag)
+            self.live_image_label.bind("<ButtonRelease-1>", self.on_live_image_release)
 
         # Bottom: Buttons + labels
         bottom_analysis_container = tk.Frame(left_live_analysis_container, bg=self.colors.theme["primary_background"])
