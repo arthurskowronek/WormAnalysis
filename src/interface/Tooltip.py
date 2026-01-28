@@ -52,7 +52,13 @@ class Tooltip:
 
         Skips creation if a tooltip already exists or if the message text is empty.
         """
-        if self.tooltip_window or not self.text:
+        if self.tooltip_window:
+            return
+
+        # Determine the text to display
+        display_text = self.text() if callable(self.text) else self.text
+        
+        if not display_text:
             return
 
         # Determine the absolute screen position for the tooltip
@@ -85,7 +91,7 @@ class Tooltip:
         close_button.bind("<Button-1>", self.hide_tooltip)
 
         # Message content
-        message_label = tk.Label(inner_frame, text=self.text, bg=self.bg, fg=self.fg, font=("Arial", 10), justify='left', wraplength=250)
+        message_label = tk.Label(inner_frame, text=display_text, bg=self.bg, fg=self.fg, font=("Arial", 10), justify='left', wraplength=250)
         message_label.pack(anchor='w', pady=(5, 0))
 
     def hide_tooltip(self, event=None):

@@ -4580,8 +4580,17 @@ class WormAnalysisApp:
             border_color=self.colors.theme["stroke_button"]
         )
 
-        tk.Label(sub2_2_analysis_container, text="Mutation", bg=self.colors.theme["primary_background"],
-                fg=self.colors.theme["secondary_text"], font=(self.font, self.screen_height // 96), takefocus=0).pack()
+        # Mutation Label + Info Icon
+        mutant_label_frame = tk.Frame(sub2_2_analysis_container, bg=self.colors.theme["primary_background"])
+        mutant_label_frame.pack(side=tk.TOP, anchor="center")
+
+        tk.Label(mutant_label_frame, text="Mutation", bg=self.colors.theme["primary_background"],
+                fg=self.colors.theme["secondary_text"], font=(self.font, self.screen_height // 96), takefocus=0).pack(side=tk.LEFT)
+        
+        mutant_info_icon = tk.Label(mutant_label_frame, image=self.info_icon, bg=self.colors.theme["primary_background"])
+        mutant_info_icon.pack(side=tk.LEFT, padx=(5, 0))
+        
+        Tooltip(mutant_info_icon, lambda: self.get_formatted_mutant_list(), title="Mutant List", theme="info", posx=30, posy=-50)
         self.proportion_mutant_label_ref = tk.Label(sub2_2_analysis_container, text=f"{int(100*(self.worms_position.get_mutant_proportion()))}%", bg=self.colors.theme["primary_background"],
                 fg=self.colors.theme["secondary_text"], font=(self.font, self.screen_height // 137), takefocus=0)
         self.proportion_mutant_label_ref.pack()
@@ -4614,6 +4623,10 @@ class WormAnalysisApp:
         bottom_buttons_4_analysis_container = tk.Frame(text_3_analysis_container, bg=self.colors.theme["primary_background"])
         bottom_buttons_4_analysis_container.pack(side=tk.BOTTOM, pady=(5, 0))  
 
+        # Label "Worm"
+        tk.Label(bottom_buttons_4_analysis_container, text="Worm", bg=self.colors.theme["primary_background"],
+                 fg=self.colors.theme["secondary_text"], font=(self.font, self.screen_height // 96)).pack(pady=(0, 0))
+
         # Create a single container for both buttons without expansion
         buttons_wrapper = tk.Frame(bottom_buttons_4_analysis_container, bg=self.colors.theme["primary_background"])
         buttons_wrapper.pack()
@@ -4631,8 +4644,8 @@ class WormAnalysisApp:
             text_color=self.colors.theme["primary_text"],
             hover_color=self.colors.theme["secondary_background"],
             font=(self.font, self.screen_height // 80), # 12
-            width_pixels=self.screen_height // 9, # old 104, new 107
-            height_pixels=self.screen_height // 14, # old 70, new 69
+            width_pixels=self.screen_height // 11, 
+            height_pixels=self.screen_height // 16,
             corner_radius=self.screen_height // 96, # 10
             side=tk.TOP,
             padx=10,  
@@ -4655,8 +4668,8 @@ class WormAnalysisApp:
             text_color=self.colors.theme["primary_text"],
             hover_color=self.colors.theme["secondary_background"],
             font=(self.font, self.screen_height // 80), # 12
-            width_pixels=self.screen_height // 9, # old 104, new 107
-            height_pixels=self.screen_height // 14, # old 70, new 69
+            width_pixels=self.screen_height // 11, 
+            height_pixels=self.screen_height // 16,
             corner_radius=self.screen_height // 96, # 10
             side=tk.TOP,
             padx=10, 
@@ -4666,9 +4679,13 @@ class WormAnalysisApp:
             border_color=self.colors.theme["stroke_button"]
         )
         
+        # Label "Mutant"
+        tk.Label(bottom_buttons_4_analysis_container, text="Mutant", bg=self.colors.theme["primary_background"],
+                 fg=self.colors.theme["secondary_text"], font=(self.font, self.screen_height // 96)).pack(pady=(5, 0))
+
         # Create a single container for both mutant buttons without expansion
         buttons_wrapper_mutant = tk.Frame(bottom_buttons_4_analysis_container, bg=self.colors.theme["primary_background"])
-        buttons_wrapper_mutant.pack(pady=(5, 0))  # Add some vertical spacing
+        buttons_wrapper_mutant.pack(pady=(0, 0))
 
         # 1st - previous mutant
         sub1_mutant_analysis_container = tk.Frame(buttons_wrapper_mutant, bg=self.colors.theme["primary_background"])
@@ -4683,8 +4700,8 @@ class WormAnalysisApp:
             text_color=self.colors.theme["primary_text"],
             hover_color=self.colors.theme["secondary_background"],
             font=(self.font, self.screen_height // 80), 
-            width_pixels=self.screen_height // 9, 
-            height_pixels=self.screen_height // 14, 
+            width_pixels=self.screen_height // 11, 
+            height_pixels=self.screen_height // 16, 
             corner_radius=self.screen_height // 96, 
             side=tk.TOP,
             padx=10,  
@@ -4707,8 +4724,8 @@ class WormAnalysisApp:
             text_color=self.colors.theme["primary_text"],
             hover_color=self.colors.theme["secondary_background"],
             font=(self.font, self.screen_height // 80), 
-            width_pixels=self.screen_height // 9, 
-            height_pixels=self.screen_height // 14, 
+            width_pixels=self.screen_height // 11, 
+            height_pixels=self.screen_height // 16, 
             corner_radius=self.screen_height // 96, 
             side=tk.TOP,
             padx=10, 
@@ -4782,6 +4799,21 @@ class WormAnalysisApp:
                 self._live_running = True
                 self.update_live_image()
             self.root.after(300, self._try_open_histogram)
+
+    def get_formatted_mutant_list(self):
+        """
+        Retrieves the list of mutant worm IDs and formats them for the tooltip.
+        """
+        mutant_ids = self.worms_position.get_mutant_worm_ids()
+        if not mutant_ids:
+            return "No mutants identified."
+        
+        # Sort ids just in case
+        mutant_ids.sort()
+        
+        # Format as a vertical list string
+        formatted_list = "\n".join([f"• Worm {worm_id + 1}" for worm_id in mutant_ids])
+        return f"Mutant Worms:\n{formatted_list}"
     
     def show_length_analysis_page(self):
         """

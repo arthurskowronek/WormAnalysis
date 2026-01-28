@@ -344,6 +344,26 @@ class WormPositionManager:
         proportion = mutant_count / total_labeled
         
         return proportion
+
+    def get_mutant_worm_ids(self) -> list:
+        """
+        Retrieves the list of IDs for worms labeled as 'Mutant'.
+
+        Returns:
+            list: A list of integers representing the IDs of mutant worms.
+        """
+        df = pd.read_csv(self.csv_file_path)
+        
+        if df.empty:
+            return []
+        
+        # Filter for 'Mutant' label
+        mutant_worms = df[df['user_label'] == 'Mutant']
+        
+        if mutant_worms.empty:
+            return []
+            
+        return mutant_worms['worm_id'].tolist()
     
     def update_worm_label(self, worm_id: int, user_label: str) -> bool:
         """
