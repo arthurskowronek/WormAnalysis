@@ -2228,6 +2228,48 @@ class WormAnalysisApp:
             id = self.worms_position.get_id_worm_seen()
             self.worms_position.update_worm_position(id, x_new, y_new)
 
+    def move_microscope_relative(self, direction):
+        """
+        Moves the microscope stage relative to the current position based on direction.
+        
+        Args:
+            direction (str): 'up', 'down', 'left', 'right'
+        """
+        try:
+            # Get current position
+            if self.CORE is None:
+                return
+                
+            x_current, y_current = self.CORE.getXYPosition()
+            
+            step_size = 100 # à tester
+                
+            # Calculate new position based on direction
+            if direction == 'left':
+                x_new = x_current - step_size
+                y_new = y_current
+            elif direction == 'right':
+                x_new = x_current + step_size
+                y_new = y_current
+            elif direction == 'up':
+                x_new = x_current
+                y_new = y_current + step_size
+            elif direction == 'down':
+                x_new = x_current
+                y_new = y_current - step_size
+            else:
+                return
+
+            self.CORE.setXYPosition(self.CORE.getXYStageDevice(), x_new, y_new)
+            
+            # Update worm position
+            if self.worms_position:
+                 id = self.worms_position.get_id_worm_seen()
+                 self.worms_position.update_worm_position(id, x_new, y_new)
+                 
+        except Exception as e:
+            log_error(e, f"Relative move {direction} failed")
+
     def go_to_next_worm(self, event=None):
         """
         Navigates the microscope stage to the position of the next worm in the
@@ -4610,8 +4652,8 @@ class WormAnalysisApp:
         
         warning_label = tk.Label(
             bottom_buttons_4_analysis_container,
-            text="⚠️ Don't use the joystick to move from one worm to another. ⚠️\n"
-                 "Use the buttons above, or the arrows on the keyboard instead.",
+            text="⚠️ You can move the microscope with the keyboard arrows. ⚠️\n"
+                 "Use the buttons above to switch from one worm to another.",
             bg=self.colors.theme["primary_background"],
             fg=self.colors.theme["secondary_text"],
             font=(self.font, self.screen_height // 107, "bold"),
@@ -4655,8 +4697,12 @@ class WormAnalysisApp:
         
         self.root.lift()
         self.root.after(50, lambda: (self.root.focus_force(), self.root.update_idletasks()))
-        self.root.bind("<Left>", lambda event: self.go_to_last_worm())
-        self.root.bind("<Right>", lambda event: self.go_to_next_worm())
+        
+        # Bind arrow keys to microscope movement
+        self.root.bind("<Left>", lambda event: self.move_microscope_relative('left'))
+        self.root.bind("<Right>", lambda event: self.move_microscope_relative('right'))
+        self.root.bind("<Up>", lambda event: self.move_microscope_relative('up'))
+        self.root.bind("<Down>", lambda event: self.move_microscope_relative('down'))
 
         """self.main_content.focus_set()  # Make sure the frame has focus to capture key events
         self.main_content.bind("<Left>", lambda event: self.go_to_last_worm())
