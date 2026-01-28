@@ -4454,73 +4454,13 @@ class WormAnalysisApp:
         self.right_map_analysis_container_ref = right_map_analysis_container
 
         # Make it expand vertically
-        right_map_analysis_container.grid_rowconfigure((0, 1, 2, 3, 4), weight=1)
+        right_map_analysis_container.grid_rowconfigure((0, 1, 2, 3, 4, 5), weight=1)
         right_map_analysis_container.grid_columnconfigure(0, weight=1)  # left spacer
         right_map_analysis_container.grid_columnconfigure(1, weight=0)  # the container column
         right_map_analysis_container.grid_columnconfigure(2, weight=1)  # right spacer
 
 
-        # 1. Label Container (fixed space with rounded border)
-        self.top_label_1_analysis_container = tk.Frame(right_map_analysis_container)
-        self.top_label_1_analysis_container.grid(row=0, column=1, sticky="ew", pady=(30, 10))
-        self.top_label_1_analysis_container.grid_columnconfigure(0, weight=1)
-        self.top_label_1_analysis_container.config(bg=self.colors.theme["primary_background"])
-
-        # Create a canvas inside this frame for drawing the rounded rectangle
-        self.top_label_canvas = tk.Canvas(
-            self.top_label_1_analysis_container, 
-            height=self.screen_height // 10, # old 100, new 96 
-            highlightthickness=0,
-            bg=self.colors.theme["primary_background"]
-        )
-        self.top_label_canvas.grid(row=0, column=0, sticky="ns")
-
-        # Create a frame on top of the canvas to hold the labels
-        self.top_label_frame = tk.Frame(self.top_label_canvas, bg=self.colors.theme["primary_background"], bd=0)
-    
-        # Now add labels inside self.top_label_frame
-        tk.Label(
-            self.top_label_frame,
-            text="Synaptic profiling prediction",
-            bg=self.colors.theme["primary_background"],
-            fg=self.colors.theme["secondary_text"],
-            font=(self.font, self.screen_height // 96, "bold"), # 10
-            takefocus=0
-        ).pack(pady=(0, 0), anchor="center")  
-
-        self.prediction_label = tk.Label(
-            self.top_label_frame,
-            text=f"The analysed worm is a mutant",
-            bg=self.colors.theme["primary_background"],
-            fg=self.colors.theme["secondary_text"],
-            justify="center",  
-            font=(self.font, self.screen_height // 120), # 8
-            takefocus=0
-        )
-        self.prediction_label.pack(pady=(5, 0), anchor="center")
-
-        self.prediction_label_2 = tk.Label(
-            self.top_label_frame,
-            text=f"with a probability of {self.prediction} %",
-            bg=self.colors.theme["primary_background"],
-            fg=self.colors.theme["secondary_text"],
-            justify="center",  
-            font=(self.font, self.screen_height // 120), # 8
-            takefocus=0
-        )
-        self.prediction_label_2.pack(pady=(0, 0), anchor="center")
-
-        
-        self.top_label_frame_window = self.top_label_canvas.create_window(
-            (0, 0), window=self.top_label_frame, anchor="center"
-        )
-
-        self.top_label_canvas.bind("<Configure>", self.resize_prediction_result_box)
-
-        # To hide it, you can use :
-        #   self.top_label_1_analysis_container.grid_remove()
-        # And to show it :
-        #   self.top_label_1_analysis_container.grid()
+        # 1. Label Container (Moved to bottom)
 
         # 2. Two Buttons with Text Below (Side by Side)
         mid_buttons_2_analysis_container = tk.Frame(right_map_analysis_container, bg=self.colors.theme["primary_background"])
@@ -4599,20 +4539,23 @@ class WormAnalysisApp:
         text_3_analysis_container = tk.Frame(right_map_analysis_container, bg=self.colors.theme["primary_background"])
         text_3_analysis_container.grid(row=2, column=1, sticky="ew", pady=0, ipady=0)
         
-        order_worms_icon = tk.Label(text_3_analysis_container, image=self.info_icon, bg=self.colors.theme["primary_background"])
-        order_worms_icon.pack(side=tk.TOP, pady=(4, 5))  # slight spacing above icon
-        Tooltip(order_worms_icon, "Be aware, the display order may change if you leave this page.", title="Info", theme="info", posx=70, posy=-80)
-        
-         
+        # Container for text and icon side-by-side
+        worm_count_container = tk.Frame(text_3_analysis_container, bg=self.colors.theme["primary_background"])
+        worm_count_container.pack(side=tk.TOP, pady=(4, 5))
+
         self.id_worm_seen_label = tk.Label(
-            text_3_analysis_container,
+            worm_count_container,
             text=f"{self.id_worm_seen+1}/{self.worms_position.get_number_of_worms()}",
             bg=self.colors.theme["primary_background"],
             fg=self.colors.theme["tertiary_text"],
             font=(self.font, self.screen_height // 96),
             takefocus=0
         )
-        self.id_worm_seen_label.pack(pady=0)
+        self.id_worm_seen_label.pack(side=tk.LEFT)
+
+        order_worms_icon = tk.Label(worm_count_container, image=self.info_icon, bg=self.colors.theme["primary_background"])
+        order_worms_icon.pack(side=tk.LEFT, padx=(5, 0))
+        Tooltip(order_worms_icon, "Be aware, the display order may change if you leave this page.", title="Info", theme="info", posx=70, posy=-80)
         
         
         # Add number of worm to the statistic file
@@ -4749,7 +4692,7 @@ class WormAnalysisApp:
 
         # 5. Button + Text with Padding
         final_5_analysis_container = tk.Frame(right_map_analysis_container, bg=self.colors.theme["primary_background"])
-        final_5_analysis_container.grid(row=4, column=1, sticky="ew", pady=(10, 50))
+        final_5_analysis_container.grid(row=4, column=1, sticky="ew", pady=(10, 10))
 
         self.create_rounded_button(
             parent=final_5_analysis_container,
@@ -4779,6 +4722,63 @@ class WormAnalysisApp:
             font=(self.font, self.screen_height // 96),
             takefocus=0
         ).pack()
+
+        # 6. Label Container (Moved from top)
+        self.top_label_1_analysis_container = tk.Frame(right_map_analysis_container)
+        self.top_label_1_analysis_container.grid(row=5, column=1, sticky="ew", pady=(10, 30))
+        self.top_label_1_analysis_container.grid_columnconfigure(0, weight=1)
+        self.top_label_1_analysis_container.config(bg=self.colors.theme["primary_background"])
+
+        # Create a canvas inside this frame for drawing the rounded rectangle
+        self.top_label_canvas = tk.Canvas(
+            self.top_label_1_analysis_container, 
+            height=self.screen_height // 10, # old 100, new 96 
+            highlightthickness=0,
+            bg=self.colors.theme["primary_background"]
+        )
+        self.top_label_canvas.grid(row=0, column=0, sticky="ns")
+
+        # Create a frame on top of the canvas to hold the labels
+        self.top_label_frame = tk.Frame(self.top_label_canvas, bg=self.colors.theme["primary_background"], bd=0)
+    
+        # Now add labels inside self.top_label_frame
+        tk.Label(
+            self.top_label_frame,
+            text="Synaptic profiling prediction",
+            bg=self.colors.theme["primary_background"],
+            fg=self.colors.theme["secondary_text"],
+            font=(self.font, self.screen_height // 96, "bold"), # 10
+            takefocus=0
+        ).pack(pady=(0, 0), anchor="center")  
+
+        self.prediction_label = tk.Label(
+            self.top_label_frame,
+            text=f"The analysed worm is a mutant",
+            bg=self.colors.theme["primary_background"],
+            fg=self.colors.theme["secondary_text"],
+            justify="center",  
+            font=(self.font, self.screen_height // 120), # 8
+            takefocus=0
+        )
+        self.prediction_label.pack(pady=(5, 0), anchor="center")
+
+        self.prediction_label_2 = tk.Label(
+            self.top_label_frame,
+            text=f"with a probability of {self.prediction} %",
+            bg=self.colors.theme["primary_background"],
+            fg=self.colors.theme["secondary_text"],
+            justify="center",  
+            font=(self.font, self.screen_height // 120), # 8
+            takefocus=0
+        )
+        self.prediction_label_2.pack(pady=(0, 0), anchor="center")
+
+        
+        self.top_label_frame_window = self.top_label_canvas.create_window(
+            (0, 0), window=self.top_label_frame, anchor="center"
+        )
+
+        self.top_label_canvas.bind("<Configure>", self.resize_prediction_result_box)
         
         self.root.lift()
         self.root.after(50, lambda: (self.root.focus_force(), self.root.update_idletasks()))
