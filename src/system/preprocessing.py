@@ -9,7 +9,8 @@ from ultralytics import YOLO
 from skimage.morphology import binary_closing, disk
 
 from config import DATA_DIR, MODELS_DIR
-from src.system.graph_analysis import get_synapses_graph
+from src.system.graph_analysis import get_synapses_graph, get_backbone_graph
+import time
 
 class Preprocessing():
     """
@@ -46,6 +47,9 @@ class Preprocessing():
         """
         method = "YOLO"  # "Filter" or "YOLO"
         
+        t_start = time.time()
+        print("    [Preprocessing] Starting worm segmentation")
+        
         if method == "YOLO":
             model_path = MODELS_DIR / "YOLO_segmentation.pt"
             if not model_path.exists():
@@ -77,22 +81,29 @@ class Preprocessing():
                 cv2.imwrite(str(temp_path), image)
                 
                 # Predict
+                t_yolo = time.time()
                 prediction = model.predict(source=str(temp_path), save=False, verbose=False)
+                print(f"    [Preprocessing] YOLO predict: {time.time() - t_yolo:.4f}s")
                 temp_path.unlink()  # Remove temp file
                 
                 masks = prediction[0].masks
                 if masks is not None:
+                    t_start_mask = time.time()
                     mask_array = masks.data
                     worm_mask = mask_array[0].cpu().numpy()
                     worm_mask = cv2.resize(worm_mask, (image.shape[1], image.shape[0]))
+                    print(f"    [Preprocessing] Segmentation (mask): {time.time() - t_start_mask:.4f}s")
                     
                     # Keep largest component 
                     # TODO 
+                    t_start_keep_largest_component = time.time()
                     labeled_mask = ski.measure.label(worm_mask)
                     largest_component = np.argmax(np.bincount(labeled_mask.flat)[1:]) + 1
                     worm_mask = (labeled_mask == largest_component).astype(np.uint8)
+                    print(f"    [Preprocessing] Segmentation (keep largest component): {time.time() - t_start_keep_largest_component:.4f}s")
                     
                     if np.sum(worm_mask) > 0:
+                        print(f"    [Preprocessing] Total segmentation (YOLO): {time.time() - t_start:.4f}s")
                         return worm_mask
                         
                 method = "Filter"
@@ -116,6 +127,7 @@ class Preprocessing():
             largest_component = np.argmax(np.bincount(labeled_mask.flat)[1:]) + 1
             worm_mask = (labeled_mask == largest_component).astype(np.uint8)
             
+            print(f"    [Preprocessing] Total segmentation (Filter): {time.time() - t_start:.4f}s")
             return worm_mask
 
     def is_coiled_worm(self, worm_mask: np.ndarray) -> bool:
@@ -189,6 +201,28 @@ class Preprocessing():
             print(f"Error in synapse detection: {str(e)}")
             empty_graph = nx.Graph()
             return [], empty_graph, 0, 0, 0, 0
+
+    def get_worm_length(self, img: np.ndarray, worm_mask: np.ndarray) -> tuple:
+        """
+        Calculates the length of the worm based on its skeleton backbone.
+
+        Args:
+            img (np.ndarray): The input image (unused, kept for consistency/logging if needed).
+            worm_mask (np.ndarray): The binary mask of the segmented worm.
+
+        Returns:
+            Tuple[int, nx.Graph]:
+                - length (int): The length of the worm in pixels.
+                - G (nx.Graph): The skeleton graph representing the backbone.
+        """
+        try:
+            t0 = time.time()
+            length, G = get_backbone_graph(worm_mask)
+            print(f"    [Preprocessing] get_backbone_graph: {time.time() - t0:.4f}s")
+            return length, G
+        except Exception as e:
+            print(f"Error in worm length calculation: {str(e)}")
+            return 0, nx.Graph()
 
     # Utils for get_synapse_using_graph
     def find_local_maxima(self, img: np.ndarray, var_gamma = 70) -> tuple:

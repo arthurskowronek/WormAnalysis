@@ -222,6 +222,39 @@ def get_synapses_graph(worm_mask: np.ndarray,
                 
     return maxima, G, median_width, measure_diff_slice, measure_diff_points, NUMBER_OF_CORDS
 
+def get_backbone_graph(worm_mask: np.ndarray) -> Tuple[int, nx.Graph]:
+    """
+    Extracts the main backbone of the worm from its binary mask and calculates its length.
+
+    This function performs the following steps:
+    1. Skeletonizes the worm mask.
+    2. Converts the skeleton to a graph.
+    3. Finds the longest path between any two endpoints of the graph (the backbone).
+    4. Returns the length of this backbone and the corresponding graph.
+
+    Args:
+        worm_mask (np.ndarray): Binary mask of the worm.
+
+    Returns:
+        Tuple[int, nx.Graph]:
+            - length (int): The number of pixels (nodes) in the backbone.
+            - G (nx.Graph): A graph representing the backbone path.
+    """
+    if worm_mask is None or np.sum(worm_mask) == 0:
+        return 0, nx.Graph()
+
+    # 1. Skeletonize
+    skeleton = ski.morphology.skeletonize(worm_mask)
+    G = _skeleton_to_graph(skeleton)
+    
+    if len(G.nodes) == 0:
+        return 0, G
+
+    # 2. Keep main branch using existing logic (but without maxima)
+    G, _ = _skeleton_keep_main_branch(G, skeleton, maxima_coords=None, keep=1)
+    
+    return G.number_of_nodes(), G
+
 # Utils functions
 def _decompose_worm_segments_into_slice(skel_path, worm_mask, n_segments):
     """
@@ -364,7 +397,7 @@ def _calculate_segment_properties(start, end_pos, end_neg):
             length_mid_pos, length_mid_neg, length_end_pos, length_end_neg, length_total)
 
 def _find_endpoints_graph(G: nx.Graph, 
-                  maxima_coords: np.ndarray,
+                  maxima_coords: Optional[np.ndarray] = None,
                   angle_threshold_degrees: float = 90,
                   verbose: bool = False) -> Tuple[List, List]:
     """
@@ -377,8 +410,9 @@ def _find_endpoints_graph(G: nx.Graph,
 
     Args:
         G (nx.Graph): A NetworkX graph representing the skeleton.
-        maxima_coords (np.ndarray): An array of (y, x) coordinates for all
+        maxima_coords (Optional[np.ndarray]): An array of (y, x) coordinates for all
                                     potential maxima points, indexed by node ID.
+                                    Can be None if nodes are coordinate tuples.
         angle_threshold_degrees (float): The angle threshold in degrees. If the
                                          angle between two branches is >= this value,
                                          it is not considered a sharp junction.
@@ -392,8 +426,8 @@ def _find_endpoints_graph(G: nx.Graph,
     """
     
     # Input validation
-    if G is None or len(G.nodes) == 0 or maxima_coords is None or len(maxima_coords) == 0:
-        if verbose: print("Warning: Empty graph or maxima coordinates provided to find_endpoints")
+    if G is None or len(G.nodes) == 0:
+        if verbose: print("Warning: Empty graph provided to find_endpoints")
         return [], []
     
     # Find endpoints (nodes with degree 1)
@@ -403,7 +437,7 @@ def _find_endpoints_graph(G: nx.Graph,
             if isinstance(node, tuple):
                 endpoints.append(node)
             elif isinstance(node, (int, np.integer)):
-                if node < len(maxima_coords):
+                if maxima_coords is not None and node < len(maxima_coords):
                     endpoints.append(tuple(maxima_coords[node]))       
     if not endpoints: 
         if verbose: print("Warning: No endpoints found"); 
@@ -421,7 +455,7 @@ def _find_endpoints_graph(G: nx.Graph,
                 node_coords = np.array(node)
                 coords = [np.array(n) for n in neighbors]
             # Handle cases where nodes are indices into maxima_coords
-            elif isinstance(node, (int, np.integer)) and node < len(maxima_coords):
+            elif isinstance(node, (int, np.integer)) and maxima_coords is not None and node < len(maxima_coords):
                 node_coords = maxima_coords[node]
                 coords = [maxima_coords[n] for n in neighbors if isinstance(n, (int, np.integer)) and n < len(maxima_coords)]
             else:
@@ -580,7 +614,7 @@ def _order_skeleton_points_skan(skeleton):
 
 def _skeleton_keep_main_branch(G: 'nx.Graph',
                             skel: np.ndarray,
-                            maxima_coords: np.ndarray,
+                            maxima_coords: Optional[np.ndarray] = None,
                             keep: int = 1,
                             verbose: bool = False) -> Tuple['nx.Graph', np.ndarray]:
     """
@@ -595,7 +629,7 @@ def _skeleton_keep_main_branch(G: 'nx.Graph',
     Args:
         G (nx.Graph): The input NetworkX graph of the skeleton.
         skel (np.ndarray): The binary skeleton image.
-        maxima_coords (np.ndarray): An array of coordinates corresponding to the nodes.
+        maxima_coords (Optional[np.ndarray]): An array of coordinates corresponding to the nodes.
         keep (int): The number of main branches to retain. Defaults to 1.
 
     Returns:
@@ -605,12 +639,11 @@ def _skeleton_keep_main_branch(G: 'nx.Graph',
     """
     # Input validation
     if (skel is None or skel.size == 0 or 
-        maxima_coords is None or len(maxima_coords) == 0 or 
         len(G.nodes) == 0):
         return nx.Graph(), np.zeros((1, 1), dtype=bool)
     
     # Find endpoints and junctions
-    endpoints, angle_junctions = _find_endpoints_graph(G, maxima_coords, verbose)
+    endpoints, angle_junctions = _find_endpoints_graph(G, maxima_coords, verbose=verbose)
     if len(endpoints) < 2:
         return G, skel  # Return original if insufficient endpoints
 

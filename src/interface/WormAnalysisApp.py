@@ -883,7 +883,10 @@ class WormAnalysisApp:
         # Create the frame
         self.params_frame = tk.Frame(self.body_frame, bg=self.colors.theme["secondary_background"], width=230)
         if self.show_parameters:
-            self.params_frame.pack(side=tk.RIGHT, fill=tk.Y)
+            if hasattr(self, "content_frame"):
+                self.params_frame.pack(side=tk.RIGHT, fill=tk.Y, before=self.content_frame)
+            else:
+                self.params_frame.pack(side=tk.RIGHT, fill=tk.Y)
         self.params_frame.pack_propagate(False)
 
         # Parameters header
@@ -1416,6 +1419,12 @@ class WormAnalysisApp:
             try:
                 if hasattr(self, "main_frame"):
                     self.main_frame.destroy()
+                # Clear references to destroyed widgets to prevent TclError in re-init
+                self.content_frame = None
+                self.params_frame = None
+                self.sidebar = None
+                self.main_content = None
+                self.body_frame = None
             except Exception:
                 pass
 
@@ -1515,7 +1524,10 @@ class WormAnalysisApp:
         try:
             self.show_parameters = not self.show_parameters
             if self.show_parameters:
-                self.params_frame.pack(side=tk.RIGHT, fill=tk.Y)
+                if hasattr(self, "content_frame") and self.content_frame.winfo_manager():
+                     self.params_frame.pack(side=tk.RIGHT, fill=tk.Y, before=self.content_frame)
+                else:
+                     self.params_frame.pack(side=tk.RIGHT, fill=tk.Y)
             else:
                 self.params_frame.pack_forget()
             
@@ -1766,11 +1778,52 @@ class WormAnalysisApp:
         self.scan_status_label.update_idletasks()
         try:
             increment_user_statistics('nb_scans')
-            worms_microscope_position = scanner.scan()
+            # Get worms and corners
+            worms_microscope_position, corners = scanner.scan()
+            
+            # --- ATOMIC UPDATE OF PARAMETERS ---
+            # We explicitly update the YAML file with both the new corners AND the new dimensions.
+            # This prevents the race condition where updating UI variables (scan_width/height) 
+            # might trigger a save that overwrites the corners if they weren't saved yet, 
+            # or where reading the file gets stale data.
+            
+            try:
+                # 1. Read current config
+                current_config = {}
+                if os.path.exists(self.PARAMS_FILE):
+                    with open(self.PARAMS_FILE, "r") as f:
+                        current_config = yaml.safe_load(f) or {}
+
+                # 2. Update with new values (Corners + Dimensions)
+                # Note: We must convert numpy/special types to standard python types if needed, 
+                # but corners are likely floats and scan_width/height are ints.
+                current_config.update(corners)
+                current_config["scan_width"] = scanner.scan_width
+                current_config["scan_height"] = scanner.scan_height
+                
+                # 3. Write back to file atomically (as much as possible)
+                with open(self.PARAMS_FILE, "w") as f:
+                    yaml.dump(current_config, f, default_flow_style=False, sort_keys=False)
+                    
+            except Exception as e:
+                log_error(e, "Failed to save parameters atomically in launch_scan")
+
+            # 4. Update UI variables (will trigger their own callbacks, but they will read the correct file now)
             self.init_pos_x = scanner.start_x
             self.init_pos_y = scanner.start_y
             self.scan_width.set(scanner.scan_width)
             self.scan_height.set(scanner.scan_height)
+
+            # 5. Check if Core was reloaded during scan (e.g. error recovery)
+            if scanner.mmc is not self.CORE:
+                print("⚠️ Core instance changed during scan! Updating application reference.")
+                self.CORE = scanner.mmc
+                # Re-apply critical settings that might be lost or need ensuring
+                try:
+                    self.CORE.setExposure(int(self.exposure_time.get()))
+                    self.CORE.setProperty(NAME_CAMERA, "Binning", self.binning.get())
+                except Exception as e_settings:
+                    log_error(e_settings, "Failed to re-apply settings after Core update")
         except Exception as e:
             self.context_error = log_error(e, "Launch scan failed")
         
@@ -1859,18 +1912,26 @@ class WormAnalysisApp:
         if self.worms_position is None:
             self.worms_position = WormPositionManager(new_acquisition=False)
             all_worm_data = self.worms_position.get_all_worm_proportion_position()
-            list_of_worm_position = [[x, y] for worm_id, x, y in all_worm_data]
+            list_of_worm_position = [[worm_id, x, y] for worm_id, x, y in all_worm_data]
         else:
             all_worm_data = self.worms_position.get_all_worm_proportion_position()
-            list_of_worm_position = [[x, y] for worm_id, x, y in all_worm_data]
+            list_of_worm_position = [[worm_id, x, y] for worm_id, x, y in all_worm_data]
           
         # Draw bounding boxes
         img_height, img_width = img_with_bounding_box_np.shape[:2]      
         for worm in list_of_worm_position:
-            x = int(worm[0] * img_width)
-            y = int(worm[1] * img_height)
+            worm_id = worm[0]
+            x = int(worm[1] * img_width)
+            y = int(worm[2] * img_height)
             box = (x - self.bounding_box_size, y - self.bounding_box_size, x + self.bounding_box_size, y + self.bounding_box_size)  # (x1, y1, x2, y2)
-            cv2.rectangle(img_with_bounding_box_np, (box[0], box[1]), (box[2], box[3]), (0, 0, 255), 1)
+            
+            # Check if mutant to change color
+            color = (0, 0, 255) # Red (BGR)
+            label = self.worms_position.get_worm_label(worm_id)
+            if label == 'Mutant':
+                color = (0, 255, 0) # Green (BGR)
+            
+            cv2.rectangle(img_with_bounding_box_np, (box[0], box[1]), (box[2], box[3]), color, 1)
     
         # Convert back to PIL Image
         img_with_bounding_box_np = cv2.cvtColor(img_with_bounding_box_np, cv2.COLOR_BGR2RGB)
@@ -2524,17 +2585,18 @@ class WormAnalysisApp:
         self.display_enhanced_image()
         self._show_enhanced_return_button()
                 
-    def start_live(self):
+    def start_live(self, switch_to_load_position=True):
         """
         Starts the live image acquisition loop.
 
         This function sets the `live_image` flag to True, switches the UI to the
-        `load_position` page, and begins the continuous `update_live_image` loop.
+        `load_position` page (optional), and begins the continuous `update_live_image` loop.
         """
         self._show_enhanced_preview = False
         self._hide_enhanced_return_button()
         self.live_image = True
-        self.show_load_position_page()
+        if switch_to_load_position:
+            self.show_load_position_page()
 
         # ensure histogram window is open
         try:
@@ -2568,16 +2630,9 @@ class WormAnalysisApp:
         Snaps a single image from the microscope and returns it as a numpy array (float32).
         """
         try:
-            if analysis_mode:
-                self.CORE.setExposure(EXPOSURE_TIME_ANALYSIS)
-            else:
-                self.CORE.setExposure(int(self.exposure_time.get()))
+            self.CORE.setExposure(EXPOSURE_TIME_ANALYSIS)
             self.CORE.snapImage()
             img = self.CORE.getImage()
-            try:
-                self.CORE.setExposure(int(self.exposure_time.get()))
-            except Exception:
-                self.CORE.setExposure(EXPOSURE_TIME_LIVE_CONFIG)
 
             # Normalize returned type to numpy float32 (raw values)
             if isinstance(img, np.ndarray):
@@ -2745,7 +2800,6 @@ class WormAnalysisApp:
                     # store raw frame for histogram/contrast code
                     self.last_live_frame = arr.copy()
 
-                    print(f"DEBUG: current_page={self.current_page}, contrast={getattr(self, 'vmin_var', None) is not None}")
                     if self.current_page == "load_position" or self.current_page == "length_analysis":
                         # If contrast controls are present (user opened contrast window),
                         # delegate display + histogram drawing to update_image_and_histogram.
@@ -4621,7 +4675,7 @@ class WormAnalysisApp:
         stats_frame.grid(row=2, column=0, sticky="ew", pady=20, padx=20)
         
         self.stats_labels = {}
-        for i, stat in enumerate(["Mean", "Variance", "Min", "Max"]):
+        for i, stat in enumerate(["Mean", "Variance", "Min", "Max", "Errors"]):
             lbl = tk.Label(
                 stats_frame, 
                 text=f"{stat}: --", 
@@ -4656,7 +4710,7 @@ class WormAnalysisApp:
 
         # Initialize WormPositionManager if not present
         if self.worms_position is None:
-             self.worms_position = WormPositionManager()
+             self.worms_position = WormPositionManager(new_acquisition=False)
 
         all_worms = self.worms_position.get_all_worm_microscope_position()
         if not all_worms:
@@ -4664,25 +4718,52 @@ class WormAnalysisApp:
             return
 
         # Clear table
+        # Check window existence before clearing table as well
+        if not self.root.winfo_exists():
+            return
+            
         for item in self.length_tree.get_children():
             self.length_tree.delete(item)
 
         lengths = []
+        errors_count = 0
         
         # Iterate over worms
         for i, (x, y) in enumerate(all_worms):
+            worm_start_time = time.time()
+            print(f"--- Analyzing Worm {i+1} ---")
+
+            # Safe check at start of iteration
+            if not self.root.winfo_exists():
+                return
+                
             worm_id = i + 1 # Assuming 1-based ID for display
             
             # 1. Move Microscope
+            t0 = time.time()
             try:
                 self.CORE.setXYPosition(self.CORE.getXYStageDevice(), x, y)
                 self.CORE.waitForDevice(self.CORE.getXYStageDevice())
                 time.sleep(0.5) # Settle time
             except Exception as e:
                 log_error(e, f"Failed to move to worm {worm_id}")
+                # Treat movement failure as an error for this worm? 
+                # Ideally yes, but the original code continued. 
+                # If we cannot move, we probably cannot snap the right image.
+                # Let's count it as error and 0 length.
+                length = 0
+                lengths.append(length)
+                
+                if self.root.winfo_exists():
+                    self.length_tree.insert("", "end", values=(worm_id, length))
+                    
+                errors_count += 1
                 continue
-
+            print(f"  [Time] Move microscope: {time.time() - t0:.4f}s")
+            
             # 2. Snap Image
+            t0 = time.time()
+            img = None
             try:
                 self.CORE.snapImage()
                 img = self.CORE.getImage()
@@ -4698,30 +4779,57 @@ class WormAnalysisApp:
 
             except Exception as e:
                 log_error(e, f"Failed to snap image for worm {worm_id}")
+                length = 0
+                lengths.append(length)
+                
+                if self.root.winfo_exists():
+                    self.length_tree.insert("", "end", values=(worm_id, length))
+                    
+                errors_count += 1
                 continue
+            print(f"  [Time] Snap image: {time.time() - t0:.4f}s")
 
             # 3. Process
             try:
                 # Segment
+                if img is None:
+                    raise Exception("Image is None")
+
+                t0 = time.time()
                 worm_mask = self.preprocessing.worm_segmentation(img)
+                print(f"  [Time] Segmentation: {time.time() - t0:.4f}s")
+
                 if np.sum(worm_mask) == 0:
-                    continue # No worm found
+                    # No worm found - treat as 0 length and error?
+                    # The user said "problem (e.g. code fails to do segmentation)".
+                    # Empty mask is a kind of failure to segment anything.
+                    raise Exception("No worm detected in segmentation")
 
                 # Skeletonize
-                # get_synapse_using_graph returns: maxima, G, median_width, diff_slice, diff_segment, NUMBER_OF_CORDS
-                _, G, _, _, _, _ = self.preprocessing.get_synapse_using_graph(img, worm_mask)
+                # Use simplified length calculation (only backbone)
+                t0 = time.time()
+                length, G = self.preprocessing.get_worm_length(img, worm_mask)
+                print(f"  [Time] Skeletonization: {time.time() - t0:.4f}s")
                 
                 # Calculate Length (number of nodes in skeleton graph)
-                if G is not None:
-                     length = G.number_of_nodes()
+                if G is not None and length > 0:
+                     # length is already calculated
                      lengths.append(length)
                      
-                     # Update Table
-                     self.length_tree.insert("", "end", values=(worm_id, length))
+                     if self.root.winfo_exists():
+                         # Update Table
+                         self.length_tree.insert("", "end", values=(worm_id, length))
                      
                      # --- VISUALIZATION ---
+                     t0 = time.time()
+                     # Convert to 8-bit if currently 16-bit (for display compatibility and visibility)
+                     if img.dtype == np.uint16:
+                         img_display_base = cv2.normalize(img, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+                     else:
+                         img_display_base = img.astype(np.uint8)
+
                      # Convert to BGR for coloring
-                     display_img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+                     display_img = cv2.cvtColor(img_display_base, cv2.COLOR_GRAY2BGR)
                      
                      # 1. Draw Segmentation (Green)
                      # Find contours requires uint8
@@ -4741,34 +4849,61 @@ class WormAnalysisApp:
                      pil_img = Image.fromarray(display_img_rgb)
                      
                      # Use display_enhanced_image logic or direct update
-                     # Resize to label
-                     w = self.live_image_label.winfo_width()
-                     h = self.live_image_label.winfo_height()
-                     if w > 0 and h > 0:
-                        pil_img = pil_img.resize((w, h), Image.Resampling.LANCZOS)
-                        
-                     tk_img = ImageTk.PhotoImage(pil_img)
-                     self.live_image_label.configure(image=tk_img)
-                     self.live_image_label.image = tk_img # Keep reference
-                     
-                     self.main_content.update_idletasks() # Refresh UI
+                     if self.root.winfo_exists() and self.live_image_label.winfo_exists():
+                         # Resize to label
+                         w = self.live_image_label.winfo_width()
+                         h = self.live_image_label.winfo_height()
+                         if w > 0 and h > 0:
+                            pil_img = pil_img.resize((w, h), Image.Resampling.LANCZOS)
+                            
+                         tk_img = ImageTk.PhotoImage(pil_img)
+                         self.live_image_label.configure(image=tk_img)
+                         self.live_image_label.image = tk_img # Keep reference
+                         
+                         self.main_content.update_idletasks() # Refresh UI
+                    
+                     print(f"  [Time] Visualization update: {time.time() - t0:.4f}s")
+                         
                      # Small pause to let user see
                      time.sleep(0.5) 
+                else:
+                    raise Exception("Skeletonization failed (G is None or length is 0)")
                 
             except Exception as e:
                 log_error(e, f"Analysis failed for worm {worm_id}")
+                length = 0
+                lengths.append(length)
+                
+                if self.root.winfo_exists():
+                    self.length_tree.insert("", "end", values=(worm_id, length))
+                    
+                errors_count += 1
 
             # Update stats live
-            if lengths:
-                self.stats_labels["Mean"].config(text=f"Mean: {np.mean(lengths):.2f}")
-                self.stats_labels["Variance"].config(text=f"Variance: {np.var(lengths):.2f}")
-                self.stats_labels["Min"].config(text=f"Min: {np.min(lengths)}")
-                self.stats_labels["Max"].config(text=f"Max: {np.max(lengths)}")
+            if self.root.winfo_exists() and lengths:
+                # Filter out 0 lengths for statistics
+                valid_lengths = [l for l in lengths if l > 0]
+                
+                if valid_lengths:
+                    self.stats_labels["Mean"].config(text=f"Mean: {np.mean(valid_lengths):.2f}")
+                    self.stats_labels["Variance"].config(text=f"Variance: {np.var(valid_lengths):.2f}")
+                    self.stats_labels["Min"].config(text=f"Min: {np.min(valid_lengths)}")
+                    self.stats_labels["Max"].config(text=f"Max: {np.max(valid_lengths)}")
+                else:
+                    self.stats_labels["Mean"].config(text=f"Mean: --")
+                    self.stats_labels["Variance"].config(text=f"Variance: --")
+                    self.stats_labels["Min"].config(text=f"Min: --")
+                    self.stats_labels["Max"].config(text=f"Max: --")
+                
+                self.stats_labels["Errors"].config(text=f"Errors: {errors_count}")
                 self.main_content.update_idletasks()
+            
+            print(f"  [Time] Total worm analysis: {time.time() - worm_start_time:.4f}s")
         
         # Restart live view after analysis
-        self.live_image = True
-        self.start_live()
+        if self.root.winfo_exists():
+            self.live_image = True
+            self.start_live(switch_to_load_position=False)
 
     def show_training_model_page(self):
         """

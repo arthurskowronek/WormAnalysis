@@ -279,9 +279,7 @@ class ScanSlice:
         start_corner_y = self.start_y - self.actual_step_y / 2
         end_corner_x = self.start_x + (self.scan_width - 1) * self.actual_step_x + self.actual_step_x / 2
         end_corner_y = self.start_y + (self.scan_height - 1) * self.actual_step_y + self.actual_step_y / 2
-        save_corner_positions_into_yaml_config_file(start_corner_x, start_corner_y, end_corner_x, end_corner_y)
-        
-        return self.get_worms_position()
+        return self.get_worms_position(), {"start_x": start_corner_x, "start_y": start_corner_y, "end_x": end_corner_x, "end_y": end_corner_y}
 
     def process_image_to_detect_worms(self):
         """
@@ -740,7 +738,8 @@ class ScanSlice:
         
         if self.scan_shape == "Square":
             pil_image = pil_image.resize((1424, 1424), Image.LANCZOS)
-            pil_image = pil_image.rotate(270, expand=True)
+            if MICROSCOPE == "Macrozoom":
+                pil_image = pil_image.rotate(270, expand=True)
         else:
             pil_image = pil_image.resize((1064, 1748), Image.LANCZOS)
             pil_image = pil_image.rotate(270, expand=True)
