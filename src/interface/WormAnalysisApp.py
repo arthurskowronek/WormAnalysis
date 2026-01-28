@@ -980,11 +980,12 @@ class WormAnalysisApp:
         )"""
 
         # Fluo objective
-        bg = "parameters_button_background" if "fluo_objective" in self.enable_parameters_buttons else "parameters_button_disabled_background"
-        tk.Label(self.params_content_frame, text="Live objective", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
-        _, self.fluo_objective_dropdown = self.create_rounded_dropdown(
-            self.params_content_frame, list_scan_objective, self.fluo_objective, bg
-        )
+        if MICROSCOPE == "Nikon":
+            bg = "parameters_button_background" if "fluo_objective" in self.enable_parameters_buttons else "parameters_button_disabled_background"
+            tk.Label(self.params_content_frame, text="Live objective", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
+            _, self.fluo_objective_dropdown = self.create_rounded_dropdown(
+                self.params_content_frame, list_scan_objective, self.fluo_objective, bg
+            )
         
         # Model name
         list_model = [d.name.replace("model_prediction_", "").replace(".pkl", "") for d in MODELS_DIR.iterdir() if "model_prediction_" in d.name]
