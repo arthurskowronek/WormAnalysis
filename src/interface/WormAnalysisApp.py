@@ -2278,6 +2278,46 @@ class WormAnalysisApp:
             self.CORE.setXYPosition(self.CORE.getXYStageDevice(), x, y)
         except Exception as e:
             self.context_error = log_error(e, f"Microscope move to last worm failed")
+
+    def go_to_next_mutant(self, event=None):
+        """
+        Navigates the microscope stage to the position of the next mutant worm.
+        """
+        try:
+            self.clear_enhanced_preview()
+            self.worms_position.go_to_next_mutant() 
+            self.id_worm_seen = self.worms_position.get_id_path_worm_seen() 
+            self.id_worm_seen_label.config(text=f"{self.id_worm_seen+1}/{self.worms_position.get_number_of_worms()}")
+
+            x,y = self.worms_position.get_worm_microscope_position(self.worms_position.get_id_worm_seen())
+            time.sleep(0.01)
+        except Exception as e:
+            self.context_error = log_error(e, "Get go to next mutant position failed")
+            
+        try:
+            self.CORE.setXYPosition(self.CORE.getXYStageDevice(), x, y)
+        except Exception as e:
+            self.context_error = log_error(e, "Microscope move to next mutant failed")
+
+    def go_to_last_mutant(self, event=None):
+        """
+        Navigates the microscope stage to the position of the previous mutant worm.
+        """
+        try:
+            self.clear_enhanced_preview()
+            self.worms_position.go_to_last_mutant() 
+            self.id_worm_seen = self.worms_position.get_id_path_worm_seen() 
+            self.id_worm_seen_label.config(text=f"{self.id_worm_seen+1}/{self.worms_position.get_number_of_worms()}")
+
+            x,y = self.worms_position.get_worm_microscope_position(self.worms_position.get_id_worm_seen())
+            time.sleep(0.01)
+        except Exception as e:
+            self.context_error = log_error(e, "Get go to last mutant position failed")
+            
+        try:
+            self.CORE.setXYPosition(self.CORE.getXYStageDevice(), x, y)
+        except Exception as e:
+            self.context_error = log_error(e, "Microscope move to last mutant failed")
     
     def classify_as_wt(self):
         """
@@ -4508,6 +4548,58 @@ class WormAnalysisApp:
             width_pixels=self.screen_height // 9, # old 104, new 107
             height_pixels=self.screen_height // 14, # old 70, new 69
             corner_radius=self.screen_height // 96, # 10
+            side=tk.TOP,
+            padx=10, 
+            pady=5,
+            padx_text=-5,
+            border_width=2,
+            border_color=self.colors.theme["stroke_button"]
+        )
+        
+        # Create a single container for both mutant buttons without expansion
+        buttons_wrapper_mutant = tk.Frame(bottom_buttons_4_analysis_container, bg=self.colors.theme["primary_background"])
+        buttons_wrapper_mutant.pack(pady=(5, 0))  # Add some vertical spacing
+
+        # 1st - previous mutant
+        sub1_mutant_analysis_container = tk.Frame(buttons_wrapper_mutant, bg=self.colors.theme["primary_background"])
+        sub1_mutant_analysis_container.pack(side=tk.LEFT, padx=(0, 1))  
+        self.create_rounded_button(
+            parent=sub1_mutant_analysis_container,
+            text="",
+            icon=self.last_icon,
+            icon_hover=self.last_icon_hover,
+            command=lambda: self.go_to_last_mutant(), 
+            bg_color=self.colors.theme["primary_background"],
+            text_color=self.colors.theme["primary_text"],
+            hover_color=self.colors.theme["secondary_background"],
+            font=(self.font, self.screen_height // 80), 
+            width_pixels=self.screen_height // 9, 
+            height_pixels=self.screen_height // 14, 
+            corner_radius=self.screen_height // 96, 
+            side=tk.TOP,
+            padx=10,  
+            pady=5,
+            padx_text=-5,
+            border_width=2,
+            border_color=self.colors.theme["stroke_button"]
+        )
+
+        # 2nd - next mutant
+        sub2_mutant_analysis_container = tk.Frame(buttons_wrapper_mutant, bg=self.colors.theme["primary_background"])
+        sub2_mutant_analysis_container.pack(side=tk.LEFT, padx=(1, 0)) 
+        self.create_rounded_button(
+            parent=sub2_mutant_analysis_container,
+            text="",
+            icon=self.next_icon,
+            icon_hover=self.next_icon_hover,
+            command=lambda: self.go_to_next_mutant(), 
+            bg_color=self.colors.theme["primary_background"],
+            text_color=self.colors.theme["primary_text"],
+            hover_color=self.colors.theme["secondary_background"],
+            font=(self.font, self.screen_height // 80), 
+            width_pixels=self.screen_height // 9, 
+            height_pixels=self.screen_height // 14, 
+            corner_radius=self.screen_height // 96, 
             side=tk.TOP,
             padx=10, 
             pady=5,
