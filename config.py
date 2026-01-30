@@ -354,3 +354,13 @@ def increment_user_statistics(field_name):
         writer.writeheader()
         writer.writerows(existing_data)
         
+def log_debug_coordinate(message):
+    """
+    Log a debug message related to coordinates to logs/debug_coordinates.txt
+    """
+    timestamp = datetime.datetime.now().strftime(DATE_FORMAT)
+    log_file_path = "logs/debug_coordinates.txt"
+    os.makedirs("logs", exist_ok=True)
+    
+    with open(log_file_path, "a", encoding="utf-8") as f:
+        f.write(f"[{timestamp}] {message}\n")

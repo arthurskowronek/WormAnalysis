@@ -5,7 +5,7 @@ import pandas as pd
 from pathlib import Path
 from typing import Optional
 
-from config import RESSOURCES_DIR, MICROSCOPE, load_config_file
+from config import RESSOURCES_DIR, MICROSCOPE, load_config_file, log_debug_coordinate
 
 from python_tsp.exact import solve_tsp_dynamic_programming # more than 25 pts
 from python_tsp.heuristics import solve_tsp_local_search # less than 25 pts
@@ -20,7 +20,7 @@ class WormPositionManager:
     calculating the shortest path using the Traveling Salesman Problem (TSP) algorithm.
     """
     
-    def __init__(self, output_folder = Path(RESSOURCES_DIR), new_acquisition = True, table_worm_position = [], filename: str = 'worm_positions.csv', id = 0):
+    def __init__(self, output_folder = Path(RESSOURCES_DIR), new_acquisition = True, table_worm_position = [], filename: str = 'worm_positions.csv', id = 0, corners=None):
         """
         Initializes the WormPositionManager.
         
@@ -46,7 +46,7 @@ class WormPositionManager:
         os.makedirs(output_folder, exist_ok=True)
         
         if new_acquisition:
-            self._initialize_csv(table_worm_position)
+            self._initialize_csv(table_worm_position, corners)
             self.go_to_first_worm(id)
         else:
             if not os.path.exists(self.csv_file_path):
@@ -56,7 +56,7 @@ class WormPositionManager:
                 #self.find_shortest_path()
                 self.go_to_first_worm(id)
      
-    def _initialize_csv(self, table_worm_position = []) -> None:
+    def _initialize_csv(self, table_worm_position = [], corners=None) -> None:
         """
         Creates and initializes a new CSV file with worm position headers.
         
@@ -72,13 +72,13 @@ class WormPositionManager:
         
         for pos in table_worm_position:
             x,y = pos[0], pos[1]
-            self.add_worm_microscope_position(x, y)
+            self.add_worm_microscope_position(x, y, corners=corners)
             
         # Find shortest path
         self.find_shortest_path()
 
     def add_worm_microscope_position(self, x: float, y: float, 
-                         prediction: float = -1, user_label: str = 'None') -> bool:
+                         prediction: float = -1, user_label: str = 'None', corners=None) -> bool:
         """
         Adds a new worm's position to the CSV file.
         
@@ -96,7 +96,7 @@ class WormPositionManager:
         df = pd.read_csv(self.csv_file_path)
         tab_worms = self.get_all_worm_microscope_position()
         # Convert microscope coordinates to proportional coordinates.
-        x_proportion, y_proportion = self.transform_microscope_positions_into_proportion(x,y)
+        x_proportion, y_proportion = self.transform_microscope_positions_into_proportion(x,y, corners)
         
         new_row = {
             'worm_id': len(df),
@@ -114,6 +114,7 @@ class WormPositionManager:
         if [x,y] not in tab_worms:
             df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
             df.to_csv(self.csv_file_path, index=False)
+            log_debug_coordinate(f"[WormPos] Added worm {len(df)-1} at microscope (x={x}, y={y}) -> prop ({x_proportion:.4f}, {y_proportion:.4f})")
             return True
         else:
             return False
@@ -177,6 +178,7 @@ class WormPositionManager:
                 worm = row.iloc[0]
                 x = worm['x_microscope']
                 y = worm['y_microscope']
+                log_debug_coordinate(f"[WormPos] Retrieved worm {worm_id} pos: ({x}, {y})")
                 return x, y
             else:
                 print(f"Worm ID {worm_id} not find")
@@ -461,22 +463,29 @@ class WormPositionManager:
             return False
     
     # Transform coordinates methods
-    def transform_microscope_positions_into_proportion(self, x, y):
+    def transform_microscope_positions_into_proportion(self, x, y, corners=None):
         """
         Transforms microscope coordinates to proportional coordinates (0 to 1).
         
         Args:
             x (float): Microscope x-coordinate.
             y (float): Microscope y-coordinate.
+            corners (dict, optional): Scan corners. Defaults to None.
             
         Returns:
             Tuple[float, float]: The transformed (x_prop, y_prop) coordinates.
         """
-        parameters = load_config_file()
-        start_corner_x = parameters.get('start_x')
-        start_corner_y = parameters.get('start_y')
-        end_corner_x = parameters.get('end_x')
-        end_corner_y = parameters.get('end_y')
+        if corners:
+            start_corner_x = corners.get('start_x')
+            start_corner_y = corners.get('start_y')
+            end_corner_x = corners.get('end_x')
+            end_corner_y = corners.get('end_y')
+        else:
+            parameters = load_config_file()
+            start_corner_x = parameters.get('start_x')
+            start_corner_y = parameters.get('start_y')
+            end_corner_x = parameters.get('end_x')
+            end_corner_y = parameters.get('end_y')
         
         x = (x - start_corner_x) / (end_corner_x - start_corner_x)
         y = (y - start_corner_y) / (end_corner_y - start_corner_y)

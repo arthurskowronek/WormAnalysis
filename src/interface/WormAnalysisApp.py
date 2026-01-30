@@ -19,7 +19,7 @@ from PIL import Image, ImageTk, ImageColor
 from tkinter.scrolledtext import ScrolledText
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
         
-from config import RESSOURCES_DIR, DATA_DIR, MODELS_DIR, USER_DIR, LOG_DIR, TRAINING_DIR, PARAMETERS_FILE, DATE_FORMAT, EXPOSURE_TIME_LIVE_CONFIG, NAME_CAMERA, EXPOSURE_TIME_ANALYSIS, MICROSCOPE, load_config_file, log_error, increment_user_statistics, update_user_statistics, clear_scan_directory
+from config import RESSOURCES_DIR, DATA_DIR, MODELS_DIR, USER_DIR, LOG_DIR, TRAINING_DIR, PARAMETERS_FILE, DATE_FORMAT, EXPOSURE_TIME_LIVE_CONFIG, NAME_CAMERA, EXPOSURE_TIME_ANALYSIS, MICROSCOPE, load_config_file, log_error, increment_user_statistics, update_user_statistics, clear_scan_directory, log_debug_coordinate
 
 from src.interface.Tooltip import Tooltip
 from src.system.ScanSlice import ScanSlice
@@ -593,13 +593,13 @@ class WormAnalysisApp:
         
         # Process next.png
         next_path = Path(RESSOURCES_DIR) / "icon" / "next.png" 
-        self.next_icon = self.flatten_and_resize_icon(next_path, 40, 40, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
-        self.next_icon_hover = self.flatten_and_resize_icon(next_path, 40, 40, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
+        self.next_icon = self.flatten_and_resize_icon(next_path, 36, 36, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
+        self.next_icon_hover = self.flatten_and_resize_icon(next_path, 36, 36, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
         
         # Process last.png
         last_path = Path(RESSOURCES_DIR) / "icon" / "last.png" 
-        self.last_icon = self.flatten_and_resize_icon(last_path, 40, 40, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
-        self.last_icon_hover = self.flatten_and_resize_icon(last_path, 40, 40, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
+        self.last_icon = self.flatten_and_resize_icon(last_path, 36, 36, self.colors.theme["primary_background"], self.colors.theme["stroke_button"])
+        self.last_icon_hover = self.flatten_and_resize_icon(last_path, 36, 36, self.colors.theme["secondary_background"], self.colors.theme["stroke_button"])
         
         # Process add_worm.png
         add_worm_path = Path(RESSOURCES_DIR) / "icon" / "add_worm.png" 
@@ -1781,6 +1781,11 @@ class WormAnalysisApp:
             increment_user_statistics('nb_scans')
             # Get worms and corners
             worms_microscope_position, corners = scanner.scan()
+            log_debug_coordinate(f"[Scan] Detected corners: {corners}")
+            log_debug_coordinate(f"[Scan] Detected {len(worms_microscope_position)} worms")
+            for i, w in enumerate(worms_microscope_position):
+                log_debug_coordinate(f"[Scan] Worm {i} detected at microscope pos: {w}")
+
             
             # --- ATOMIC UPDATE OF PARAMETERS ---
             # We explicitly update the YAML file with both the new corners AND the new dimensions.
@@ -1832,7 +1837,7 @@ class WormAnalysisApp:
         self.scan_status_label.config(text="Saving worm positions...")
         self.scan_status_label.update_idletasks()
         try:
-            self.worms_position = WormPositionManager(table_worm_position=worms_microscope_position)
+            self.worms_position = WormPositionManager(table_worm_position=worms_microscope_position, corners=corners)
             update_user_statistics('nb_vers_detected', self.worms_position.get_number_of_worms())
         except Exception as e:
             self.context_error = log_error(e, "Saving worm position failed")
@@ -4295,8 +4300,10 @@ class WormAnalysisApp:
         x_microscope, y_microscope = self.CORE.getXYPosition()
         if [int(x_microscope), int(y_microscope)] not in self.worms_position.get_all_worm_microscope_position():
             x_microscope_1st_worm, y_microscope_1st_worm = self.worms_position.get_worm_microscope_position(self.worms_position.get_id_worm_seen())
+            log_debug_coordinate(f"[Load Position] Init: Moving from current ({x_microscope}, {y_microscope}) to 1st worm ({x_microscope_1st_worm}, {y_microscope_1st_worm})")
             time.sleep(0.01)
             self.CORE.setXYPosition(self.CORE.getXYStageDevice(), x_microscope_1st_worm, y_microscope_1st_worm)
+
             
         # Disable some paramaters buttons   
         self.update_parameter_widgets_state(disabled_widgets=["scan_shape", "scan_objective"]) 
@@ -4980,7 +4987,9 @@ class WormAnalysisApp:
             # 1. Move Microscope
             t0 = time.time()
             try:
+                log_debug_coordinate(f"[Analysis] Moving to worm {worm_id} at ({x}, {y})")
                 self.CORE.setXYPosition(self.CORE.getXYStageDevice(), x, y)
+
                 self.CORE.waitForDevice(self.CORE.getXYStageDevice())
                 time.sleep(0.5) # Settle time
             except Exception as e:
