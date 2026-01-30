@@ -980,12 +980,11 @@ class WormAnalysisApp:
         )"""
 
         # Fluo objective
-        if MICROSCOPE == "Nikon":
-            bg = "parameters_button_background" if "fluo_objective" in self.enable_parameters_buttons else "parameters_button_disabled_background"
-            tk.Label(self.params_content_frame, text="Live objective", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
-            _, self.fluo_objective_dropdown = self.create_rounded_dropdown(
-                self.params_content_frame, list_scan_objective, self.fluo_objective, bg
-            )
+        bg = "parameters_button_background" if "fluo_objective" in self.enable_parameters_buttons else "parameters_button_disabled_background"
+        tk.Label(self.params_content_frame, text="Live objective", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
+        _, self.fluo_objective_dropdown = self.create_rounded_dropdown(
+            self.params_content_frame, list_scan_objective, self.fluo_objective, bg
+        )
         
         # Model name
         list_model = [d.name.replace("model_prediction_", "").replace(".pkl", "") for d in MODELS_DIR.iterdir() if "model_prediction_" in d.name]
@@ -2234,10 +2233,10 @@ class WormAnalysisApp:
         display_height = self.live_image_label.winfo_height()
         
         # Calculate scale factor
-        fov_size_um = 100 # à tester
+        fov_size_um = 1000 # à tester
         
-        delta_stage_y = (dx / display_width) * fov_size_um
-        delta_stage_x = -(dy / display_height) * fov_size_um
+        delta_stage_x = (dx / display_width) * fov_size_um
+        delta_stage_y = (dy / display_height) * fov_size_um
         
         # Move microscope
         if self.CORE:
@@ -2313,14 +2312,14 @@ class WormAnalysisApp:
                 
             x_current, y_current = self.CORE.getXYPosition()
             
-            step_size = 100 # à tester
+            step_size = 100 # 10 fois moins que la valeur dans drag ?
                 
             # Calculate new position based on direction
             if direction == 'left':
-                x_new = x_current - step_size
+                x_new = x_current + step_size
                 y_new = y_current
             elif direction == 'right':
-                x_new = x_current + step_size
+                x_new = x_current - step_size
                 y_new = y_current
             elif direction == 'up':
                 x_new = x_current

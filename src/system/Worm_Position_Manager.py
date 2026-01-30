@@ -595,24 +595,6 @@ class WormPositionManager:
         df.loc[mask, 'seen'] = False
         df.loc[mask2, 'seen'] = True
         df.to_csv(self.csv_file_path, index=False)
-         
-    def go_to_next_mutant(self):
-        """
-        Navigates to the next worm in the path that has the user label 'Mutant'.
-        
-        Continues iterating through the path until a 'Mutant' is found. If no
-        mutants exist, a message is printed.
-        """
-        df = pd.read_csv(self.csv_file_path)
-        
-        label = ''
-        if 'Mutant' in df['user_label'].values:
-            while label != 'Mutant':
-                self.go_to_newt_worm()
-                id = self.get_id_worm_seen()
-                label = self.get_worm_label(id)
-        else:
-            print("There is no mutant")
             
     def go_to_last_worm(self):
         """
@@ -640,23 +622,60 @@ class WormPositionManager:
         df.loc[mask2, 'seen'] = True
         df.to_csv(self.csv_file_path, index=False)
         
-    def go_to_last_mutant(self):
+    def go_to_next_mutant(self):
         """
-        Navigates to the previous worm in the path that has the user label 'Mutant'.
-        
-        Continues iterating backward through the path until a 'Mutant' is found.
-        If no mutants exist, a message is printed.
+        Navigue vers le prochain mutant après la position actuelle.
+        S'arrête s'il n'y en a plus après.
         """
         df = pd.read_csv(self.csv_file_path)
         
-        label = ''
-        if 'Mutant' in df['user_label'].values:
-            while label != 'Mutant':
-                self.go_to_last_worm()
-                id = self.get_id_worm_seen()
-                label = self.get_worm_label(id)  
+        # 1. Trouver l'index du ver actuellement "vu"
+        current_seen = df[df['seen'] == True]
+        if current_seen.empty:
+            return # Ou décider de partir du début
+        
+        current_idx = current_seen.index[0]
+        
+        # 2. Chercher les mutants qui ont un index SUPÉRIEUR à l'index actuel
+        next_mutants = df[(df.index > current_idx) & (df['user_label'] == 'Mutant')]
+        
+        if not next_mutants.empty:
+            # On prend le tout premier mutant trouvé après notre position
+            next_idx = next_mutants.index[0]
+            
+            df['seen'] = False
+            df.at[next_idx, 'seen'] = True
+            df.to_csv(self.csv_file_path, index=False)
+            print(f"Déplacement vers le mutant à l'index {next_idx}")
         else:
-            print("There is no mutant")
+            print("Il n'y a plus de mutant après cette position. On ne bouge pas.")
+
+    def go_to_last_mutant(self):
+        """
+        Navigue vers le mutant précédent avant la position actuelle.
+        S'arrête s'il n'y en a plus avant.
+        """
+        df = pd.read_csv(self.csv_file_path)
+        
+        current_seen = df[df['seen'] == True]
+        if current_seen.empty:
+            return
+        
+        current_idx = current_seen.index[0]
+        
+        # 2. Chercher les mutants qui ont un index INFÉRIEUR à l'index actuel
+        prev_mutants = df[(df.index < current_idx) & (df['user_label'] == 'Mutant')]
+        
+        if not prev_mutants.empty:
+            # On prend le DERNIER mutant de la liste filtrée (le plus proche de nous)
+            prev_idx = prev_mutants.index[-1]
+            
+            df['seen'] = False
+            df.at[prev_idx, 'seen'] = True
+            df.to_csv(self.csv_file_path, index=False)
+            print(f"Déplacement vers le mutant précédent à l'index {prev_idx}")
+        else:
+            print("Il n'y a pas de mutant avant cette position. On ne bouge pas.")
     
     # Others methods
     def find_shortest_path(self):
