@@ -22,3 +22,4 @@ microscope_objective_size_5: '40'
 microscope_objective_size_6: '60'
 fluo_objective: 60x
 name_model: V1
+fov_size_um: 1000

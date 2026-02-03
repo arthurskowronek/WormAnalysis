@@ -85,7 +85,7 @@ class WormAnalysisApp:
         self.bounding_box_size = 15 # Size of the bounding box around worms in pixels
         self.loaded_params = load_config_file()
         self.set_parameters()
-        self.enable_parameters_buttons = ["exposure_time","binning","shutter","dual_view","display_mode","scan_objective","fluo_objective","scan_shape", "model_name"]
+        self.enable_parameters_buttons = ["exposure_time","binning","shutter","dual_view","display_mode","scan_objective","fluo_objective","scan_shape", "model_name", "fov_size_um"]
         self.list_files_to_annotate = []
 
         # Initialize preprocessing
@@ -263,6 +263,9 @@ class WormAnalysisApp:
         self.name_model = tk.StringVar(value=self.loaded_params.get("name_model"))
         self.name_model.trace_add("write", lambda *args: self.save_parameters())
         
+        self.fov_size_um = tk.StringVar(value=self.loaded_params.get("fov_size_um", 1000))
+        self.fov_size_um.trace_add("write", lambda *args: self.save_parameters())
+        
         # machine parameters
         self.machine_has_dual_view = tk.BooleanVar(value=self.loaded_params.get("machine_has_dual_view", True))
         self.machine_has_dual_view.trace_add("write", lambda *args: self.save_parameters())
@@ -343,7 +346,8 @@ class WormAnalysisApp:
             "microscope_objective_size_3": self.microscope_objective_size_3.get(),
             "microscope_objective_size_4": self.microscope_objective_size_4.get(),
             "microscope_objective_size_5": self.microscope_objective_size_5.get(),
-            "microscope_objective_size_6": self.microscope_objective_size_6.get()
+            "microscope_objective_size_6": self.microscope_objective_size_6.get(),
+            "fov_size_um": self.fov_size_um.get()
         }
         
         # Read and parse the existing YAML file
@@ -992,6 +996,13 @@ class WormAnalysisApp:
         tk.Label(self.params_content_frame, text="Model name", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
         _, self.model_name_dropdown = self.create_rounded_dropdown(
             self.params_content_frame, list_model, self.name_model, bg
+        )
+        
+        # FOV Size 
+        bg = "parameters_button_background" if "fov_size_um" in self.enable_parameters_buttons else "parameters_button_disabled_background" # enabled by default if not in enable_parameters_buttons check logic, or needs adding to that list
+        tk.Label(self.params_content_frame, text="Microscope step size", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
+        _, self.fov_size_um_entry = self.create_rounded_input(
+            self.params_content_frame, self.fov_size_um, bg
         )
     
     # --- Button ---
@@ -2236,7 +2247,11 @@ class WormAnalysisApp:
         display_height = self.live_image_label.winfo_height()
         
         # Calculate scale factor
-        fov_size_um = 1000 # à tester
+        try:
+            fov_size_um = float(self.fov_size_um.get())
+        except ValueError:
+             fov_size_um = 1000
+             print("[WARNING] FOV size is not a valid number. Using default value of 1000.")
         
         if MICROSCOPE == "Macrozoom":
             delta_stage_x = (dx / display_width) * fov_size_um
@@ -2319,7 +2334,11 @@ class WormAnalysisApp:
                 
             x_current, y_current = self.CORE.getXYPosition()
             
-            step_size = 100 # 10 fois moins que la valeur dans drag ?
+            try:
+                step_size = float(self.fov_size_um.get()) / 10
+            except ValueError:
+                step_size = 100
+                print("[WARNING] FOV size is not a valid number. Using default value of 1000.")
                 
             if MICROSCOPE == "Macrozoom":
                 # Calculate new position based on direction
