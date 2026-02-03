@@ -1576,6 +1576,9 @@ class WormAnalysisApp:
             self._show_enhanced_preview = False
             self.root.unbind_all("<Left>")
             self.root.unbind_all("<Right>")
+            self.root.unbind_all("<Up>")
+            self.root.unbind_all("<Down>")
+            self.root.unbind_all("<space>")
             self.root.update_idletasks()
         except Exception as e:
             self.context_error = log_error(e, f"Switch page {page_id} failed")
@@ -2235,8 +2238,12 @@ class WormAnalysisApp:
         # Calculate scale factor
         fov_size_um = 1000 # à tester
         
-        delta_stage_x = (dx / display_width) * fov_size_um
-        delta_stage_y = (dy / display_height) * fov_size_um
+        if MICROSCOPE == "Macrozoom":
+            delta_stage_x = (dx / display_width) * fov_size_um
+            delta_stage_y = (dy / display_height) * fov_size_um
+        elif MICROSCOPE == "Nikon":
+            delta_stage_y = (dx / display_width) * fov_size_um
+            delta_stage_x = -(dy / display_height) * fov_size_um
         
         # Move microscope
         if self.CORE:
@@ -2314,21 +2321,39 @@ class WormAnalysisApp:
             
             step_size = 100 # 10 fois moins que la valeur dans drag ?
                 
-            # Calculate new position based on direction
-            if direction == 'left':
-                x_new = x_current + step_size
-                y_new = y_current
-            elif direction == 'right':
-                x_new = x_current - step_size
-                y_new = y_current
-            elif direction == 'up':
-                x_new = x_current
-                y_new = y_current + step_size
-            elif direction == 'down':
-                x_new = x_current
-                y_new = y_current - step_size
-            else:
-                return
+            if MICROSCOPE == "Macrozoom":
+                # Calculate new position based on direction
+                if direction == 'left':
+                    x_new = x_current + step_size
+                    y_new = y_current
+                elif direction == 'right':
+                    x_new = x_current - step_size
+                    y_new = y_current
+                elif direction == 'up':
+                    x_new = x_current
+                    y_new = y_current + step_size
+                elif direction == 'down':
+                    x_new = x_current
+                    y_new = y_current - step_size
+                else:
+                    return
+            elif MICROSCOPE == "Nikon":
+                # Calculate new position based on direction
+                if direction == 'down':
+                    x_new = x_current + step_size
+                    y_new = y_current
+                elif direction == 'up':
+                    x_new = x_current - step_size
+                    y_new = y_current
+                elif direction == 'left':
+                    x_new = x_current
+                    y_new = y_current + step_size
+                elif direction == 'right':
+                    x_new = x_current
+                    y_new = y_current - step_size
+                else:
+                    return
+
 
             self.CORE.setXYPosition(self.CORE.getXYStageDevice(), x_new, y_new)
             
@@ -2449,49 +2474,50 @@ class WormAnalysisApp:
             self.proportion_wt_label_ref.config(text=f"{int(100*(1-self.worms_position.get_mutant_proportion()))}%")
             self.proportion_mutant_label_ref.config(text=f"{int(100*(self.worms_position.get_mutant_proportion()))}%")
             
-            # save image in the corresponding directory
-            filename = f"{id}.tif"
-            WT_path = Path(DATA_DIR) / "WT_prediction" / filename
-            Mutant_path = Path(DATA_DIR) / "Mutant_prediction" / filename
-            final_directory = Path(DATA_DIR) / "WT"
-            file_count = len(list(final_directory.glob("*")))
-            new_filename = f"WT_{file_count}.tif"
-            classified_path = final_directory / new_filename
-            if WT_path.exists() or Mutant_path.exists():
-                unclassified_path = WT_path if WT_path.exists() else Mutant_path
-                shutil.move(str(unclassified_path), str(classified_path))
-                
-                # update label in the big dataset
-                big_dataset = Dataset_Manager()
-                big_dataset.load_images(compute=False, name_dataset="big_dataset")
-                big_dataset.update_label_by_filename(filename, "WT", new_filename)
-                
-                # update model_performance file
-                # Get variables
-                csv_path_best_model = Path(MODELS_DIR) / "best_model_tracking.csv"
-                df_best_model = pd.read_csv(csv_path_best_model)
-                best_row = df_best_model.loc[df_best_model['best_score'].idxmax()]
-                best_scaler = best_row['best_scaler_name']
-                best_model = best_row['best_model_name']
-                new_line = {
-                    'date': [pd.Timestamp.now().strftime(DATE_FORMAT)],
-                    'best_scaler_name': [best_scaler], 
-                    'best_model_name': [best_model],
-                    'label_predicted': [self.worms_position.get_worm_prediction(id)],
-                    'label_true': ["WT"]
-                }
-                df_new_results = pd.DataFrame(new_line)
-                csv_path = Path(MODELS_DIR) / "model_performance.csv"
-                df_existing_results = pd.read_csv(csv_path)
-                df_combined_results = pd.concat([df_existing_results, df_new_results], ignore_index=True)
-                df_combined_results.to_csv(csv_path, index=False, mode='w')
-                
-            else:
-                snap_img = self.snap_image()
-                mask = self.find_worm_segmentation(snap_img)
-                img = np.zeros_like(snap_img)
-                img[mask] = snap_img[mask]
-                cv2.imwrite(str(classified_path), img)
+            if False:
+                # save image in the corresponding directory
+                filename = f"{id}.tif"
+                WT_path = Path(DATA_DIR) / "WT_prediction" / filename
+                Mutant_path = Path(DATA_DIR) / "Mutant_prediction" / filename
+                final_directory = Path(DATA_DIR) / "WT"
+                file_count = len(list(final_directory.glob("*")))
+                new_filename = f"WT_{file_count}.tif"
+                classified_path = final_directory / new_filename
+                if WT_path.exists() or Mutant_path.exists():
+                    unclassified_path = WT_path if WT_path.exists() else Mutant_path
+                    shutil.move(str(unclassified_path), str(classified_path))
+                    
+                    # update label in the big dataset
+                    big_dataset = Dataset_Manager()
+                    big_dataset.load_images(compute=False, name_dataset="big_dataset")
+                    big_dataset.update_label_by_filename(filename, "WT", new_filename)
+                    
+                    # update model_performance file
+                    # Get variables
+                    csv_path_best_model = Path(MODELS_DIR) / "best_model_tracking.csv"
+                    df_best_model = pd.read_csv(csv_path_best_model)
+                    best_row = df_best_model.loc[df_best_model['best_score'].idxmax()]
+                    best_scaler = best_row['best_scaler_name']
+                    best_model = best_row['best_model_name']
+                    new_line = {
+                        'date': [pd.Timestamp.now().strftime(DATE_FORMAT)],
+                        'best_scaler_name': [best_scaler], 
+                        'best_model_name': [best_model],
+                        'label_predicted': [self.worms_position.get_worm_prediction(id)],
+                        'label_true': ["WT"]
+                    }
+                    df_new_results = pd.DataFrame(new_line)
+                    csv_path = Path(MODELS_DIR) / "model_performance.csv"
+                    df_existing_results = pd.read_csv(csv_path)
+                    df_combined_results = pd.concat([df_existing_results, df_new_results], ignore_index=True)
+                    df_combined_results.to_csv(csv_path, index=False, mode='w')
+                    
+                else:
+                    snap_img = self.snap_image()
+                    mask = self.find_worm_segmentation(snap_img)
+                    img = np.zeros_like(snap_img)
+                    img[mask] = snap_img[mask]
+                    cv2.imwrite(str(classified_path), img)
         except Exception as e:
             self.context_error = log_error(e, f"Classify as WT failed")
     
@@ -2510,49 +2536,50 @@ class WormAnalysisApp:
             self.proportion_wt_label_ref.config(text=f"{int(100*(1-self.worms_position.get_mutant_proportion()))}%")
             self.proportion_mutant_label_ref.config(text=f"{int(100*(self.worms_position.get_mutant_proportion()))}%")
             
-            # save image in the corresponding directory
-            filename = f"{id}.tif"
-            WT_path = Path(DATA_DIR) / "WT_prediction" / filename
-            Mutant_path = Path(DATA_DIR) / "Mutant_prediction" / filename
-            final_directory = Path(DATA_DIR) / "Mutant"
-            file_count = len(list(final_directory.glob("*")))
-            new_filename = f"Mut_{file_count}.tif"
-            classified_path = final_directory / new_filename
-            if WT_path.exists() or Mutant_path.exists():
-                unclassified_path = WT_path if WT_path.exists() else Mutant_path
-                shutil.move(str(unclassified_path), str(classified_path))
-                
-                # update label in the big dataset
-                big_dataset = Dataset_Manager()
-                big_dataset.load_images(compute=False, name_dataset="big_dataset")
-                big_dataset.update_label_by_filename(filename, "Mutant", new_filename)
-                
-                # update model_performance file
-                # Get variables
-                csv_path_best_model = Path(MODELS_DIR) / "best_model_tracking.csv"
-                df_best_model = pd.read_csv(csv_path_best_model)
-                best_row = df_best_model.loc[df_best_model['best_score'].idxmax()]
-                best_scaler = best_row['best_scaler_name']
-                best_model = best_row['best_model_name']
-                new_line = {
-                    'date': [pd.Timestamp.now().strftime(DATE_FORMAT)],
-                    'best_scaler_name': [best_scaler],
-                    'best_model_name': [best_model],
-                    'label_predicted': [self.worms_position.get_worm_prediction(id)],
-                    'label_true': ["Mutant"]
-                }
-                df_new_results = pd.DataFrame(new_line)
-                csv_path = Path(MODELS_DIR) / "model_performance.csv"
-                df_existing_results = pd.read_csv(csv_path)
-                df_combined_results = pd.concat([df_existing_results, df_new_results], ignore_index=True)
-                df_combined_results.to_csv(csv_path, index=False, mode='w')
-                
-            else:
-                snap_img = self.snap_image()
-                mask = self.find_worm_segmentation(snap_img)
-                img = np.zeros_like(snap_img)
-                img[mask] = snap_img[mask]
-                cv2.imwrite(str(classified_path), img)
+            if False:
+                # save image in the corresponding directory
+                filename = f"{id}.tif"
+                WT_path = Path(DATA_DIR) / "WT_prediction" / filename
+                Mutant_path = Path(DATA_DIR) / "Mutant_prediction" / filename
+                final_directory = Path(DATA_DIR) / "Mutant"
+                file_count = len(list(final_directory.glob("*")))
+                new_filename = f"Mut_{file_count}.tif"
+                classified_path = final_directory / new_filename
+                if WT_path.exists() or Mutant_path.exists():
+                    unclassified_path = WT_path if WT_path.exists() else Mutant_path
+                    shutil.move(str(unclassified_path), str(classified_path))
+                    
+                    # update label in the big dataset
+                    big_dataset = Dataset_Manager()
+                    big_dataset.load_images(compute=False, name_dataset="big_dataset")
+                    big_dataset.update_label_by_filename(filename, "Mutant", new_filename)
+                    
+                    # update model_performance file
+                    # Get variables
+                    csv_path_best_model = Path(MODELS_DIR) / "best_model_tracking.csv"
+                    df_best_model = pd.read_csv(csv_path_best_model)
+                    best_row = df_best_model.loc[df_best_model['best_score'].idxmax()]
+                    best_scaler = best_row['best_scaler_name']
+                    best_model = best_row['best_model_name']
+                    new_line = {
+                        'date': [pd.Timestamp.now().strftime(DATE_FORMAT)],
+                        'best_scaler_name': [best_scaler],
+                        'best_model_name': [best_model],
+                        'label_predicted': [self.worms_position.get_worm_prediction(id)],
+                        'label_true': ["Mutant"]
+                    }
+                    df_new_results = pd.DataFrame(new_line)
+                    csv_path = Path(MODELS_DIR) / "model_performance.csv"
+                    df_existing_results = pd.read_csv(csv_path)
+                    df_combined_results = pd.concat([df_existing_results, df_new_results], ignore_index=True)
+                    df_combined_results.to_csv(csv_path, index=False, mode='w')
+                    
+                else:
+                    snap_img = self.snap_image()
+                    mask = self.find_worm_segmentation(snap_img)
+                    img = np.zeros_like(snap_img)
+                    img[mask] = snap_img[mask]
+                    cv2.imwrite(str(classified_path), img)
         except Exception as e:
             self.context_error = log_error(e, f"Classify as mutant failed")
      
@@ -4794,6 +4821,8 @@ class WormAnalysisApp:
         self.root.bind("<Right>", lambda event: self.move_microscope_relative('right'))
         self.root.bind("<Up>", lambda event: self.move_microscope_relative('up'))
         self.root.bind("<Down>", lambda event: self.move_microscope_relative('down'))
+        # Bind spacebar to next worm (using root to be consistent with arrow keys)
+        self.root.bind("<space>", lambda event: self.go_to_next_worm())
 
         """self.main_content.focus_set()  # Make sure the frame has focus to capture key events
         self.main_content.bind("<Left>", lambda event: self.go_to_last_worm())
