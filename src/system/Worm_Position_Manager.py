@@ -41,6 +41,7 @@ class WormPositionManager:
         
         # Define the columns for the DataFrame.
         self.columns = ['worm_id', 'id_path', 'x_microscope', 'y_microscope', 'x_proportion', 'y_proportion', 'prediction', 'user_label', 'seen']
+        self.df = pd.DataFrame(columns=self.columns)
         
         # Create the output directory if it does not exist.
         os.makedirs(output_folder, exist_ok=True)
@@ -53,8 +54,13 @@ class WormPositionManager:
                 self._initialize_csv(table_worm_position)
                 self.go_to_first_worm(id)
             else:
+                self.df = pd.read_csv(self.csv_file_path)
                 #self.find_shortest_path()
                 self.go_to_first_worm(id)
+      
+    def _save_csv(self):
+        """Helper to save the current DF to CSV."""
+        self.df.to_csv(self.csv_file_path, index=False)
      
     def _initialize_csv(self, table_worm_position = [], corners=None) -> None:
         """
@@ -67,8 +73,8 @@ class WormPositionManager:
             table_worm_position (List): A list of initial worm positions.
         """
         data = {col: [] for col in self.columns}
-        df = pd.DataFrame(data)
-        df.to_csv(self.csv_file_path, index=False)
+        self.df = pd.DataFrame(data)
+        self._save_csv()
         
         for pos in table_worm_position:
             x,y = pos[0], pos[1]
@@ -93,28 +99,28 @@ class WormPositionManager:
                   False if the position already exists.
         """
         # read the CSV file
-        df = pd.read_csv(self.csv_file_path)
+        # df = pd.read_csv(self.csv_file_path) # CACHED
         tab_worms = self.get_all_worm_microscope_position()
         # Convert microscope coordinates to proportional coordinates.
         x_proportion, y_proportion = self.transform_microscope_positions_into_proportion(x,y, corners)
         
         new_row = {
-            'worm_id': len(df),
-            'id_path': len(df),
+            'worm_id': len(self.df),
+            'id_path': len(self.df),
             'x_microscope': float(x),
             'y_microscope': float(y),
             'x_proportion': float(x_proportion),
             'y_proportion': float(y_proportion),
             'prediction': float(prediction),
             'user_label': str(user_label) if user_label != 'None' else '',
-            'seen': False if len(df) > 0 else True
+            'seen': False if len(self.df) > 0 else True
         }
         
         # Add the new line
         if [x,y] not in tab_worms:
-            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-            df.to_csv(self.csv_file_path, index=False)
-            log_debug_coordinate(f"[WormPos] Added worm {len(df)-1} at microscope (x={x}, y={y}) -> prop ({x_proportion:.4f}, {y_proportion:.4f})")
+            self.df = pd.concat([self.df, pd.DataFrame([new_row])], ignore_index=True)
+            self._save_csv()
+            log_debug_coordinate(f"[WormPos] Added worm {len(self.df)-1} at microscope (x={x}, y={y}) -> prop ({x_proportion:.4f}, {y_proportion:.4f})")
             return True
         else:
             return False
@@ -132,30 +138,70 @@ class WormPositionManager:
         Returns:
             bool: True if the worm was successfully deleted, False otherwise.
         """
-        df = pd.read_csv(self.csv_file_path)
-        if df.empty:
+        # df = pd.read_csv(self.csv_file_path) # CACHED
+        if self.df.empty:
             return False
 
-        if worm_id not in df['worm_id'].values:
+        if worm_id not in self.df['worm_id'].values:
             return False
 
-        df = df[df['worm_id'] != worm_id].reset_index(drop=True)
+        self.df = self.df[self.df['worm_id'] != worm_id].reset_index(drop=True)
 
-        df['worm_id'] = range(len(df))
-        df['id_path'] = range(len(df))  # Reset id_path after deletion
-        df.to_csv(self.csv_file_path, index=False)
+        self.df['worm_id'] = range(len(self.df))
+        self.df['id_path'] = range(len(self.df))  # Reset id_path after deletion
+        self._save_csv()
 
-        self.find_shortest_path()
+        # Optimization: Do NOT recalculate shortest path here.
+        # It takes too long (O(N!) or heuristic) for a simple interaction.
+        # It will be calculated when entering the "Load Position" page.
+        # self.find_shortest_path()
 
         return True
+
+    def fast_delete_worm(self, worm_id: int) -> bool:
+        """
+        Deletes a worm from the in-memory DataFrame ONLY.
+        Does NOT save to CSV or recalculate paths.
+        Used for batch deletions (e.g. during drag).
+        """
+        if self.df.empty:
+            return False
+
+        if worm_id not in self.df['worm_id'].values:
+            return False
+
+        self.df = self.df[self.df['worm_id'] != worm_id]
+        return True
+
+    def commit_deletions(self):
+        """
+        Finalizes batch deletions:
+        1. Re-indexes worm_ids and id_paths.
+        2. Saves to CSV.
+        3. 
+        Note: Does NOT calculate TSP (find_shortest_path) to save time.
+        TSP should be called when switching to 'Show Load Position'.
+        """
+        if self.df.empty:
+            self._save_csv()
+            return
+
+        self.df = self.df.reset_index(drop=True)
+        self.df['worm_id'] = range(len(self.df))
+        # Reset id_path temporarily to match order, or keep as is?
+        # If we delete, gaps in id_path might exist if we don't re-index.
+        # Simple re-index:
+        self.df['id_path'] = range(len(self.df)) 
+        
+        self._save_csv()
     
     def delete_all_worms(self):
         """
         Deletes all worms from the CSV file
         """
         data = {col: [] for col in self.columns}
-        df = pd.DataFrame(data)
-        df.to_csv(self.csv_file_path, index=False)
+        self.df = pd.DataFrame(data)
+        self._save_csv()
 
     # Getters and Setters methods
     def get_worm_microscope_position(self, worm_id: int) -> Optional[pd.Series]:
@@ -169,9 +215,9 @@ class WormPositionManager:
             Tuple[float, float]: The (x, y) coordinates of the worm. Returns (0, 0)
                                  if the worm is not found.
         """
-        df = pd.read_csv(self.csv_file_path)
-        if df is not None and not df.empty:
-            row = df[df['worm_id'] == worm_id]
+        # df = pd.read_csv(self.csv_file_path) # CACHED
+        if self.df is not None and not self.df.empty:
+            row = self.df[self.df['worm_id'] == worm_id]
             if not row.empty:
                 
                 # return x,y as a tuple
@@ -193,9 +239,9 @@ class WormPositionManager:
             List[List[float]]: A list of `[x, y]` coordinate pairs for all worms.
                                Returns an empty list if no worms are found.
         """
-        df = pd.read_csv(self.csv_file_path)
-        if df is not None and not df.empty:
-            positions = df[['x_microscope', 'y_microscope']].astype(int).values.tolist()
+        # df = pd.read_csv(self.csv_file_path) # CACHED
+        if self.df is not None and not self.df.empty:
+            positions = self.df[['x_microscope', 'y_microscope']].astype(int).values.tolist()
             return positions
         else:
             #print("CSV file is empty or not found")
@@ -209,9 +255,9 @@ class WormPositionManager:
             List[List[float]]: A list of `[worm_id, x_proportion, y_proportion]`
                                for all worms. Returns an empty list if no worms are found.
         """
-        df = pd.read_csv(self.csv_file_path)
-        if df is not None and not df.empty:
-            positions = df[['worm_id', 'x_proportion', 'y_proportion']].values.tolist()
+        # df = pd.read_csv(self.csv_file_path) # CACHED
+        if self.df is not None and not self.df.empty:
+            positions = self.df[['worm_id', 'x_proportion', 'y_proportion']].values.tolist()
             return positions
         else:
             #print("CSV file is empty or not found")
@@ -224,11 +270,11 @@ class WormPositionManager:
         Returns:
             int: The `worm_id` of the seen worm. Returns 0 if no worm is marked as seen.
         """
-        df = pd.read_csv(self.csv_file_path)
+        # df = pd.read_csv(self.csv_file_path) # CACHED
 
         id_seen = 0
         
-        for idx, row in df.iterrows():
+        for idx, row in self.df.iterrows():
             if row['seen'] == True:
                 id_seen = row['worm_id'] 
         
@@ -241,11 +287,11 @@ class WormPositionManager:
         Returns:
             int: The `id_path` of the seen worm. Returns 0 if no worm is marked as seen.
         """
-        df = pd.read_csv(self.csv_file_path)
+        # df = pd.read_csv(self.csv_file_path) # CACHED
 
         id_path_seen = 0
         
-        for idx, row in df.iterrows():
+        for idx, row in self.df.iterrows():
             if row['seen'] == True:
                 id_path_seen = row['id_path'] 
         
@@ -263,11 +309,11 @@ class WormPositionManager:
                  Returns 'None' if the worm is not found or an error occurs.
         """
         try:
-            df = pd.read_csv(self.csv_file_path)
-            if df.empty:
+            # df = pd.read_csv(self.csv_file_path) # CACHED
+            if self.df.empty:
                 return 'None'
 
-            row = df[df['worm_id'] == worm_id]
+            row = self.df[self.df['worm_id'] == worm_id]
             if row.empty:
                 print(f"Worm ID {worm_id} not find.")
                 return 'None'
@@ -290,11 +336,11 @@ class WormPositionManager:
                    Returns -1.0 if the worm is not found or an error occurs.
         """
         try:
-            df = pd.read_csv(self.csv_file_path)
-            if df.empty:
+            # df = pd.read_csv(self.csv_file_path) # CACHED
+            if self.df.empty:
                 return 'None'
 
-            row = df[df['worm_id'] == worm_id]
+            row = self.df[self.df['worm_id'] == worm_id]
             if row.empty:
                 print(f"Worm ID {worm_id} not find.")
                 return 'None'
@@ -312,8 +358,8 @@ class WormPositionManager:
         Returns:
             int: The count of worms. Returns 0 if the CSV file is empty or not found.
         """
-        df = pd.read_csv(self.csv_file_path)
-        return len(df) if df is not None else 0
+        # df = pd.read_csv(self.csv_file_path) # CACHED
+        return len(self.df) if self.df is not None else 0
 
     def get_mutant_proportion(self) -> float:
         """
@@ -324,16 +370,16 @@ class WormPositionManager:
             float: The proportion of mutants (0.0 to 1.0). Returns 0.0 if no
                    worms have a user label.
         """
-        df = pd.read_csv(self.csv_file_path)
+        # df = pd.read_csv(self.csv_file_path) # CACHED
         
-        if df.empty:
+        if self.df.empty:
             return 0.0
         
         # Filter worms that have a user_label (not empty, not 'None', not NaN)
-        labeled_worms = df[
-            (df['user_label'].notna()) & 
-            (df['user_label'] != '') & 
-            (df['user_label'] != 'None')
+        labeled_worms = self.df[
+            (self.df['user_label'].notna()) & 
+            (self.df['user_label'] != '') & 
+            (self.df['user_label'] != 'None')
         ]
         
         if labeled_worms.empty:
@@ -354,13 +400,13 @@ class WormPositionManager:
         Returns:
             list: A list of integers representing the IDs of mutant worms.
         """
-        df = pd.read_csv(self.csv_file_path)
+        # df = pd.read_csv(self.csv_file_path) # CACHED
         
-        if df.empty:
+        if self.df.empty:
             return []
         
         # Filter for 'Mutant' label
-        mutant_worms = df[df['user_label'] == 'Mutant']
+        mutant_worms = self.df[self.df['user_label'] == 'Mutant']
         
         if mutant_worms.empty:
             return []
@@ -379,17 +425,17 @@ class WormPositionManager:
             bool: True if the update was successful, False otherwise.
         """
         try:
-            df = pd.read_csv(self.csv_file_path)
-            if df.empty:
+            # df = pd.read_csv(self.csv_file_path) # CACHED
+            if self.df.empty:
                 return False
                 
-            mask = df['worm_id'] == worm_id
+            mask = self.df['worm_id'] == worm_id
             if not mask.any():
                 print(f"Worm ID {worm_id} not find for update")
                 return False
             
-            df.loc[mask, 'user_label'] = str(user_label)
-            df.to_csv(self.csv_file_path, index=False)
+            self.df.loc[mask, 'user_label'] = str(user_label)
+            self._save_csv()
             
             return True
             
@@ -410,21 +456,21 @@ class WormPositionManager:
             bool: True if the update was successful, False otherwise.
         """
         try:
-            df = pd.read_csv(self.csv_file_path)
-            if df.empty:
+            # df = pd.read_csv(self.csv_file_path) # CACHED
+            if self.df.empty:
                 return False
                 
-            mask = df['worm_id'] == worm_id
+            mask = self.df['worm_id'] == worm_id
             if not mask.any():
                 print(f"Worm ID {worm_id} not find for update")
                 return False
             
-            df.loc[mask, 'x_microscope'] = float(microscope_position_x)
-            df.loc[mask, 'y_microscope'] = float(microscope_position_y)
+            self.df.loc[mask, 'x_microscope'] = float(microscope_position_x)
+            self.df.loc[mask, 'y_microscope'] = float(microscope_position_y)
             x_proportion, y_proportion = self.transform_microscope_positions_into_proportion(microscope_position_x,microscope_position_y)
-            df.loc[mask, 'x_proportion'] = float(x_proportion)
-            df.loc[mask, 'y_proportion'] = float(y_proportion)
-            df.to_csv(self.csv_file_path, index=False)
+            self.df.loc[mask, 'x_proportion'] = float(x_proportion)
+            self.df.loc[mask, 'y_proportion'] = float(y_proportion)
+            self._save_csv()
             
             return True
             
@@ -444,17 +490,17 @@ class WormPositionManager:
             bool: True if the update was successful, False otherwise.
         """
         try:
-            df = pd.read_csv(self.csv_file_path)
-            if df.empty:
+            # df = pd.read_csv(self.csv_file_path) # CACHED
+            if self.df.empty:
                 return False
                 
-            mask = df['worm_id'] == worm_id
+            mask = self.df['worm_id'] == worm_id
             if not mask.any():
                 print(f"Worm ID {worm_id} not find for update")
                 return False
             
-            df.loc[mask, 'prediction'] = float(prediction)
-            df.to_csv(self.csv_file_path, index=False)
+            self.df.loc[mask, 'prediction'] = float(prediction)
+            self._save_csv()
             
             return True
             
@@ -556,21 +602,21 @@ class WormPositionManager:
         All other worms are marked as 'not seen'.
         """
         print(f"id: {id}")
-        df = pd.read_csv(self.csv_file_path)
+        # df = pd.read_csv(self.csv_file_path) # CACHED
         
-        if df.empty:
+        if self.df.empty:
             print("No worms available in the CSV file.")
             return
         
         # Set all worms to not seen
-        df['seen'] = False
+        self.df['seen'] = False
         
         # Set the first worm in the path (id_path = 0) to seen
-        mask_first = df['id_path'] == id
-        df.loc[mask_first, 'seen'] = True
+        mask_first = self.df['id_path'] == id
+        self.df.loc[mask_first, 'seen'] = True
         
         # Save the updated DataFrame
-        df.to_csv(self.csv_file_path, index=False)
+        self._save_csv()
              
     def go_to_newt_worm(self):
         """
@@ -579,22 +625,22 @@ class WormPositionManager:
         The current 'seen' worm is marked as 'not seen', and the worm with
         the next `id_path` is marked as 'seen'. 
         """
-        df = pd.read_csv(self.csv_file_path)
+        # df = pd.read_csv(self.csv_file_path) # CACHED
         
         id_seen = 0
 
-        for idx, row in df.iterrows():
+        for idx, row in self.df.iterrows():
             if row['seen'] == True:
                 id_seen = idx
                 
-        mask = df['id_path'] == id_seen
-        if id_seen+1 >= len(df):
-            mask2 = df['id_path'] == id_seen
+        mask = self.df['id_path'] == id_seen
+        if id_seen+1 >= len(self.df):
+            mask2 = self.df['id_path'] == id_seen
         else:
-            mask2 = df['id_path'] == id_seen+1
-        df.loc[mask, 'seen'] = False
-        df.loc[mask2, 'seen'] = True
-        df.to_csv(self.csv_file_path, index=False)
+            mask2 = self.df['id_path'] == id_seen+1
+        self.df.loc[mask, 'seen'] = False
+        self.df.loc[mask2, 'seen'] = True
+        self._save_csv()
             
     def go_to_last_worm(self):
         """
@@ -604,48 +650,48 @@ class WormPositionManager:
         the previous `id_path` is marked as 'seen'. Wraps around to the end
         if at the beginning of the path.
         """
-        df = pd.read_csv(self.csv_file_path)
+        # df = pd.read_csv(self.csv_file_path) # CACHED
         
         id_seen = 0
         
-        for idx, row in df.iterrows():
+        for idx, row in self.df.iterrows():
             if row['seen'] == True:
                 id_seen = idx
                 
-        mask = df['id_path'] == id_seen
+        mask = self.df['id_path'] == id_seen
         if id_seen-1 < 0:
-            mask2 = df['id_path'] == id_seen
+            mask2 = self.df['id_path'] == id_seen
         else:
-            mask2 = df['id_path'] == id_seen-1
+            mask2 = self.df['id_path'] == id_seen-1
         
-        df.loc[mask, 'seen'] = False
-        df.loc[mask2, 'seen'] = True
-        df.to_csv(self.csv_file_path, index=False)
+        self.df.loc[mask, 'seen'] = False
+        self.df.loc[mask2, 'seen'] = True
+        self._save_csv()
         
     def go_to_next_mutant(self):
         """
         Navigue vers le prochain mutant après la position actuelle.
         S'arrête s'il n'y en a plus après.
         """
-        df = pd.read_csv(self.csv_file_path)
+        # df = pd.read_csv(self.csv_file_path) # CACHED
         
         # 1. Trouver l'index du ver actuellement "vu"
-        current_seen = df[df['seen'] == True]
+        current_seen = self.df[self.df['seen'] == True]
         if current_seen.empty:
             return # Ou décider de partir du début
         
         current_idx = current_seen.index[0]
         
         # 2. Chercher les mutants qui ont un index SUPÉRIEUR à l'index actuel
-        next_mutants = df[(df.index > current_idx) & (df['user_label'] == 'Mutant')]
+        next_mutants = self.df[(self.df.index > current_idx) & (self.df['user_label'] == 'Mutant')]
         
         if not next_mutants.empty:
             # On prend le tout premier mutant trouvé après notre position
             next_idx = next_mutants.index[0]
             
-            df['seen'] = False
-            df.at[next_idx, 'seen'] = True
-            df.to_csv(self.csv_file_path, index=False)
+            self.df['seen'] = False
+            self.df.at[next_idx, 'seen'] = True
+            self._save_csv()
             print(f"Déplacement vers le mutant à l'index {next_idx}")
         else:
             print("Il n'y a plus de mutant après cette position. On ne bouge pas.")
@@ -655,24 +701,24 @@ class WormPositionManager:
         Navigue vers le mutant précédent avant la position actuelle.
         S'arrête s'il n'y en a plus avant.
         """
-        df = pd.read_csv(self.csv_file_path)
+        # df = pd.read_csv(self.csv_file_path) # CACHED
         
-        current_seen = df[df['seen'] == True]
+        current_seen = self.df[self.df['seen'] == True]
         if current_seen.empty:
             return
         
         current_idx = current_seen.index[0]
         
         # 2. Chercher les mutants qui ont un index INFÉRIEUR à l'index actuel
-        prev_mutants = df[(df.index < current_idx) & (df['user_label'] == 'Mutant')]
+        prev_mutants = self.df[(self.df.index < current_idx) & (self.df['user_label'] == 'Mutant')]
         
         if not prev_mutants.empty:
             # On prend le DERNIER mutant de la liste filtrée (le plus proche de nous)
             prev_idx = prev_mutants.index[-1]
             
-            df['seen'] = False
-            df.at[prev_idx, 'seen'] = True
-            df.to_csv(self.csv_file_path, index=False)
+            self.df['seen'] = False
+            self.df.at[prev_idx, 'seen'] = True
+            self._save_csv()
             print(f"Déplacement vers le mutant précédent à l'index {prev_idx}")
         else:
             print("Il n'y a pas de mutant avant cette position. On ne bouge pas.")
@@ -688,26 +734,26 @@ class WormPositionManager:
         is sorted and saved.
         """
         # Compute dist_matrix from worm positions
-        df = pd.read_csv(self.csv_file_path)
-        if df.empty:
+        # df = pd.read_csv(self.csv_file_path) # CACHED
+        if self.df.empty:
             return
-        positions = df[['x_microscope', 'y_microscope']].values
+        positions = self.df[['x_microscope', 'y_microscope']].values
         dist_matrix = np.linalg.norm(positions[:, np.newaxis] - positions, axis=2)
         
-        if len(df) <= 10: # software bug with more points
+        if len(self.df) <= 10: # software bug with more points
             # Use exact method
             permutation, dist_opt = solve_tsp_dynamic_programming(dist_matrix)
         else:
             # Use local search method
             permutation, dist_approx = solve_tsp_local_search(dist_matrix)
             
-        for i in range(len(df)):
-            mask = df['worm_id'] == permutation[i]
-            df.loc[mask, 'id_path'] = i
+        for i in range(len(self.df)):
+            mask = self.df['worm_id'] == permutation[i]
+            self.df.loc[mask, 'id_path'] = i
             
         # create new csv file with row in order of 'id_path'
-        sorted_df = df.sort_values(by='id_path')
-        sorted_df.to_csv(self.csv_file_path, index=False)
+        self.df = self.df.sort_values(by='id_path')
+        self._save_csv()
     
     def show_map_worms_position(self):
         """
@@ -722,7 +768,8 @@ class WormPositionManager:
         Returns:
             np.ndarray: An OpenCV-compatible image (numpy array).
         """
-        df = pd.read_csv(self.csv_file_path)
+        # df = pd.read_csv(self.csv_file_path) # CACHED
+        df = self.df
 
         # Create a black image
         size = 700
@@ -787,7 +834,8 @@ class WormPositionManager:
         Returns:
             np.ndarray: An OpenCV-compatible image (numpy array) of the table.
         """
-        df = pd.read_csv(self.csv_file_path)
+        # df = pd.read_csv(self.csv_file_path) # CACHED
+        df = self.df
 
         # Create blank image
         rows = len(df)

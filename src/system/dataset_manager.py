@@ -749,7 +749,8 @@ class Dataset_Manager:
                         
                         print(f"[INFO] Saved {len(support)} selected feature indices to {file_path}")
 
-                
+                    print("[DEBUG] Feature selection saved. Proceeding to save metrics...")
+            
                 # Visualize results with a heatmap if multiple models or scalers were tested.
                 if (len(classifier_type) > 1 or len(scaler) > 1) and verbose_plot == True:
                     plot_heatmap(results_df)
@@ -805,6 +806,7 @@ class Dataset_Manager:
             else:
                 saved_len = len(y)
     
+            print("[DEBUG] Saving metrics to CSV...")
             new_line = {
                 'date': [pd.Timestamp.now().strftime(DATE_FORMAT)],
                 'best_scaler_name': [best_scaler_name],
@@ -820,19 +822,22 @@ class Dataset_Manager:
                 df_combined_results.to_csv(csv_path, index=False, mode='w')
             else:
                 df_new_results.to_csv(csv_path, index=False, mode='w', header=True)
+            print("[DEBUG] Metrics CSV saved.")   
                 
                 
-                
+            print("[DEBUG] Checking for best model update...")
             df = pd.read_csv(csv_path)        
             max_existing_score = df['best_score'].max()
             # Save the new model only if its performance is better than the best saved model.
             if best_score >= max_existing_score: 
                 try:
+                    print(f"[DEBUG] Saving pickle model to {MODELS_DIR / 'model_prediction.pkl'}...")
                     joblib.dump(model, MODELS_DIR / "model_prediction.pkl")
                     print(f"Model saved to", MODELS_DIR / "model_prediction.pkl")
                 except Exception as e:
                     print(f"Error saving model: {e}")
             
+            print("[DEBUG] get_model finishing.")
             return model, best_score
        
     def get_y_without_coiled_worm(self) -> np.ndarray:
