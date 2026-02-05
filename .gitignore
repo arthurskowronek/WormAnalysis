@@ -22,3 +22,4 @@ main.spec
 notebooks/runs
 notebooks/YOLO_data
 .env
+training/Sephora
