@@ -291,23 +291,31 @@ class WormAnalysisApp:
         self.microscope_step_size = tk.StringVar(value=self.loaded_params.get("microscope_step_size"))
         self.microscope_step_size.trace_add("write", lambda *args: self.save_parameters())
         
-        self.microscope_objective_size_1 = tk.StringVar(value=self.loaded_params.get("microscope_objective_size_1"))
-        self.microscope_objective_size_1.trace_add("write", lambda *args: self.save_parameters())
-        
-        self.microscope_objective_size_2 = tk.StringVar(value=self.loaded_params.get("microscope_objective_size_2"))
-        self.microscope_objective_size_2.trace_add("write", lambda *args: self.save_parameters())
-        
-        self.microscope_objective_size_3 = tk.StringVar(value=self.loaded_params.get("microscope_objective_size_3"))
-        self.microscope_objective_size_3.trace_add("write", lambda *args: self.save_parameters())
-        
-        self.microscope_objective_size_4 = tk.StringVar(value=self.loaded_params.get("microscope_objective_size_4"))
-        self.microscope_objective_size_4.trace_add("write", lambda *args: self.save_parameters())
-        
-        self.microscope_objective_size_5 = tk.StringVar(value=self.loaded_params.get("microscope_objective_size_5"))
-        self.microscope_objective_size_5.trace_add("write", lambda *args: self.save_parameters())
-        
-        self.microscope_objective_size_6 = tk.StringVar(value=self.loaded_params.get("microscope_objective_size_6"))
-        self.microscope_objective_size_6.trace_add("write", lambda *args: self.save_parameters())
+        if MICROSCOPE == "macrozoom":
+            self.microscope_objective_size_1 = tk.StringVar(value="2")
+            self.microscope_objective_size_2 = tk.StringVar(value="3")
+            self.microscope_objective_size_3 = tk.StringVar(value="4")
+            self.microscope_objective_size_4 = tk.StringVar(value="5")
+            self.microscope_objective_size_5 = tk.StringVar(value="6")
+            self.microscope_objective_size_6 = tk.StringVar(value="7")
+        else:
+            self.microscope_objective_size_1 = tk.StringVar(value=self.loaded_params.get("microscope_objective_size_1"))
+            self.microscope_objective_size_1.trace_add("write", lambda *args: self.save_parameters())
+            
+            self.microscope_objective_size_2 = tk.StringVar(value=self.loaded_params.get("microscope_objective_size_2"))
+            self.microscope_objective_size_2.trace_add("write", lambda *args: self.save_parameters())
+            
+            self.microscope_objective_size_3 = tk.StringVar(value=self.loaded_params.get("microscope_objective_size_3"))
+            self.microscope_objective_size_3.trace_add("write", lambda *args: self.save_parameters())
+            
+            self.microscope_objective_size_4 = tk.StringVar(value=self.loaded_params.get("microscope_objective_size_4"))
+            self.microscope_objective_size_4.trace_add("write", lambda *args: self.save_parameters())
+            
+            self.microscope_objective_size_5 = tk.StringVar(value=self.loaded_params.get("microscope_objective_size_5"))
+            self.microscope_objective_size_5.trace_add("write", lambda *args: self.save_parameters())
+            
+            self.microscope_objective_size_6 = tk.StringVar(value=self.loaded_params.get("microscope_objective_size_6"))
+            self.microscope_objective_size_6.trace_add("write", lambda *args: self.save_parameters())
 
         self.exposure_time.trace_add("write", self.update_exposure_and_save)
         self.binning.trace_add("write", self.update_binning_and_save)
@@ -977,9 +985,9 @@ class WormAnalysisApp:
         info_icon_label.pack(side=tk.LEFT, padx=(5, 0))
         
         if MICROSCOPE == "Macrozoom":
-            Tooltip(info_icon_label, "Enter the zoom used on the wheel (from 1 to 8). 3 is recommended. Also, always use the 2x objective for the scan.", title="Scan Objective", theme="info")
+            Tooltip(info_icon_label, "Enter the zoom used on the wheel (from 1 to 8). 3 is recommended. Also, always use the 2x objective for the scan.", title="Scan Objective", theme="info", posy=20, posx=-200)
         elif MICROSCOPE == "Nikon": 
-            Tooltip(info_icon_label, "Enter the objective used for the scan (x4 is recommended).", title="Scan Objective", theme="info")
+            Tooltip(info_icon_label, "Enter the objective used for the scan (x4 is recommended).", title="Scan Objective", theme="info", posy=20, posx=-200)
 
         _, self.scan_objective_dropdown = self.create_rounded_dropdown(
             self.params_content_frame, list_scan_objective, self.scan_objective, bg
@@ -6475,15 +6483,17 @@ class WormAnalysisApp:
         input_container_frame.pack(pady=0)
 
         # Create the first canvas (size_scan_height) and pack it to the left
-        self.size_scan_height_canvas = self.create_rounded_input(
+        _, entry = self.create_rounded_input(
             input_container_frame, self.scan_height_length, bg="machine_config_button", width=100
         )
+        self.size_scan_height_canvas = entry.master
         self.size_scan_height_canvas.pack(side=tk.LEFT, padx=10) # Use side=tk.LEFT and padx for spacing
 
         # Create the second canvas (size_scan_width) and pack it to the left
-        self.size_scan_width_canvas = self.create_rounded_input(
+        _, entry = self.create_rounded_input(
             input_container_frame, self.scan_width_length, bg="machine_config_button", width=100
         )
+        self.size_scan_width_canvas = entry.master
         self.size_scan_width_canvas.pack(side=tk.LEFT, padx=10) # It will appear to the right of the first
 
 
@@ -6513,73 +6523,75 @@ class WormAnalysisApp:
 
 
         # -------------------------------------------------------------------------------------------------- #
+        # -------------------------------------------------------------------------------------------------- #
         # section with button size of the objective on the microscope
-        buttons_objective_size = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
-        buttons_objective_size.pack(fill=tk.BOTH, expand=True, pady=(10,50))
+        if MICROSCOPE != "macrozoom":
+            buttons_objective_size = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
+            buttons_objective_size.pack(fill=tk.BOTH, expand=True, pady=(10,50))
 
-        # Create an inner frame to hold the canvas
-        input_container_size_objective_frame = tk.Frame(buttons_objective_size, bg=self.colors.theme["primary_background"])
-        # Center this inner frame horizontally
-        input_container_size_objective_frame.pack(pady=0)
+            # Create an inner frame to hold the canvas
+            input_container_size_objective_frame = tk.Frame(buttons_objective_size, bg=self.colors.theme["primary_background"])
+            # Center this inner frame horizontally
+            input_container_size_objective_frame.pack(pady=0)
 
-        # Create the first canvas (size_scan_height) and pack it to the left
-        self.size_objective_microscope_canva = self.create_rounded_input(
-            input_container_size_objective_frame, self.microscope_objective_size_1, bg="machine_config_button", width=80
-        )
-        self.size_objective_microscope_canva.pack(side=tk.LEFT, padx=5) 
-        
-        # Create the 2nd canvas (size_scan_height) and pack it to the left
-        self.size_objective_microscope_canva = self.create_rounded_input(
-            input_container_size_objective_frame, self.microscope_objective_size_2, bg="machine_config_button", width=80
-        )
-        self.size_objective_microscope_canva.pack(side=tk.LEFT, padx=5) 
-        
-        # Create the 3th canvas (size_scan_height) and pack it to the left
-        self.size_objective_microscope_canva = self.create_rounded_input(
-            input_container_size_objective_frame, self.microscope_objective_size_3, bg="machine_config_button", width=80
-        )
-        self.size_objective_microscope_canva.pack(side=tk.LEFT, padx=5) 
-        
-        # Create the 4th canvas (size_scan_height) and pack it to the left
-        self.size_objective_microscope_canva = self.create_rounded_input(
-            input_container_size_objective_frame, self.microscope_objective_size_4, bg="machine_config_button", width=80
-        )
-        self.size_objective_microscope_canva.pack(side=tk.LEFT, padx=5) 
-        
-        # Create the 5th canvas (size_scan_height) and pack it to the left
-        self.size_objective_microscope_canva = self.create_rounded_input(
-            input_container_size_objective_frame, self.microscope_objective_size_5, bg="machine_config_button", width=80
-        )
-        self.size_objective_microscope_canva.pack(side=tk.LEFT, padx=5) 
-        
-        # Create the 6th canvas (size_scan_height) and pack it to the left
-        self.size_objective_microscope_canva = self.create_rounded_input(
-            input_container_size_objective_frame, self.microscope_objective_size_6, bg="machine_config_button", width=80
-        )
-        self.size_objective_microscope_canva.pack(side=tk.LEFT, padx=5)
+            # Create the first canvas (size_scan_height) and pack it to the left
+            _, entry = self.create_rounded_input(
+                input_container_size_objective_frame, self.microscope_objective_size_1, bg="machine_config_button", width=80
+            )
+            entry.master.pack(side=tk.LEFT, padx=5) 
+            
+            # Create the 2nd canvas (size_scan_height) and pack it to the left
+            _, entry = self.create_rounded_input(
+                input_container_size_objective_frame, self.microscope_objective_size_2, bg="machine_config_button", width=80
+            )
+            entry.master.pack(side=tk.LEFT, padx=5) 
+            
+            # Create the 3th canvas (size_scan_height) and pack it to the left
+            _, entry = self.create_rounded_input(
+                input_container_size_objective_frame, self.microscope_objective_size_3, bg="machine_config_button", width=80
+            )
+            entry.master.pack(side=tk.LEFT, padx=5) 
+            
+            # Create the 4th canvas (size_scan_height) and pack it to the left
+            _, entry = self.create_rounded_input(
+                input_container_size_objective_frame, self.microscope_objective_size_4, bg="machine_config_button", width=80
+            )
+            entry.master.pack(side=tk.LEFT, padx=5) 
+            
+            # Create the 5th canvas (size_scan_height) and pack it to the left
+            _, entry = self.create_rounded_input(
+                input_container_size_objective_frame, self.microscope_objective_size_5, bg="machine_config_button", width=80
+            )
+            entry.master.pack(side=tk.LEFT, padx=5) 
+            
+            # Create the 6th canvas (size_scan_height) and pack it to the left
+            _, entry = self.create_rounded_input(
+                input_container_size_objective_frame, self.microscope_objective_size_6, bg="machine_config_button", width=80
+            )
+            entry.master.pack(side=tk.LEFT, padx=5)
 
 
-        # Container to hold label + info icon
-        microscope_objective_size_label_frame = tk.Frame(buttons_objective_size, bg=self.colors.theme["primary_background"])
-        microscope_objective_size_label_frame.pack()
+            # Container to hold label + info icon
+            microscope_objective_size_label_frame = tk.Frame(buttons_objective_size, bg=self.colors.theme["primary_background"])
+            microscope_objective_size_label_frame.pack()
 
-        # Text label
-        title_objective_size = tk.Label(
-            microscope_objective_size_label_frame, text="Manage the magnifications on your microscope",
-            bg=self.colors.theme["primary_background"], fg=self.colors.theme["tertiary_text"],
-            font=(self.font, 10)
-        )
-        title_objective_size.pack(side=tk.LEFT)
+            # Text label
+            title_objective_size = tk.Label(
+                microscope_objective_size_label_frame, text="Manage the magnifications on your microscope",
+                bg=self.colors.theme["primary_background"], fg=self.colors.theme["tertiary_text"],
+                font=(self.font, 10)
+            )
+            title_objective_size.pack(side=tk.LEFT)
 
-        # Info icon
-        info_objective_size_label = tk.Label(
-            microscope_objective_size_label_frame, image=self.info_icon,
-            bg=self.colors.theme["primary_background"]
-        )
-        info_objective_size_label.pack(side=tk.LEFT, padx=(5, 0))  # small gap between text and icon
+            # Info icon
+            info_objective_size_label = tk.Label(
+                microscope_objective_size_label_frame, image=self.info_icon,
+                bg=self.colors.theme["primary_background"]
+            )
+            info_objective_size_label.pack(side=tk.LEFT, padx=(5, 0))  # small gap between text and icon
 
-        # Tooltip on hover
-        Tooltip(info_objective_size_label, "Enter the magnification of each objective you have on your microscope.", title="Info", theme="info", posx=70, posy=-70)
+            # Tooltip on hover
+            Tooltip(info_objective_size_label, "Enter the magnification of each objective you have on your microscope.", title="Info", theme="info", posx=70, posy=-70)
         
     def show_loading_page(self):
         """
