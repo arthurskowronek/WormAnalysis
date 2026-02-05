@@ -1,5 +1,6 @@
 alembic==1.16.4
 altgraph==0.17.4
+annotated-types==0.7.0
 Boruta==0.4.3
 certifi==2025.7.14
 charset-normalizer==3.4.2
@@ -44,6 +45,8 @@ psutil==7.0.0
 psygnal==0.14.2
 py-cpuinfo==9.0.0
 pyconify==0.2.1
+pydantic==2.12.5
+pydantic_core==2.41.5
 pyfeats==1.0.1
 Pygments==2.19.2
 pyinstaller==6.16.0
@@ -210,6 +213,7 @@ pyobjc-framework-Vision==11.1
 pyobjc-framework-WebKit==11.1
 pyparsing==3.2.3
 python-dateutil==2.9.0.post0
+python-dotenv==1.2.1
 python_tsp==0.5.0
 pytz==2025.2
 PyWavelets==1.9.0
@@ -240,10 +244,11 @@ torchvision==0.22.1
 tqdm==4.67.1
 transformers==4.55.3
 tsplib95==0.7.1
+typing-inspection==0.4.2
 typing_extensions==4.14.1
 tzdata==2025.2
 ultralytics==8.3.170
 ultralytics-thop==2.0.14
+unicorn==2.1.4
 urllib3==2.5.0
 wrapt==1.17.3
-python-dotenv

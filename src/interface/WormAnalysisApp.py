@@ -575,6 +575,7 @@ class WormAnalysisApp:
         # Process info.png
         info_path = Path(RESSOURCES_DIR) / "icon" / "info.png" 
         self.info_icon = self.flatten_and_resize_icon(info_path, 16, 16, self.colors.theme["primary_background"], self.colors.theme["secondary_text"])
+        self.info_icon_secondary = self.flatten_and_resize_icon(info_path, 16, 16, self.colors.theme["secondary_background"], self.colors.theme["secondary_text"])
            
         # Process plus.png
         plus_path = Path(RESSOURCES_DIR) / "icon" / "plus.png" 
@@ -964,7 +965,22 @@ class WormAnalysisApp:
             if str(self.loaded_params.get(f"microscope_objective_size_{i}")) != ""
         ]
         bg = "parameters_button_background" if "scan_objective" in self.enable_parameters_buttons else "parameters_button_disabled_background"
-        tk.Label(self.params_content_frame, text="Scan objective", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
+        
+        # Frame for label + info icon
+        objective_label_frame = tk.Frame(self.params_content_frame, bg=self.colors.theme["secondary_background"])
+        objective_label_frame.pack(anchor='w', pady=(5, 0), fill=tk.X)
+        
+        tk.Label(objective_label_frame, text="Scan objective", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(side=tk.LEFT)
+        
+        # Info icon with tooltip
+        info_icon_label = tk.Label(objective_label_frame, image=self.info_icon_secondary, bg=self.colors.theme["secondary_background"], cursor="hand2")
+        info_icon_label.pack(side=tk.LEFT, padx=(5, 0))
+        
+        if MICROSCOPE == "Macrozoom":
+            Tooltip(info_icon_label, "Enter the zoom used on the wheel (from 1 to 8). 3 is recommended. Also, always use the 2x objective for the scan.", title="Scan Objective", theme="info")
+        elif MICROSCOPE == "Nikon": 
+            Tooltip(info_icon_label, "Enter the objective used for the scan (x4 is recommended).", title="Scan Objective", theme="info")
+
         _, self.scan_objective_dropdown = self.create_rounded_dropdown(
             self.params_content_frame, list_scan_objective, self.scan_objective, bg
         )
@@ -1016,7 +1032,7 @@ class WormAnalysisApp:
         )
         
         # Model name
-        list_model = [d.name.replace("model_prediction_", "").replace(".pkl", "") for d in MODELS_DIR.iterdir() if "model_prediction_" in d.name]
+        list_model = [d.name.replace("model_prediction_", "").replace(".pkl", "") for d in MODELS_DIR.iterdir() if "model_prediction_" in d.name and not d.name.startswith("._")]
         bg = "parameters_button_background" if "model_name" in self.enable_parameters_buttons else "parameters_button_disabled_background"
         tk.Label(self.params_content_frame, text="Model name", bg=self.colors.theme["secondary_background"], fg=self.colors.theme["secondary_text"], font=(self.font, 10)).pack(anchor='w', pady=(5, 0))
         _, self.model_name_dropdown = self.create_rounded_dropdown(

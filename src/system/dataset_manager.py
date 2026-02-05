@@ -677,6 +677,7 @@ class Dataset_Manager:
                 X_balanced = X[balanced_indices]
                 y_balanced = y[balanced_indices]
                 X, y = shuffle(X_balanced, y_balanced, random_state=42)
+                print(f"Dataset balanced: {min_size} WT and {min_size} Mutant images kept (Total: {2*min_size}).")
             
             
                 # Check if the dataset has new samples to decide whether to retrain.
