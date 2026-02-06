@@ -291,7 +291,7 @@ class WormAnalysisApp:
         self.microscope_step_size = tk.StringVar(value=self.loaded_params.get("microscope_step_size"))
         self.microscope_step_size.trace_add("write", lambda *args: self.save_parameters())
         
-        if MICROSCOPE == "macrozoom":
+        if MICROSCOPE == "Macrozoom":
             self.microscope_objective_size_1 = tk.StringVar(value="2")
             self.microscope_objective_size_2 = tk.StringVar(value="3")
             self.microscope_objective_size_3 = tk.StringVar(value="4")
@@ -6229,20 +6229,22 @@ class WormAnalysisApp:
             "- Left Panel: Live camera feed or snapped image. Use the histogram tool to adjust brightness/contrast.",
             "- Right Panel: Prediction results, manual classification buttons, and navigation controls.",
             "Workflow:",
-            "1. Navigate between worms using the Next/Previous buttons.",
+            "1. Navigate between worms using the Space bar or the Next/Last worm buttons.",
             "2. The stage automatically moves to center the selected worm.",
-            "3. 'Analyse' button: Runs the specific activity/synapse classification model on the current view.",
-            "4. Review the AI confidence score.",
-            "5. Manually classify as 'Wild-Type' or 'Mutant' if needed. This updates the session statistics.",
-            "6. 'Save image': Save a snapshot of the current view to disk."
+            "3. 'Launch Analysis' button: Runs the specific activity/synapse classification model on the current view.",
+            "4. Review the AI prediction (Synaptic profiling prediction) appearing at the bottom right.",
+            "5. Manually classify as 'Wild-Type' or 'Mutant' if needed.",
+            "6. Navigate specifically between mutants using 'Next/Last mutant' buttons if revisiting data.",
+            "7. 'Save image': Save a snapshot of the current view to disk."
         ]
         load_shortcuts = [
-            "Left / Right arrow keys: Navigate to previous/next worm.",
+            "Space bar: Navigate to the next worm.",
+            "Arrow keys (Up/Down/Left/Right): Move the microscope stage manually relative to the current position.",
             "Do NOT use the joystick to move between worms; the app tracks coordinates internally."
         ]
         load_tips = [
             "Click on the live image to recenter the stage on that specific point.",
-            "Snap an image to freeze it before saving if the worm is moving.",
+            "Use 'Next/Last mutant' to quickly review all worms classified as mutants.",
             "Adjust the histogram (brightness/contrast) to see faint features better."
         ]
         load_warning = "Avoid manually moving the stage with the joystick, as it may desynchronize the app's coordinate system."
@@ -6525,7 +6527,7 @@ class WormAnalysisApp:
         # -------------------------------------------------------------------------------------------------- #
         # -------------------------------------------------------------------------------------------------- #
         # section with button size of the objective on the microscope
-        if MICROSCOPE != "macrozoom":
+        if MICROSCOPE != "Macrozoom":
             buttons_objective_size = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
             buttons_objective_size.pack(fill=tk.BOTH, expand=True, pady=(10,50))
 
