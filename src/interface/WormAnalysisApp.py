@@ -2654,7 +2654,7 @@ class WormAnalysisApp:
         """
         try:
             self.clear_enhanced_preview()
-            self.worms_position.go_to_newt_worm() # set "seen" to True to the next worm
+            self.worms_position.go_to_next_worm() # set "seen" to True to the next worm
             self.id_worm_seen = self.worms_position.get_id_path_worm_seen() # get the id of the newt worm
             self.id_worm_seen_label.config(text=f"{self.id_worm_seen+1}/{self.worms_position.get_number_of_worms()}")
 

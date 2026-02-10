@@ -618,28 +618,41 @@ class WormPositionManager:
         # Save the updated DataFrame
         self._save_csv()
              
-    def go_to_newt_worm(self):
+    def go_to_next_worm(self):
         """
         Navigates to the next worm in the TSP-calculated path.
         
         The current 'seen' worm is marked as 'not seen', and the worm with
         the next `id_path` is marked as 'seen'. 
         """
-        # df = pd.read_csv(self.csv_file_path) # CACHED
-        
-        id_seen = 0
+        if self.df.empty:
+            return
 
-        for idx, row in self.df.iterrows():
-            if row['seen'] == True:
-                id_seen = idx
-                
-        mask = self.df['id_path'] == id_seen
-        if id_seen+1 >= len(self.df):
-            mask2 = self.df['id_path'] == id_seen
+        # Get current seen worm path id
+        current_seen = self.df[self.df['seen'] == True]
+        if current_seen.empty:
+            current_id_path = -1
         else:
-            mask2 = self.df['id_path'] == id_seen+1
-        self.df.loc[mask, 'seen'] = False
-        self.df.loc[mask2, 'seen'] = True
+            current_id_path = current_seen.iloc[0]['id_path']
+
+        # Determine next id_path
+        next_id_path = current_id_path + 1
+        if next_id_path >= len(self.df):
+            # stay at the last valid index
+            next_id_path = len(self.df) - 1
+
+        # Update seen status
+        self.df['seen'] = False
+        
+        # Find the row with the next_id_path and set it to seen
+        mask = self.df['id_path'] == next_id_path
+        if mask.any():
+            self.df.loc[mask, 'seen'] = True
+        else:
+            # Fallback if id_path is missing for some reason
+            if not self.df.empty:
+                self.df.iloc[-1, self.df.columns.get_loc('seen')] = True
+
         self._save_csv()
             
     def go_to_last_worm(self):
@@ -647,25 +660,32 @@ class WormPositionManager:
         Navigates to the previous worm in the TSP-calculated path.
         
         The current 'seen' worm is marked as 'not seen', and the worm with
-        the previous `id_path` is marked as 'seen'. Wraps around to the end
-        if at the beginning of the path.
+        the previous `id_path` is marked as 'seen'.
         """
-        # df = pd.read_csv(self.csv_file_path) # CACHED
-        
-        id_seen = 0
-        
-        for idx, row in self.df.iterrows():
-            if row['seen'] == True:
-                id_seen = idx
-                
-        mask = self.df['id_path'] == id_seen
-        if id_seen-1 < 0:
-            mask2 = self.df['id_path'] == id_seen
+        if self.df.empty:
+            return
+
+        # Get current seen worm path id
+        current_seen = self.df[self.df['seen'] == True]
+        if current_seen.empty:
+            current_id_path = 0
         else:
-            mask2 = self.df['id_path'] == id_seen-1
+            current_id_path = current_seen.iloc[0]['id_path']
+
+        # Determine prev id_path
+        prev_id_path = current_id_path - 1
+        if prev_id_path < 0:
+            prev_id_path = 0
         
-        self.df.loc[mask, 'seen'] = False
-        self.df.loc[mask2, 'seen'] = True
+        self.df['seen'] = False
+        
+        mask = self.df['id_path'] == prev_id_path
+        if mask.any():
+            self.df.loc[mask, 'seen'] = True
+        else:
+             if not self.df.empty:
+                self.df.iloc[0, self.df.columns.get_loc('seen')] = True
+
         self._save_csv()
         
     def go_to_next_mutant(self):
@@ -673,55 +693,65 @@ class WormPositionManager:
         Navigue vers le prochain mutant après la position actuelle.
         S'arrête s'il n'y en a plus après.
         """
-        # df = pd.read_csv(self.csv_file_path) # CACHED
-        
-        # 1. Trouver l'index du ver actuellement "vu"
+        if self.df.empty:
+            return
+
+        # 1. Finds the id_path of the currently "seen" worm
         current_seen = self.df[self.df['seen'] == True]
         if current_seen.empty:
-            return # Ou décider de partir du début
+            current_id_path = -1
+        else:
+            current_id_path = current_seen.iloc[0]['id_path']
         
-        current_idx = current_seen.index[0]
-        
-        # 2. Chercher les mutants qui ont un index SUPÉRIEUR à l'index actuel
-        next_mutants = self.df[(self.df.index > current_idx) & (self.df['user_label'] == 'Mutant')]
+        # 2. Search for mutants that have an id_path GREATER than the current id_path
+        # Use sort_values by id_path to ensure we get the next one in the path order
+        next_mutants = self.df[
+            (self.df['id_path'] > current_id_path) & 
+            (self.df['user_label'] == 'Mutant')
+        ].sort_values(by='id_path')
         
         if not next_mutants.empty:
-            # On prend le tout premier mutant trouvé après notre position
-            next_idx = next_mutants.index[0]
+            # We take the very first mutant found after our position
+            next_worm_id = next_mutants.iloc[0]['worm_id']
             
             self.df['seen'] = False
-            self.df.at[next_idx, 'seen'] = True
+            self.df.loc[self.df['worm_id'] == next_worm_id, 'seen'] = True
             self._save_csv()
-            print(f"Déplacement vers le mutant à l'index {next_idx}")
+            print(f"Moving to mutant with id_path {next_mutants.iloc[0]['id_path']}")
         else:
-            print("Il n'y a plus de mutant après cette position. On ne bouge pas.")
+            print("There are no more mutants after this position. We don't move.")
 
     def go_to_last_mutant(self):
         """
         Navigue vers le mutant précédent avant la position actuelle.
         S'arrête s'il n'y en a plus avant.
         """
-        # df = pd.read_csv(self.csv_file_path) # CACHED
-        
+        if self.df.empty:
+            return
+
         current_seen = self.df[self.df['seen'] == True]
         if current_seen.empty:
-            return
+            current_id_path = len(self.df)
+        else:
+            current_id_path = current_seen.iloc[0]['id_path']
         
-        current_idx = current_seen.index[0]
-        
-        # 2. Chercher les mutants qui ont un index INFÉRIEUR à l'index actuel
-        prev_mutants = self.df[(self.df.index < current_idx) & (self.df['user_label'] == 'Mutant')]
+        # 2. Search for mutants that have an id_path LOWER than the current id_path
+        # Sort descending to find the closest one
+        prev_mutants = self.df[
+            (self.df['id_path'] < current_id_path) & 
+            (self.df['user_label'] == 'Mutant')
+        ].sort_values(by='id_path', ascending=False)
         
         if not prev_mutants.empty:
-            # On prend le DERNIER mutant de la liste filtrée (le plus proche de nous)
-            prev_idx = prev_mutants.index[-1]
+            # We take the first one in the descending list (the closest predecessor)
+            prev_worm_id = prev_mutants.iloc[0]['worm_id']
             
             self.df['seen'] = False
-            self.df.at[prev_idx, 'seen'] = True
+            self.df.loc[self.df['worm_id'] == prev_worm_id, 'seen'] = True
             self._save_csv()
-            print(f"Déplacement vers le mutant précédent à l'index {prev_idx}")
+            print(f"Moving to previous mutant with id_path {prev_mutants.iloc[0]['id_path']}")
         else:
-            print("Il n'y a pas de mutant avant cette position. On ne bouge pas.")
+            print("There is no mutant before this position. We don't move.")
     
     # Others methods
     def find_shortest_path(self):
