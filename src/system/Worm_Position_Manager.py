@@ -55,7 +55,6 @@ class WormPositionManager:
                 self.go_to_first_worm(id)
             else:
                 self.df = pd.read_csv(self.csv_file_path)
-                #self.find_shortest_path()
                 self.go_to_first_worm(id)
       
     def _save_csv(self):
@@ -151,11 +150,6 @@ class WormPositionManager:
         self.df['id_path'] = range(len(self.df))  # Reset id_path after deletion
         self._save_csv()
 
-        # Optimization: Do NOT recalculate shortest path here.
-        # It takes too long (O(N!) or heuristic) for a simple interaction.
-        # It will be calculated when entering the "Load Position" page.
-        # self.find_shortest_path()
-
         return True
 
     def fast_delete_worm(self, worm_id: int) -> bool:
@@ -178,9 +172,6 @@ class WormPositionManager:
         Finalizes batch deletions:
         1. Re-indexes worm_ids and id_paths.
         2. Saves to CSV.
-        3. 
-        Note: Does NOT calculate TSP (find_shortest_path) to save time.
-        TSP should be called when switching to 'Show Load Position'.
         """
         if self.df.empty:
             self._save_csv()

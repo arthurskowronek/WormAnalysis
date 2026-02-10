@@ -5381,13 +5381,9 @@ class WormAnalysisApp:
                 self.CORE.setXYPosition(self.CORE.getXYStageDevice(), x, y)
 
                 self.CORE.waitForDevice(self.CORE.getXYStageDevice())
-                time.sleep(0.5) # Settle time
+                #time.sleep(0.5) # Settle time
             except Exception as e:
                 log_error(e, f"Failed to move to worm {worm_id}")
-                # Treat movement failure as an error for this worm? 
-                # Ideally yes, but the original code continued. 
-                # If we cannot move, we probably cannot snap the right image.
-                # Let's count it as error and 0 length.
                 length = 0
                 lengths.append(length)
                 
@@ -5402,17 +5398,12 @@ class WormAnalysisApp:
             t0 = time.time()
             img = None
             try:
-                self.CORE.snapImage()
-                img = self.CORE.getImage()
+                print(f"  [Analysis] Snapping image for worm {worm_id}")
+                # Use snap_image helper which handles exposure and format conversion
+                img = self.snap_image(analysis_mode=True)
                 
-                # Check dimensions and reshape if necessary
-                if img.ndim == 2:
-                    pass
-                elif img.ndim == 3 and img.shape[2] == 1: # (H, W, 1) to (H, W) 
-                     img = img.squeeze()
-                elif img.ndim == 3: # (H, W, C) -> Gray ?? Or just take first channel
-                     if img.shape[2] > 1:
-                         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                if img is None:
+                     raise Exception("Snap image returned None")
 
             except Exception as e:
                 log_error(e, f"Failed to snap image for worm {worm_id}")
@@ -5433,19 +5424,30 @@ class WormAnalysisApp:
                     raise Exception("Image is None")
 
                 t0 = time.time()
-                worm_mask = self.preprocessing.worm_segmentation(img)
+                # Use self.find_worm_segmentation (uses cached model + auto_contrast)
+                worm_mask = self.find_worm_segmentation(img, verbose=False)
                 print(f"  [Time] Segmentation: {time.time() - t0:.4f}s")
 
-                if np.sum(worm_mask) == 0:
-                    # No worm found - treat as 0 length and error?
-                    # The user said "problem (e.g. code fails to do segmentation)".
-                    # Empty mask is a kind of failure to segment anything.
+                if worm_mask is None or np.sum(worm_mask) == 0:
+                    # No worm found - try fallback or just fail
                     raise Exception("No worm detected in segmentation")
 
                 # Skeletonize
                 # Use simplified length calculation (only backbone)
                 t0 = time.time()
-                length, G = self.preprocessing.get_worm_length(img, worm_mask)
+                
+                # worm_mask from find_worm_segmentation is boolean, convert to uint8 if needed by get_worm_length
+                # get_worm_length uses get_backbone_graph which usually expects bool or uint8, checking usages...
+                # Preprocessing.get_worm_length calls get_backbone_graph(worm_mask)
+                # Let's ensure it's bool as likely expected, or whatever find_worm_segmentation returns (it returns bool mask)
+                # But for visualization (find contours) we need uint8.
+                
+                if worm_mask.dtype == bool:
+                     worm_mask_uint8 = worm_mask.astype(np.uint8)
+                else:
+                     worm_mask_uint8 = worm_mask
+                     
+                length, G = self.preprocessing.get_worm_length(img, worm_mask_uint8)
                 print(f"  [Time] Skeletonization: {time.time() - t0:.4f}s")
                 
                 # Calculate Length (number of nodes in skeleton graph)
@@ -5460,7 +5462,7 @@ class WormAnalysisApp:
                      # --- VISUALIZATION ---
                      t0 = time.time()
                      # Convert to 8-bit if currently 16-bit (for display compatibility and visibility)
-                     if img.dtype == np.uint16:
+                     if img.dtype == np.uint16 or img.dtype == np.float32:
                          img_display_base = cv2.normalize(img, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
                      else:
                          img_display_base = img.astype(np.uint8)
@@ -5470,7 +5472,7 @@ class WormAnalysisApp:
                      
                      # 1. Draw Segmentation (Green)
                      # Find contours requires uint8
-                     contours, _ = cv2.findContours(worm_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                     contours, _ = cv2.findContours(worm_mask_uint8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                      cv2.drawContours(display_img, contours, -1, (0, 255, 0), 1)
                      
                      # 2. Draw Skeleton (Red)
@@ -5486,7 +5488,7 @@ class WormAnalysisApp:
                      pil_img = Image.fromarray(display_img_rgb)
                      
                      # Use display_enhanced_image logic or direct update
-                     if self.root.winfo_exists() and self.live_image_label.winfo_exists():
+                     if self.root.winfo_exists() and hasattr(self, "live_image_label") and self.live_image_label.winfo_exists():
                          # Resize to label
                          w = self.live_image_label.winfo_width()
                          h = self.live_image_label.winfo_height()
@@ -5500,9 +5502,6 @@ class WormAnalysisApp:
                          self.main_content.update_idletasks() # Refresh UI
                     
                      print(f"  [Time] Visualization update: {time.time() - t0:.4f}s")
-                         
-                     # Small pause to let user see
-                     time.sleep(0.5) 
                 else:
                     raise Exception("Skeletonization failed (G is None or length is 0)")
                 
