@@ -164,6 +164,26 @@ To bundle the app for distribution (Freeze), use **PyInstaller**.
 
 ---
 
+## Computer Migration Guide
+
+- **Copy the folder:** Copy the `WormAnalysis` folder to the new computer.
+- **Clean up:** Delete the existing `.venv` folder.
+- **Create environment:** In VSCode, create a new virtual environment by running:
+    `python -m venv .venv`
+- **Activate environment:** Activate it using:
+    `.venv/Scripts/activate`
+- **Install dependencies:** Reinstall the required packages:
+    `pip install -r requirements.txt`
+- **Hardware Configuration:** Create a new configuration file for the computer-to-camera connection using Micro-Manager (In the _Hardware Configuration Wizard_, select **'None'** to start from scratch).
+- **Move configuration:** Add this newly created configuration file to the following directory:
+    `WormAnalysis/Micro-Manager-2.0gamma`
+- **Update .env file:** * Set the `CONFIG_FILE` variable to the name of your new configuration file.
+    - Ensure the `NAME_CAMERA_CONFIG` variable matches exactly what was entered during the Micro-Manager configuration setup.
+- **Calibrate hardware:** The `MICROSCOPE_STEP_SIZE` variable (representing the length of a single step) may need adjustment. You will need to perform slide scanning tests to determine the optimal step value for this specific microscope.
+
+
+---
+
 ## ⚠️ Troubleshooting & FAQ
 
 *   **Error `Load core failed`**:

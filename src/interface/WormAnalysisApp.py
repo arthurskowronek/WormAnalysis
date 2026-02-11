@@ -6443,7 +6443,7 @@ class WormAnalysisApp:
 
         # -------------------------------------------------------------------------------------------------- #
 
-        # section with buttons dual view
+        """# section with buttons dual view
         buttons_dual_view_frame = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
         buttons_dual_view_frame.pack(fill=tk.BOTH, expand=True, pady=(50,10))
 
@@ -6472,7 +6472,7 @@ class WormAnalysisApp:
 
         # Tooltip on hover
         Tooltip(info_label, "If your microscope has a dual-view mode, you can active this button to enable the use of the scan with it. (It will appear in the parameters panel)", title="Info", theme="info", posx=70, posy=-70)
-
+        """
         # -------------------------------------------------------------------------------------------------- #
         # section with button scan length
         buttons_scan_length_frame = tk.Frame(self.main_content, bg=self.colors.theme["primary_background"])
