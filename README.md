@@ -180,6 +180,20 @@ To bundle the app for distribution (Freeze), use **PyInstaller**.
 - **Update .env file:** * Set the `CONFIG_FILE` variable to the name of your new configuration file.
     - Ensure the `NAME_CAMERA_CONFIG` variable matches exactly what was entered during the Micro-Manager configuration setup.
 - **Calibrate hardware:** The `MICROSCOPE_STEP_SIZE` variable (representing the length of a single step) may need adjustment. You will need to perform slide scanning tests to determine the optimal step value for this specific microscope.
+- **Create the executable:** Run the following command to create the executable:
+    ```pyinstaller --onefile --windowed `
+        --name=Worm_detection `
+        --icon=icon_desktop.ico `
+        --add-data "logs;logs" `
+        --add-data "models;models" `
+        --add-data "ressources;ressources" `
+        --collect-all skan `
+        --collect-all python_tsp `
+        --collect-all sklearn `
+        --collect-all numpy `
+        --collect-all scipy `
+        main.py
+    ```
 
 
 ---
