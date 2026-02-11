@@ -2,7 +2,7 @@
 
 **Author**: Arthur SKOWRONEK, BESSEREAU LAB, INMG, LYON  
 **Contact**: arthur.skowronek13@gmail.com (Review subject: [WORM_ANALYSIS])  
-**Python Version**: 3.13+  
+**Python Version**: 3.8.10
 **Interface**: Tkinter  
 **Hardware Control**: Micro-Manager (pymmcore)  
 **Deep Learning**: PyTorch / Ultralytics (YOLO)
@@ -19,6 +19,8 @@ The application enables:
 3.  **Worm Analysis**: Deep Learning (YOLO) based detection and classification (WT vs. Mutant).
 4.  **Data Management**: Automated file organization and usage statistics.
 5.  **Model Training**: Integrated interface for re-training or fine-tuning models.
+
+**User guide:** A pdf and a pptx files are available in the `docs/` directory, describing the application, its features, and how to use it.
 
 ---
 
@@ -41,22 +43,26 @@ The project follows a component-based architecture isolating the GUI, system log
 ### File Structure
 ```
 WormAnalysis/
-├── main.py                  # 🚀 Application Entry Point
-├── config.py                # 🔧 Global Configuration (Paths, Env Vars)
+├── main.py                    # 🚀 Application Entry Point
+├── config.py                  # 🔧 Global Configuration (Paths, Env Vars)
 ├── src/
-│   ├── interface/           # 🖥️ GUI Layer (Tkinter)
-│   │   └── WormAnalysisApp.py # Main Application Window & PC Logic
-│   └── system/              # 🧠 Business Logic
+│   ├── interface/             # 🖥️ GUI Layer (Tkinter)
+│   │   ├── WormAnalysisApp.py # Main Application Window & PC Logic
+│   │   ├── colorTheme.py      # Color theme management
+│   │   └── Tooltip.py         # Tooltip management
+│   └── system/                # 🧠 Business Logic
 │       ├── dataset_manager.py # Data loading & preprocessing
 │       ├── preprocessing.py   # Image segmentation pipeline
 │       └── features.py        # Feature extraction
-├── ressources/              # ⚙️ Static Resources
-│   └── parameters.yaml      # User-adjustable scanning parameters
-├── models/                  # 🤖 Application Models (YOLO .pt, Sklearn .pkl)
-├── notebooks/               # 📓 Jupyter Notebooks for analysis & training
-├── logs/                    # 📝 Application logs & Error tracking
-├── data/                    # 📂 Generated Data (Images, predictions)
-└── Micro-Manager-2.0gamma/  # 🔬 Hardware Drivers (Required)
+├── ressources/                # ⚙️ Static Resources
+│   └── parameters.yaml        # User-adjustable scanning parameters
+├── models/                    # 🤖 Application Models (YOLO .pt, Sklearn .pkl)
+├── notebooks/                 # 📓 Jupyter Notebooks for analysis & training
+├── logs/                      # 📝 Application logs & Error tracking
+├── data/                      # 📂 Generated Data (Images, predictions)
+├── training/                  # 🤖 Training data for prediction models
+├── docs/                      # 📄 Documentation : user guide, pptx, pdf
+└── Micro-Manager-2.0gamma/    # 🔬 Hardware Drivers (Required)
 ```
 
 ---
