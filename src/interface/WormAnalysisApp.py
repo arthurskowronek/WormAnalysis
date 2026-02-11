@@ -2968,7 +2968,7 @@ class WormAnalysisApp:
         mutant). The prediction result is saved and displayed to the user.
         If the model fails, a default prediction is used.
         """
-        VERBOSE = True
+        VERBOSE = False
         # Step 0: Tell the user the analysis is starting
         self.prediction_label_2.configure(text=f"with a probability of : computing...")
         self.root.update() 
@@ -4913,7 +4913,7 @@ class WormAnalysisApp:
 
         self.id_worm_seen_label = tk.Label(
             worm_count_container,
-            text=f"{self.id_worm_seen+1}/{self.worms_position.get_number_of_worms()}",
+            text=f"{int(self.id_worm_seen+1)}/{self.worms_position.get_number_of_worms()}",
             bg=self.colors.theme["primary_background"],
             fg=self.colors.theme["tertiary_text"],
             font=(self.font, self.screen_height // 120),

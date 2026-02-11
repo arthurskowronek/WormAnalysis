@@ -160,7 +160,11 @@ class Dataset_Manager:
 
                         # Get worm mask
                         if not training and bool_mask is not None:
-                            worm_mask = bool_mask
+                            if bool_mask.shape != IMAGE_SIZE:
+                                # Resize mask to match image size, preserving binary nature
+                                worm_mask = resize(bool_mask, IMAGE_SIZE, order=0, preserve_range=True).astype(np.uint8)
+                            else:
+                                worm_mask = bool_mask
                         else:
                             worm_mask = preprocessing.worm_segmentation(img)
 
@@ -472,9 +476,14 @@ class Dataset_Manager:
             features, feature_names, y = feature_extractor._process_features(y, indices_coiled)
 
             # handle NaNs then scale
-            scaler = StandardScaler()
-            features = scaler.fit_transform(features)
-            features = np.nan_to_num(features)
+            if features.shape[0] > 0:
+                scaler = StandardScaler()
+                features = scaler.fit_transform(features)
+                features = np.nan_to_num(features)
+            else:
+                if verbose:
+                    print("No features to scale (possibly all worms are coiled).")
+                return self
 
             count = 0
             for item in self.data:
@@ -695,7 +704,7 @@ class Dataset_Manager:
 
         if not compute:
             try:
-                if model_name is not None:
+                if model_name is not None and model_name != "":
                     model = joblib.load(MODELS_DIR / f"model_prediction_{model_name}.pkl")
                     print("Loaded cached model from", MODELS_DIR / f"model_prediction_{model_name}.pkl")
                 else:

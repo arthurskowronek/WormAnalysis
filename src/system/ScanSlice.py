@@ -744,7 +744,5 @@ class ScanSlice:
             pil_image = pil_image.resize((1064, 1748), Image.LANCZOS)
             pil_image = pil_image.rotate(270, expand=True)
         
-        pil_image = pil_image.convert('RGB')
-        
-        pil_image.save(output_path, 'JPEG', quality=95)
+        pil_image.save(output_path, 'JPEG', quality=85)
         if verbose: print(f"✅ Final stitched image saved to: {output_path}")

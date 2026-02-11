@@ -769,8 +769,9 @@ class WormPositionManager:
             permutation, dist_approx = solve_tsp_local_search(dist_matrix)
             
         for i in range(len(self.df)):
-            mask = self.df['worm_id'] == permutation[i]
-            self.df.loc[mask, 'id_path'] = i
+            # permutation[i] matches the row index in the current DF
+            row_label = self.df.index[permutation[i]]
+            self.df.at[row_label, 'id_path'] = i
             
         # create new csv file with row in order of 'id_path'
         self.df = self.df.sort_values(by='id_path')

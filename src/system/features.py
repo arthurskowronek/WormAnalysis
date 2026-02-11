@@ -563,7 +563,12 @@ class FeatureExtractor:
             new_window[~mask] = mean_boundary  # Replace background with mean boundary intensity
 
             # Apply K-means to the intensity and binary mask.
-            I = new_window / new_window.max()  # Normalize intensities
+            max_val = new_window.max()
+            if max_val > 0:
+                I = new_window / max_val  # Normalize intensities
+            else:
+                I = np.zeros_like(new_window, dtype=np.float64) # Handle zero max
+
             B = mask.astype(float) * 0  # Binary weight
             features = np.column_stack((I.flatten(), B.flatten()))  # 2D feature space
             
@@ -576,6 +581,10 @@ class FeatureExtractor:
             plt.ylabel("Binary weight")
             plt.show()"""
             
+            # Check for NaNs or Inf in features
+            if not np.all(np.isfinite(features)):
+                 features = np.nan_to_num(features)
+
             if features.shape[0] < 2: # Not enough features for region
                 labels = np.zeros_like(features)
                 continue
