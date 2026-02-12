@@ -622,7 +622,7 @@ class Dataset_Manager:
                   retrain: bool = True,
                   model_type: str = 'classifier', 
                   outlier_type: str = 'mahalanobis_chi2',
-                  classifier_type: List[str] = ['hist_gradient_boosting', 'svm', 'random_forest', 'knn', 'mlp'], 
+                  classifier_type: List[str] = ['svm', 'random_forest', 'knn'], 
                   scaler: List[str] = ['NoScaler','StandardScaler','RobustScaler','MinMaxScaler','MaxAbsScaler','Normalizer','QuantileTransformer'],
                   optimizing: bool = False,
                   verbose: bool = False,

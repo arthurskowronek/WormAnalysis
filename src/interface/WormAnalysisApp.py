@@ -2087,10 +2087,10 @@ class WormAnalysisApp:
             self.CORE.setXYPosition(self.CORE.getXYStageDevice(), self.init_pos_x, self.init_pos_y)
                 
             # train model with new data
-            big_dataset = Dataset_Manager()
+            """big_dataset = Dataset_Manager()
             big_dataset.set_features(compute=False, name_dataset="big_dataset")
             big_dataset.remove_unclassified()
-            big_dataset.get_model(compute=True)
+            big_dataset.get_model(compute=True)"""
             
             self.CORE.unloadAllDevices() 
             self.CORE.shutdown() 
@@ -6231,6 +6231,7 @@ class WormAnalysisApp:
             "1. Navigate between worms using the Space bar or the Next/Last worm buttons.",
             "2. The stage automatically moves to center the selected worm.",
             "3. 'Launch Analysis' button: Runs the specific activity/synapse classification model on the current view.",
+            "   (Note: The analysis runs directly on the cleared view; ensure the worm is well-centered and focused.)",
             "4. Review the AI prediction (Synaptic profiling prediction) appearing at the bottom right.",
             "5. Manually classify as 'Wild-Type' or 'Mutant' if needed.",
             "6. Navigate specifically between mutants using 'Next/Last mutant' buttons if revisiting data.",
@@ -6268,7 +6269,8 @@ class WormAnalysisApp:
         ]
         training_tips = [
             "Use simple names for models (no spaces/special chars specific to your OS).",
-            "The training process moves 'validation' images automatically; keep backups of your raw data."
+            "The training process moves 'validation' images automatically; keep backups of your raw data.",
+            "The system automatically balances the dataset: if you have different counts of Mutant/WT, it will randomly sample to match the smaller set."
         ]
         training_warning = "Training is CPU-intensive. Ensure you have enough disk space and do not close the app during training."
 
@@ -6283,8 +6285,7 @@ class WormAnalysisApp:
             "- Model name: Choose which AI model to use for the 'Analyse' button in the Worm Analysis page."
         ]
         params_tips = [
-            "Parameters are disabled during active scans to prevent hardware conflicts.",
-            "Dual View options appear here if enabled in Machine Configuration."
+            "Parameters are disabled during active scans to prevent hardware conflicts."
         ]
 
         # ----------------- Machine Configuration -----------------
@@ -6292,9 +6293,9 @@ class WormAnalysisApp:
             "Found in 'Menu > Help > Machine Config'.",
             "Purpose: Set global hardware constants. THESE SHOULD RARELY BE CHANGED.",
             "Settings:",
-            "- Dual View Mode: Toggle this if your system uses a dual-view splitter (allows simultaneous dual-channel imaging).",
             "- Scan Area Dimensions: Defines the physical travel limits of the scan in microscope units (default 26000 x 45000).",
-            "- Objective Offsets/Parcentricity: Calibrate the position difference between objectives."
+            "- Constants: Sets physical limits to avoid crashing the stage.",
+            "Note: For Macrozoom microscopes, the objective list is fixed and cannot be modified here."
         ]
         config_warning = "Incorrectly changing scan dimensions or offsets can cause the stage to crash or coordinates to be wrong. Only change if you know the physical limits."
 
