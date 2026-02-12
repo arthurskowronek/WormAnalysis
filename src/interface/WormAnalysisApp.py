@@ -1286,7 +1286,7 @@ class WormAnalysisApp:
                           hover_color, font, width_pixels, height_pixels,
                           corner_radius, side, padx=0, pady=0, padx_text=0, pady_text=0,
                           anchor='center', border_width=0, border_color=None, icon=None, icon_hover=None, 
-                          icon_path=None, icon_hover_path=None, autoresize=False, expand=False, fill=None):
+                          icon_path=None, icon_hover_path=None, autoresize=False, expand=False, fill=None, icon_scale=1.0):
         """Creates a stylized button with rounded corners and optional icon.
 
         The button is rendered on a canvas and supports hover effects, click binding,
@@ -1321,6 +1321,7 @@ class WormAnalysisApp:
             autoresize (bool, optional): If True, the button will resize with its container. Defaults to False.
             expand (bool, optional): Whether to expand the button in its parent. Defaults to False.
             fill (str, optional): How to fill the button in its parent (tk.X, tk.Y, tk.BOTH). Defaults to None.
+            icon_scale (float, optional): Scaling factor for the icon relative to button height. Defaults to 1.0.
 
         Returns:
             tk.Canvas: The canvas containing the button.
@@ -1364,7 +1365,7 @@ class WormAnalysisApp:
         # Load PIL images if paths provided
         canvas.icon_pil = None
         canvas.icon_hover_pil = None
-        canvas.icon_ratio = 0.6  # Default ratio target_height / button_height
+        canvas.icon_ratio = 0.6 * icon_scale # Default ratio target_height / button_height
         
         if icon_path:
             try:
@@ -1372,7 +1373,7 @@ class WormAnalysisApp:
                 
                 # Determine initial size ratio from the passed icon if it exists, otherwise use default
                 if icon:
-                     canvas.icon_ratio = icon.height() / height_pixels
+                     canvas.icon_ratio = (icon.height() / height_pixels) * icon_scale
             except Exception as e:
                 print(f"Error loading icon path: {e}")
 
@@ -4850,7 +4851,8 @@ class WormAnalysisApp:
             expand=True,
             fill=tk.BOTH,
             icon_path=Path(RESSOURCES_DIR) / "icon" / "wildtype.png", 
-            icon_hover_path=Path(RESSOURCES_DIR) / "icon" / "wildtype.png"
+            icon_hover_path=Path(RESSOURCES_DIR) / "icon" / "wildtype.png",
+            icon_scale=0.8
         )
 
         tk.Label(sub1_2_analysis_container, text="Wild-Type", bg=self.colors.theme["primary_background"],
@@ -4885,7 +4887,8 @@ class WormAnalysisApp:
             expand=True,
             fill=tk.BOTH,
             icon_path=Path(RESSOURCES_DIR) / "icon" / "mutant.png",
-            icon_hover_path=Path(RESSOURCES_DIR) / "icon" / "mutant.png"
+            icon_hover_path=Path(RESSOURCES_DIR) / "icon" / "mutant.png",
+            icon_scale=0.8
         )
 
         # Mutation Label + Info Icon
@@ -4969,7 +4972,8 @@ class WormAnalysisApp:
             expand=True,
             fill=tk.X,
             icon_path=Path(RESSOURCES_DIR) / "icon" / "last.png", 
-            icon_hover_path=Path(RESSOURCES_DIR) / "icon" / "last.png"
+            icon_hover_path=Path(RESSOURCES_DIR) / "icon" / "last.png",
+            icon_scale=0.8
         )
 
         # 2nd - last worm
@@ -4998,7 +5002,8 @@ class WormAnalysisApp:
             expand=True,
             fill=tk.X,
             icon_path=Path(RESSOURCES_DIR) / "icon" / "next.png",
-            icon_hover_path=Path(RESSOURCES_DIR) / "icon" / "next.png"
+            icon_hover_path=Path(RESSOURCES_DIR) / "icon" / "next.png",
+            icon_scale=0.8
         )
 
         warning_label = tk.Label(
@@ -5046,7 +5051,8 @@ class WormAnalysisApp:
             expand=True,
             fill=tk.X,
             icon_path=Path(RESSOURCES_DIR) / "icon" / "last.png",
-            icon_hover_path=Path(RESSOURCES_DIR) / "icon" / "last.png"
+            icon_hover_path=Path(RESSOURCES_DIR) / "icon" / "last.png",
+            icon_scale=0.8
         )
 
         # 2nd - next mutant
@@ -5075,7 +5081,8 @@ class WormAnalysisApp:
             expand=True,
             fill=tk.X,
             icon_path=Path(RESSOURCES_DIR) / "icon" / "next.png",
-            icon_hover_path=Path(RESSOURCES_DIR) / "icon" / "next.png"
+            icon_hover_path=Path(RESSOURCES_DIR) / "icon" / "next.png",
+            icon_scale=0.8
         )
 
         # 5. Button + Text with Padding
@@ -5095,6 +5102,7 @@ class WormAnalysisApp:
             hover_color=self.colors.theme["secondary_background"],
             icon_path=Path(RESSOURCES_DIR) / "icon" / "play.png",
             icon_hover_path=Path(RESSOURCES_DIR) / "icon" / "play.png",
+            icon_scale=0.8,
             font=(self.font, self.screen_height // 80), # 12
             width_pixels=self.screen_height // 4, # old 250, new 240
             height_pixels=self.screen_height // 30, # reduced from 16 to 20
