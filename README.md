@@ -2,7 +2,7 @@
 
 **Author**: Arthur SKOWRONEK, BESSEREAU LAB, INMG, LYON  
 **Contact**: arthur.skowronek13@gmail.com (Review subject: [WORM_ANALYSIS])  
-**Python Version**: 3.8.10
+**Python Version**: 3.13.12
 **Interface**: Tkinter  
 **Hardware Control**: Micro-Manager (pymmcore)  
 **Deep Learning**: PyTorch / Ultralytics (YOLO)
