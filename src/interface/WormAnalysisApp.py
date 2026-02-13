@@ -2767,9 +2767,9 @@ class WormAnalysisApp:
                     shutil.move(str(unclassified_path), str(classified_path))
                     
                     # update label in the big dataset
-                    big_dataset = Dataset_Manager()
+                    """big_dataset = Dataset_Manager()
                     big_dataset.load_images(compute=False, name_dataset="big_dataset")
-                    big_dataset.update_label_by_filename(filename, "WT", new_filename)
+                    big_dataset.update_label_by_filename(filename, "WT", new_filename)"""
                     
                     # update model_performance file
                     # Get variables
@@ -2829,9 +2829,9 @@ class WormAnalysisApp:
                     shutil.move(str(unclassified_path), str(classified_path))
                     
                     # update label in the big dataset
-                    big_dataset = Dataset_Manager()
+                    """big_dataset = Dataset_Manager()
                     big_dataset.load_images(compute=False, name_dataset="big_dataset")
-                    big_dataset.update_label_by_filename(filename, "Mutant", new_filename)
+                    big_dataset.update_label_by_filename(filename, "Mutant", new_filename)"""
                     
                     # update model_performance file
                     # Get variables
@@ -2969,7 +2969,7 @@ class WormAnalysisApp:
         mutant). The prediction result is saved and displayed to the user.
         If the model fails, a default prediction is used.
         """
-        VERBOSE = False
+        VERBOSE = True
         # Step 0: Tell the user the analysis is starting
         self.prediction_label_2.configure(text=f"with a probability of : computing...")
         self.root.update() 
@@ -2986,7 +2986,7 @@ class WormAnalysisApp:
         # Step 2: Try to predict with model
         try:
             dataset = Dataset_Manager()
-            _, _, _, self.enhanced_image = dataset.load_images(visualize=True, bool_mask=mask)
+            _, _, _, self.enhanced_image = dataset.load_images(visualize=True, bool_mask=mask, verbose=True)
             dataset.set_features()
             self.prediction_label_2.configure(text=f"with a probability of : set features...")
             self.root.update() 
@@ -2995,9 +2995,9 @@ class WormAnalysisApp:
             pred = model.predict(dataset.get_features_selected()[0])[0]
             print(f"Model-derived prediction : {pred:.2f}")
             
-            big_dataset = Dataset_Manager()
+            """big_dataset = Dataset_Manager()
             big_dataset.load_images(compute=False, name_dataset="big_dataset")
-            big_dataset.merge_with(dataset)
+            big_dataset.merge_with(dataset)"""
 
             # Step 3: Update prediction in worm database
             self.worms_position.update_worm_prediction(id, pred)

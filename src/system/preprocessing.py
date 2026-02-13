@@ -7,6 +7,7 @@ import skimage as ski
 import networkx as nx
 from ultralytics import YOLO
 from skimage.morphology import binary_closing, disk
+import matplotlib.pyplot as plt
 
 from config import DATA_DIR, MODELS_DIR
 from src.system.graph_analysis import get_synapses_graph, get_backbone_graph
@@ -183,10 +184,10 @@ class Preprocessing():
             gamma = 10
             len_maxima = 0
             for g in [10, 30, 50, 70]:
-                img, local_max = self.find_local_maxima(image, g)
+                img, local_max = self.find_local_maxima(image, g, verbose=True)
                 maxima, G, median_width, diff_slice, diff_segment, NUMBER_OF_CORDS = get_synapses_graph(worm_mask, local_max, verbose=verbose)
                 maxima = list(map(tuple, maxima))
-                
+                 
                 if len(maxima) > len_maxima:
                     len_maxima = len(maxima)
                     gamma = g 
@@ -225,7 +226,7 @@ class Preprocessing():
             return 0, nx.Graph()
 
     # Utils for get_synapse_using_graph
-    def find_local_maxima(self, img: np.ndarray, var_gamma = 70) -> tuple:
+    def find_local_maxima(self, img: np.ndarray, var_gamma = 70, verbose = False) -> tuple:
         """
         Preprocesses an image to identify potential synapse locations by finding
         local maxima after applying a Frangi filter.
@@ -251,10 +252,32 @@ class Preprocessing():
             beta=0.5,
             gamma=var_gamma
         )
+
+        if verbose:
+            plt.figure(figsize=(8, 6))
+            plt.imshow(frangi_response, cmap='gray')  
+            plt.title('Frangi filter')
+            plt.axis('off')  
+            plt.show()
+
         frangi_response = ski.filters.apply_hysteresis_threshold(frangi_response, 0.01, 0.2)
+
+        if verbose: 
+            plt.figure(figsize=(8, 6))
+            plt.imshow(frangi_response, cmap='gray')  
+            plt.title('Hysteresis')
+            plt.axis('off')  
+            plt.show()
         
         # Clean up response
         frangi_response = self.remove_small_objects(frangi_response)
+
+        if verbose:
+            plt.figure(figsize=(8, 6))
+            plt.imshow(frangi_response, cmap='gray')  
+            plt.title('Remove small objects')
+            plt.axis('off')  
+            plt.show()
         
         # Keep line-like components
         labeled_image = ski.measure.label(frangi_response)
@@ -282,6 +305,13 @@ class Preprocessing():
         # Apply mask
         masked_img = img.copy()
         masked_img[~mask] = 0
+
+        if verbose:
+            plt.figure(figsize=(8, 6))
+            plt.imshow(masked_img, cmap='gray')  
+            plt.title('Get cords')
+            plt.axis('off')  
+            plt.show()
         
         # Find local maxima
         local_max = ski.feature.peak_local_max(
@@ -290,6 +320,14 @@ class Preprocessing():
             threshold_abs=0,
             exclude_border=False
         )
+
+        if verbose:
+            plt.figure(figsize=(8, 6))
+            plt.imshow(img, cmap='gray')  
+            plt.title('Worm with its puncta')
+            plt.scatter(local_max[:, 1], local_max[:, 0], c='red', s=1, marker='o', label='Local Maxima')
+            plt.axis('off')  
+            plt.show()
         
         return img, local_max
 

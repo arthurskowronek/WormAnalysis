@@ -56,6 +56,8 @@ def get_synapses_graph(worm_mask: np.ndarray,
     if worm_mask is None or worm_mask.size == 0 or maxima_coords is None or len(maxima_coords) == 0:
         if verbose: print("Warning: Empty worm mask or maxima coordinates provided")
         return DEFAULT_RETURN
+    else:
+        if verbose: print("Input validation passed")
         
     # -- 1 -- Skeletonize worm and get main branch
     skeleton = ski.morphology.skeletonize(worm_mask)
@@ -64,6 +66,8 @@ def get_synapses_graph(worm_mask: np.ndarray,
     if len(G.nodes) == 0: 
         if verbose: print("Warning: No nodes found in skeleton"); 
         return DEFAULT_RETURN
+    else:
+        if verbose: print("Skeletonization passed")
 
     # -- 2 -- Decompose skeleton into segments
     skel_path = _order_skeleton_points_skan(skeleton)
@@ -76,6 +80,8 @@ def get_synapses_graph(worm_mask: np.ndarray,
     if not centers: 
         if verbose: print("Warning: No segment centers found"); 
         return DEFAULT_RETURN
+    else:
+        if verbose: print("Segment decomposition passed")
 
     # -- 3 -- Calculate segment statistics
     distances = cdist(maxima_coords, centers)
@@ -84,6 +90,8 @@ def get_synapses_graph(worm_mask: np.ndarray,
     if len(counts) == 0: 
         if verbose: print("Warning: No valid segment counts"); 
         return DEFAULT_RETURN
+    else:
+        if verbose: print("Segment statistics passed")
     mean_count = np.mean(counts)
     diff_points = counts - mean_count
     measure_diff_points = np.sqrt(np.sum(diff_points**2))
@@ -105,6 +113,8 @@ def get_synapses_graph(worm_mask: np.ndarray,
     if not directions: 
         if verbose: print("Warning: No valid segment directions found"); 
         return DEFAULT_RETURN
+    else:
+        if verbose: print("Segment directions calculated")
 
     # -- 5 -- Decompose segments into slices
     # Set entire border to black
@@ -138,28 +148,29 @@ def get_synapses_graph(worm_mask: np.ndarray,
             labels_slice[i] = 3 + slice_offset  # Maps 0,1,2 to 3,4,5     
 
     # IMAGE_DIAPO
-    """plt.figure(figsize=(8, 8))
-    plt.imshow(worm_mask, cmap='gray')
-    for i in range(n_segments-1):
-        plt.plot([dic_segments[i][4][1], dic_segments[i][3][1]], [dic_segments[i][4][0], dic_segments[i][3][0]], 'g-', label=f'Segment {i}' if i == 0 else "")
-        start = dic_segments[i][0]
-        end = dic_segments[i+1][0]
-        plt.plot([start[1], end[1]], [start[0], end[0]], 'b--', label=f'Segment {i}' if i == 0 else "")
-        start = dic_segments[i][1]
-        end = dic_segments[i+1][1]
-        plt.plot([start[1], end[1]], [start[0], end[0]], 'b--', label=f'Segment {i}' if i == 0 else "")
-        start = dic_segments[i][2]
-        end = dic_segments[i+1][2]
-        plt.plot([start[1], end[1]], [start[0], end[0]], 'b--', label=f'Segment {i}' if i == 0 else "")
-        start = dic_segments[i][3]
-        end = dic_segments[i+1][3]
-        plt.plot([start[1], end[1]], [start[0], end[0]], 'b--', label=f'Segment {i}' if i == 0 else "")
-        start = dic_segments[i][4]
-        end = dic_segments[i+1][4]
-        plt.plot([start[1], end[1]], [start[0], end[0]], 'b--', label=f'Segment {i}' if i == 0 else "")
-    plt.plot([dic_segments[n_segments-1][4][1], dic_segments[n_segments-1][3][1]], [dic_segments[n_segments-1][4][0], dic_segments[n_segments-1][3][0]], 'g-', label=f'Segment {n_segments-1}' if n_segments-1 == 0 else "")
-    plt.title("Segment Directions with Perpendicular Lines (Both Directions)")
-    plt.show()"""
+    if verbose:
+        plt.figure(figsize=(8, 8))
+        plt.imshow(worm_mask, cmap='gray')
+        for i in range(n_segments-1):
+            plt.plot([dic_segments[i][4][1], dic_segments[i][3][1]], [dic_segments[i][4][0], dic_segments[i][3][0]], 'g-', label=f'Segment {i}' if i == 0 else "")
+            start = dic_segments[i][0]
+            end = dic_segments[i+1][0]
+            plt.plot([start[1], end[1]], [start[0], end[0]], 'b--', label=f'Segment {i}' if i == 0 else "")
+            start = dic_segments[i][1]
+            end = dic_segments[i+1][1]
+            plt.plot([start[1], end[1]], [start[0], end[0]], 'b--', label=f'Segment {i}' if i == 0 else "")
+            start = dic_segments[i][2]
+            end = dic_segments[i+1][2]
+            plt.plot([start[1], end[1]], [start[0], end[0]], 'b--', label=f'Segment {i}' if i == 0 else "")
+            start = dic_segments[i][3]
+            end = dic_segments[i+1][3]
+            plt.plot([start[1], end[1]], [start[0], end[0]], 'b--', label=f'Segment {i}' if i == 0 else "")
+            start = dic_segments[i][4]
+            end = dic_segments[i+1][4]
+            plt.plot([start[1], end[1]], [start[0], end[0]], 'b--', label=f'Segment {i}' if i == 0 else "")
+        plt.plot([dic_segments[n_segments-1][4][1], dic_segments[n_segments-1][3][1]], [dic_segments[n_segments-1][4][0], dic_segments[n_segments-1][3][0]], 'g-', label=f'Segment {n_segments-1}' if n_segments-1 == 0 else "")
+        plt.title("Segment Directions with Perpendicular Lines (Both Directions)")
+        plt.show()
 
     # -- 6 -- Calculate segment statistics
     Nb_slice = np.zeros(6, dtype=int)
@@ -219,6 +230,8 @@ def get_synapses_graph(worm_mask: np.ndarray,
     if len(maxima) == 0: 
         if verbose: print("Warning: No valid maxima points found in skeleton"); 
         return DEFAULT_RETURN
+    else: 
+        if verbose: print("Maxima points found in skeleton")
                 
     return maxima, G, median_width, measure_diff_slice, measure_diff_points, NUMBER_OF_CORDS
 

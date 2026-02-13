@@ -217,6 +217,9 @@ class Dataset_Manager:
                         new_data.number_of_cords = NUMBER_OF_CORDS
                         self.add_data(new_data)
 
+                        if verbose:
+                            new_data.print_data()
+
                         if test_mode and len(self.data) >= 2:
                             break
 
@@ -366,25 +369,38 @@ class Dataset_Manager:
             Tuple[np.ndarray, list]: A tuple containing a numpy array of the
                                      selected features and a list of their names.
         """
+        print("--- DEBUG: Dataset_Manager.get_features_selected called ---")
         features = []
+        print(f"--- DEBUG: Total items in self.data: {len(self.data)}")
         
-        for item in self.data:
+        for i, item in enumerate(self.data):
             if item.coiled == False:
-                features.append(item.get_features_selected()[0])
+                # print(f"--- DEBUG: Item {i} ({item.filename}) is NOT coiled. Getting features...")
+                feat, _ = item.get_features_selected()
+                features.append(feat)
+            else:
+                print(f"--- DEBUG: Item {i} ({item.filename}) IS coiled. Skipping.")
    
         features = np.array(features)
+        print(f"--- DEBUG: Final features shape: {features.shape}")
+        
         feature_names = self._get_feature_names_selected()
+        print(f"--- DEBUG: Feature names retrieved: {feature_names}")
         
         return features, feature_names
     
     def _get_feature_names_selected(self):
-        for item in self.data:
+        print("--- DEBUG: _get_feature_names_selected called ---")
+        for i, item in enumerate(self.data):
             try:
                 fn = item.get_features_selected()[1]
                 if fn is not None and len(fn) > 0:
+                    print(f"--- DEBUG: Found feature names in item {i} ({item.filename})")
                     return fn
-            except Exception:
+            except Exception as e:
+                print(f"--- DEBUG: Exception getting feature names from item {i}: {e}")
                 continue
+        print("--- DEBUG: No feature names found in any item!")
         raise ValueError("No feature names found (no non-coiled item with selected features).")
     
     def set_features(self, 
@@ -475,10 +491,8 @@ class Dataset_Manager:
             indices_coiled = self.get_coiled_worms()
             features, feature_names, y = feature_extractor._process_features(y, indices_coiled)
 
-            # handle NaNs then scale
+            # handle NaNs 
             if features.shape[0] > 0:
-                scaler = StandardScaler()
-                features = scaler.fit_transform(features)
                 features = np.nan_to_num(features)
             else:
                 if verbose:

@@ -147,7 +147,11 @@ class FeatureExtractor:
             number_of_cords = dataset.data[i].number_of_cords
             measure_diff_slice = dataset.data[i].diff_slice
             measure_diff_segment = dataset.data[i].diff_segment
-            image_features.extend([measure_diff_slice, measure_diff_segment, len(component)/number_of_cords])
+            if number_of_cords == 0:
+                image_features.extend([measure_diff_slice, measure_diff_segment, 0])
+                print("[WARNING]Number of cords is 0")
+            else:
+                image_features.extend([measure_diff_slice, measure_diff_segment, len(component)/number_of_cords])
 
             # Add features to basic_features    
             basic_features.append(image_features)

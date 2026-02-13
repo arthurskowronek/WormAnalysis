@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 from pathlib import Path
+import uuid
 
 # Load images
 DIRECTORY = Path("data/images_to_transform")
@@ -22,7 +23,7 @@ for i, image_path in enumerate(DIRECTORY.glob("*.tif")):
         image_normalized = cv2.normalize(image, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
 
     # Save image
-    filename = image_path.stem + ".png" 
+    filename = str(uuid.uuid4()) + ".png" 
     if TYPE == "Segmentation":
         new_path = Path("data/images_to_annotate_for_segmentation") / filename
     elif TYPE == "Detection":
