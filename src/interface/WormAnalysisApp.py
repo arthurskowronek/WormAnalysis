@@ -2992,8 +2992,16 @@ class WormAnalysisApp:
             self.root.update() 
 
             model, _ = dataset.get_model(model_name = str(self.name_model.get()))
-            pred = model.predict(dataset.get_features_selected()[0])[0]
-            print(f"Model-derived prediction : {pred:.2f}")
+            
+            # Use predict_proba to get confidence score
+            try:
+                # Probability of being Mutant (class 1)
+                pred = model.predict_proba(dataset.get_features_selected()[0])[0][1]
+            except Exception:
+                # Fallback if predict_proba is not available
+                pred = float(model.predict(dataset.get_features_selected()[0])[0])
+            
+            print(f"Model-derived prediction (Mutant probability): {pred:.2f}")
             
             """big_dataset = Dataset_Manager()
             big_dataset.load_images(compute=False, name_dataset="big_dataset")
@@ -3510,6 +3518,20 @@ class WormAnalysisApp:
                                  highlightbackground=bg_color) # Try to blend button
             full_btn.pack(side=tk.LEFT, padx=10)
 
+            # Autostretch Checkbox
+            if not hasattr(self, "autostretch_var"):
+                self.autostretch_var = tk.BooleanVar(value=False)
+            
+            def toggle_autostretch():
+                if self.autostretch_var.get():
+                    self.auto_adjust_contrast()
+            
+            autostretch_chk = tk.Checkbutton(button_frame, text="Autostretch", variable=self.autostretch_var,
+                                             command=toggle_autostretch,
+                                             bg=bg_color, fg=text_color, selectcolor=bg_color,
+                                             activebackground=bg_color, activeforeground=text_color)
+            autostretch_chk.pack(side=tk.LEFT, padx=10)
+
             # Labels and scales: set from_/to to the image's integer bounds
             vmin_label = tk.Label(slider_frame, text="vmin", bg=bg_color, fg=text_color) # Add colors
             vmin_label.grid(row=0, column=0, padx=5)
@@ -3677,6 +3699,27 @@ class WormAnalysisApp:
             if img_array is None:
                 return
 
+            # --- Autostretch Logic ---
+            if getattr(self, "autostretch_var", None) and self.autostretch_var.get():
+                 # Avoid recursively calling update_image_and_histogram if we just called it
+                 # self.auto_adjust_contrast() calls update_image_and_histogram
+                 # But we can just duplicate the simplified logic here or call a helper that DOESNT call update
+                 try:
+                     arr_flat = img_array.ravel()
+                     if arr_flat.size > 0:
+                        v_auto_min = float(np.percentile(arr_flat, 0.5))
+                        v_auto_max = float(np.percentile(arr_flat, 99.5))
+                        if v_auto_max <= v_auto_min:
+                            v_auto_max = v_auto_min + 1.0
+                        
+                        # Update variables directly
+                        if getattr(self, "vmin_var", None): self.vmin_var.set(v_auto_min)
+                        if getattr(self, "vmax_var", None): self.vmax_var.set(v_auto_max)
+                        # We will let the slider update below handle the visual slider
+                 except:
+                     pass
+            # -------------------------
+
             # get current vmin/vmax (if not set, compute from array)
             if getattr(self, "vmin_var", None) is None or getattr(self, "vmax_var", None) is None:
                 vmin_val = float(np.min(img_array))
@@ -3786,10 +3829,13 @@ class WormAnalysisApp:
                     self.vmin_var.set(v_auto_min)
                 if getattr(self, "vmax_var", None):
                     self.vmax_var.set(v_auto_max)
-                if getattr(self, "vmin_slider", None):
-                    self.vmin_slider.set(int(round(v_auto_min)))
-                if getattr(self, "vmax_slider", None):
-                    self.vmax_slider.set(int(round(v_auto_max)))
+                # Update sliders if they exist (sync with vars)
+                # Only if NOT dragging, OR if autostretch is ON (override user)
+                if not getattr(self, "_contrast_slider_active", False) or (getattr(self, "autostretch_var", None) and self.autostretch_var.get()):
+                    if getattr(self, "vmin_slider", None):
+                        self.vmin_slider.set(int(round(v_auto_min)))
+                    if getattr(self, "vmax_slider", None):
+                        self.vmax_slider.set(int(round(v_auto_max)))
             except Exception as e:
                 print("[auto_adjust] failed to set sliders/vars:", e)
 
@@ -5193,6 +5239,11 @@ class WormAnalysisApp:
         self.root.bind("<Down>", lambda event: self.move_microscope_relative('down'))
         # Bind spacebar to next worm (using root to be consistent with arrow keys)
         self.root.bind("<space>", lambda event: self.go_to_next_worm())
+        # Bind Return key to next worm
+        self.root.bind("<Return>", lambda event: self.go_to_next_worm())
+        # Bind all letter keys to next worm
+        for char in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ":
+            self.root.bind(char, lambda event: self.go_to_next_worm())
 
         """self.main_content.focus_set()  # Make sure the frame has focus to capture key events
         self.main_content.bind("<Left>", lambda event: self.go_to_last_worm())
